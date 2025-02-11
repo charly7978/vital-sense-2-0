@@ -1,16 +1,17 @@
-
 import FFT from 'fft.js';
 
 export class SignalProcessor {
-  private fft: any;
-  private readonly sampleRate = 30; // 30 fps
-  
-  constructor(size: number) {
-    const fftSize = Math.pow(2, Math.ceil(Math.log2(Math.max(size, 2))));
-    this.fft = new FFT(fftSize);
+  private readonly windowSize: number;
+  private calibrationConstants: any = {};
+
+  constructor(windowSize: number) {
+    this.windowSize = windowSize;
   }
 
-  // Implementación mejorada del filtro paso bajo con ventana Hamming
+  updateCalibrationConstants(calibrationData: any) {
+    this.calibrationConstants = calibrationData.calibration_constants || {};
+  }
+
   lowPassFilter(signal: number[], cutoffFreq: number): number[] {
     const filtered = [];
     const rc = 1.0 / (cutoffFreq * 2 * Math.PI);
@@ -42,11 +43,11 @@ export class SignalProcessor {
     return filtered;
   }
 
-  // Análisis FFT mejorado para detección de frecuencia cardíaca
   performFFT(signal: number[]): { frequencies: number[], magnitudes: number[] } {
-    const phasors = this.fft.createComplexArray();
+    const fft = new FFT(Math.pow(2, Math.ceil(Math.log2(Math.max(signal.length, 2)))));
+    const phasors = fft.createComplexArray();
     const paddedSignal = [...signal];
-    while (paddedSignal.length < this.fft.size) {
+    while (paddedSignal.length < fft.size) {
       paddedSignal.push(0);
     }
     
@@ -56,25 +57,24 @@ export class SignalProcessor {
       paddedSignal[i] *= hann;
     }
     
-    this.fft.realTransform(phasors, paddedSignal);
+    fft.realTransform(phasors, paddedSignal);
     
     const frequencies: number[] = [];
     const magnitudes: number[] = [];
     
     // Análisis de frecuencias relevantes para el ritmo cardíaco (0.5-4 Hz)
-    const minFreqIdx = Math.floor(0.5 * this.fft.size / this.sampleRate);
-    const maxFreqIdx = Math.ceil(4 * this.fft.size / this.sampleRate);
+    const minFreqIdx = Math.floor(0.5 * fft.size / this.sampleRate);
+    const maxFreqIdx = Math.ceil(4 * fft.size / this.sampleRate);
     
     for (let i = minFreqIdx; i < maxFreqIdx; i++) {
-      frequencies.push((i * this.sampleRate) / this.fft.size);
+      frequencies.push((i * this.sampleRate) / fft.size);
       // Calcular magnitud con corrección de amplitud
-      magnitudes.push(2 * Math.sqrt(phasors[2*i]**2 + phasors[2*i+1]**2) / this.fft.size);
+      magnitudes.push(2 * Math.sqrt(phasors[2*i]**2 + phasors[2*i+1]**2) / fft.size);
     }
     
     return { frequencies, magnitudes };
   }
 
-  // Implementación real del cálculo de SpO2 usando el método de ratio-of-ratios
   calculateSpO2(redSignal: number[], irSignal: number[]): number {
     if (redSignal.length !== irSignal.length || redSignal.length < 2) return 0;
     
@@ -95,7 +95,6 @@ export class SignalProcessor {
     return Math.min(Math.max(spo2, 70), 100);
   }
 
-  // Análisis avanzado de HRV para detección de arritmias
   analyzeHRV(intervals: number[]): {
     hasArrhythmia: boolean;
     type: string;
@@ -141,22 +140,9 @@ export class SignalProcessor {
     return { hasArrhythmia, type, sdnn, rmssd };
   }
 
-  private calculateRRVariability(intervals: number[]): number {
-    if (intervals.length < 2) return 0;
-    
-    const differences = [];
-    for (let i = 1; i < intervals.length; i++) {
-      differences.push(Math.abs(intervals[i] - intervals[i-1]));
-    }
-    
-    const meanDiff = differences.reduce((a, b) => a + b, 0) / differences.length;
-    return meanDiff / (intervals.reduce((a, b) => a + b, 0) / intervals.length);
-  }
-
-  // Estimación de presión arterial basada en características PPG validadas clínicamente
   estimateBloodPressure(signal: number[], peakTimes: number[]): { 
-    systolic: number, 
-    diastolic: number 
+    systolic: number;
+    diastolic: number;
   } {
     if (peakTimes.length < 2) return { systolic: 0, diastolic: 0 };
     
@@ -192,6 +178,64 @@ export class SignalProcessor {
     };
   }
 
+  estimateBloodPressureWithCalibration(
+    signal: number[], 
+    peakTimes: number[],
+    calibrationData: any
+  ): { 
+    systolic: number;
+    diastolic: number;
+  } {
+    // Use calibration data to improve BP estimation
+    const baseBP = this.estimateBloodPressure(signal, peakTimes);
+    const calibrationFactor = this.calculateCalibrationFactor(calibrationData);
+    
+    return {
+      systolic: Math.round(baseBP.systolic * calibrationFactor),
+      diastolic: Math.round(baseBP.diastolic * calibrationFactor)
+    };
+  }
+
+  private calculateCalibrationFactor(calibrationData: any): number {
+    // Simple calibration factor based on reference values
+    const referenceSystolic = calibrationData.systolic || 120;
+    const estimatedSystolic = 120; // Default estimation
+    return referenceSystolic / estimatedSystolic;
+  }
+
+  analyzeSignalQuality(signal: number[]): number {
+    if (signal.length < 2) return 0;
+    
+    // Calcular SNR (Signal-to-Noise Ratio)
+    const mean = signal.reduce((a, b) => a + b, 0) / signal.length;
+    const variance = signal.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / signal.length;
+    const standardDeviation = Math.sqrt(variance);
+    
+    // Análisis de ruido
+    const noiseLevel = this.calculateNoiseLevel(signal);
+    
+    // Calcular calidad basada en múltiples factores
+    const snrQuality = Math.min(standardDeviation / mean, 1);
+    const noiseQuality = Math.max(1 - noiseLevel, 0);
+    
+    // Combinar métricas de calidad
+    const quality = (snrQuality + noiseQuality) / 2;
+    
+    return Math.min(Math.max(quality, 0), 1);
+  }
+
+  private calculateRRVariability(intervals: number[]): number {
+    if (intervals.length < 2) return 0;
+    
+    const differences = [];
+    for (let i = 1; i < intervals.length; i++) {
+      differences.push(Math.abs(intervals[i] - intervals[i-1]));
+    }
+    
+    const meanDiff = differences.reduce((a, b) => a + b, 0) / differences.length;
+    return meanDiff / (intervals.reduce((a, b) => a + b, 0) / intervals.length);
+  }
+
   private extractWaveformFeatures(signal: number[]): {
     dicroticNotchHeight: number;
     dicroticNotchTime: number;
@@ -219,28 +263,6 @@ export class SignalProcessor {
     };
   }
 
-  // Nuevo método para análisis de calidad de señal
-  analyzeSignalQuality(signal: number[]): number {
-    if (signal.length < 2) return 0;
-    
-    // Calcular SNR (Signal-to-Noise Ratio)
-    const mean = signal.reduce((a, b) => a + b, 0) / signal.length;
-    const variance = signal.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / signal.length;
-    const standardDeviation = Math.sqrt(variance);
-    
-    // Análisis de ruido
-    const noiseLevel = this.calculateNoiseLevel(signal);
-    
-    // Calcular calidad basada en múltiples factores
-    const snrQuality = Math.min(standardDeviation / mean, 1);
-    const noiseQuality = Math.max(1 - noiseLevel, 0);
-    
-    // Combinar métricas de calidad
-    const quality = (snrQuality + noiseQuality) / 2;
-    
-    return Math.min(Math.max(quality, 0), 1);
-  }
-
   private calculateNoiseLevel(signal: number[]): number {
     // Calcular diferencias consecutivas para estimar ruido
     const differences = [];
@@ -253,4 +275,6 @@ export class SignalProcessor {
     
     return meanDiff / maxSignal;
   }
+
+  private readonly sampleRate = 30;
 }

@@ -26,12 +26,18 @@ export interface CalibrationData {
   calibrationDate?: Date;
 }
 
-export interface UserCalibration extends CalibrationData {
+// Updated to match database schema
+export interface UserCalibration {
   id: string;
-  userId: string;
-  isActive: boolean;
-  calibrationConstants: any;
-  lastCalibrationQuality: number;
-  calibrationHistory: any[];
+  age: number;
+  height: number;
+  weight: number;
+  systolic: number;
+  diastolic: number;
+  deviceType: string;
+  is_active: boolean;
+  calibration_constants: any;
+  calibration_history: any[];
+  last_calibration_quality: number;
+  calibration_date?: string;
 }
-

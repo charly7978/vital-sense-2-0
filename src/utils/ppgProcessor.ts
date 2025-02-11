@@ -1,4 +1,3 @@
-
 import { VitalReading, UserCalibration } from './types';
 import { BeepPlayer } from './audioUtils';
 import { SignalProcessor } from './signalProcessing';
@@ -221,4 +220,3 @@ export class PPGProcessor {
     return this.readings;
   }
 }
-
