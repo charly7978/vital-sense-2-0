@@ -1,4 +1,3 @@
-
 export interface VitalReading {
   [key: string]: number;
   timestamp: number;
@@ -30,3 +29,12 @@ export interface SensitivitySettings {
   peakDetection: number;
 }
 
+export interface CalibrationSettings {
+  [key: string]: {
+    value: number;
+    min: number;
+    max: number;
+    step: number;
+    description: string;
+  };
+}

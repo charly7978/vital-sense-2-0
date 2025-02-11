@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import CameraView from './CameraView';
 import VitalChart from './VitalChart';
 import SensitivityControls from './SensitivityControls';
+import CalibrationPanel from './CalibrationPanel';
 import { PPGProcessor } from '../utils/ppgProcessor';
 import { BeepPlayer } from '../utils/audioUtils';
 import type { VitalReading, PPGData, SensitivitySettings } from '../utils/types';
@@ -42,6 +43,21 @@ const HeartRateMonitor: React.FC = () => {
   const handleSensitivityChange = (newSettings: SensitivitySettings) => {
     setSensitivitySettings(newSettings);
     ppgProcessor.updateSensitivitySettings(newSettings);
+  };
+
+  const handleCalibrationChange = (key: string, value: number) => {
+    const newSettings = {
+      ...sensitivitySettings,
+      [key]: value
+    };
+    
+    setSensitivitySettings(newSettings);
+    ppgProcessor.updateSensitivitySettings(newSettings);
+    
+    toast({
+      title: "Calibración actualizada",
+      description: `${key} ajustado a ${value}`,
+    });
   };
 
   const handleFrame = useCallback((imageData: ImageData) => {
@@ -256,6 +272,11 @@ const HeartRateMonitor: React.FC = () => {
         <SensitivityControls 
           settings={sensitivitySettings}
           onSettingsChange={handleSensitivityChange}
+        />
+
+        <CalibrationPanel 
+          settings={defaultSensitivitySettings}
+          onSettingChange={handleCalibrationChange}
         />
 
         <div className="flex justify-center">

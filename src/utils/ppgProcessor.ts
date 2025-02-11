@@ -34,9 +34,13 @@ export class PPGProcessor {
     this.signalNormalizer = new SignalNormalizer();
   }
 
-  updateSensitivitySettings(settings: SensitivitySettings) {
-    this.sensitivitySettings = settings;
-    console.log('Updated sensitivity settings:', settings);
+  updateSensitivitySettings(settings: any) {
+    Object.assign(this.sensitivitySettings, settings);
+    this.signalProcessor.updateKalmanParameters(
+      settings.kalmanQ || 0.1,
+      settings.kalmanR || 1
+    );
+    console.log('Updated calibration settings:', settings);
   }
 
   processFrame(imageData: ImageData): PPGData | null {
