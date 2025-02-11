@@ -17,7 +17,7 @@ export class BeepPlayer {
       this.gainNode.gain.value = 0;
       console.log('Audio context initialized successfully');
     } catch (error) {
-      console.error('Error al inicializar contexto de audio:', error);
+      console.warn('Error initializing audio context:', error);
     }
   }
 
@@ -29,15 +29,17 @@ export class BeepPlayer {
 
     try {
       if (!this.audioContext || !this.gainNode) {
-        console.error('Audio context still not available after initialization');
+        console.warn('Audio context still not available after initialization');
         return;
       }
 
+      // Ensure audioContext is running
       if (this.audioContext.state !== 'running') {
         console.log('Resuming audio context');
         await this.audioContext.resume();
       }
 
+      // Cleanup previous oscillator
       if (this.oscillator) {
         this.oscillator.disconnect();
         this.oscillator = null;
@@ -45,9 +47,11 @@ export class BeepPlayer {
 
       this.oscillator = this.audioContext.createOscillator();
       
+      // Configure frequencies for different sound types
       switch (type) {
         case 'heartbeat':
-          this.oscillator.frequency.value = 60;
+          // Lower frequency for more realistic heartbeat sound
+          this.oscillator.frequency.value = 40;
           break;
         case 'warning':
           this.oscillator.frequency.value = 440;
@@ -64,10 +68,21 @@ export class BeepPlayer {
       this.gainNode.gain.setValueAtTime(0, now);
       
       if (type === 'heartbeat') {
-        this.gainNode.gain.linearRampToValueAtTime(0.3, now + 0.01); // Aumentado de 0.1
+        // Create a more realistic "lub-dub" heartbeat sound
+        // First beat (lub)
+        this.gainNode.gain.linearRampToValueAtTime(0.5, now + 0.01);
         this.gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+        
+        // Short pause
+        this.gainNode.gain.linearRampToValueAtTime(0.001, now + 0.15);
+        
+        // Second beat (dub)
+        this.gainNode.gain.linearRampToValueAtTime(0.3, now + 0.16);
+        this.gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+        
         this.oscillator.start(now);
-        this.oscillator.stop(now + 0.1);
+        this.oscillator.stop(now + 0.3);
+        
         console.log('Playing heartbeat sound');
       } else if (type === 'warning') {
         this.gainNode.gain.linearRampToValueAtTime(0.3, now + 0.01);
@@ -81,6 +96,7 @@ export class BeepPlayer {
         this.oscillator.stop(now + 0.15);
       }
 
+      // Cleanup oscillator after sound is complete
       setTimeout(() => {
         if (this.oscillator) {
           this.oscillator.disconnect();
@@ -88,8 +104,7 @@ export class BeepPlayer {
         }
       }, 500);
     } catch (error) {
-      console.error('Error al reproducir beep:', error);
+      console.warn('Error playing beep:', error);
     }
   }
 }
-
