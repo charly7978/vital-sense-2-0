@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { Heart, Droplets, Activity, AlertTriangle } from 'lucide-react';
 import CameraView from './CameraView';
@@ -26,18 +25,17 @@ const HeartRateMonitor: React.FC = () => {
         try {
           const { error } = await supabase
             .from('vital_signs')
-            .insert([
-              {
-                heart_rate: bpm,
-                spo2: spo2,
-                systolic: systolic,
-                diastolic: diastolic,
-                has_arrhythmia: hasArrhythmia,
-                arrhythmia_details: { type: arrhythmiaType },
-                ppg_data: { readings: readings },
-                measurement_quality: 1.0
-              }
-            ]);
+            .insert({
+              heart_rate: bpm,
+              spo2: spo2,
+              systolic: systolic,
+              diastolic: diastolic,
+              has_arrhythmia: hasArrhythmia,
+              arrhythmia_details: { type: arrhythmiaType },
+              ppg_data: JSON.stringify({ readings }),
+              measurement_quality: 1.0,
+              user_id: (await supabase.auth.getUser()).data.user?.id
+            });
 
           if (error) {
             console.error('Error saving vital signs:', error);

@@ -1,5 +1,6 @@
 
 export interface VitalReading {
+  [key: string]: number;  // Add index signature to make it JSON compatible
   timestamp: number;
   value: number;
 }
