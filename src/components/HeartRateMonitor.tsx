@@ -1,5 +1,7 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Heart, Droplets, Activity, AlertTriangle } from 'lucide-react';
+import { useToast } from "@/hooks/use-toast";
 import CameraView from './CameraView';
 import VitalChart from './VitalChart';
 import { PPGProcessor } from '../utils/ppgProcessor';
@@ -17,31 +19,48 @@ const HeartRateMonitor: React.FC = () => {
   const [arrhythmiaType, setArrhythmiaType] = useState<string>('Normal');
   const [readings, setReadings] = useState<VitalReading[]>([]);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const { toast } = useToast();
 
   // Guardar las mediciones en Supabase
   useEffect(() => {
     const saveVitalSigns = async () => {
       if (bpm > 0 && spo2 > 0) {
         try {
+          const vitalSignsData = {
+            heart_rate: bpm,
+            spo2: spo2,
+            systolic: systolic,
+            diastolic: diastolic,
+            has_arrhythmia: hasArrhythmia,
+            arrhythmia_details: { type: arrhythmiaType },
+            ppg_data: JSON.stringify({ readings }),
+            measurement_quality: 1.0,
+          };
+
           const { error } = await supabase
             .from('vital_signs')
-            .insert({
-              heart_rate: bpm,
-              spo2: spo2,
-              systolic: systolic,
-              diastolic: diastolic,
-              has_arrhythmia: hasArrhythmia,
-              arrhythmia_details: { type: arrhythmiaType },
-              ppg_data: JSON.stringify({ readings }),
-              measurement_quality: 1.0,
-              user_id: (await supabase.auth.getUser()).data.user?.id
-            });
+            .insert(vitalSignsData);
 
           if (error) {
             console.error('Error saving vital signs:', error);
+            toast({
+              variant: "destructive",
+              title: "Error al guardar los signos vitales",
+              description: "Por favor, intenta nuevamente."
+            });
+          } else {
+            toast({
+              title: "Medición guardada",
+              description: "Los signos vitales se han registrado correctamente."
+            });
           }
         } catch (error) {
           console.error('Error in saveVitalSigns:', error);
+          toast({
+            variant: "destructive",
+            title: "Error inesperado",
+            description: "Ocurrió un error al procesar la medición."
+          });
         }
       }
     };
@@ -49,19 +68,28 @@ const HeartRateMonitor: React.FC = () => {
     if (isProcessing && bpm > 0) {
       saveVitalSigns();
     }
-  }, [bpm, spo2, systolic, diastolic, hasArrhythmia, arrhythmiaType, readings, isProcessing]);
+  }, [bpm, spo2, systolic, diastolic, hasArrhythmia, arrhythmiaType, readings, isProcessing, toast]);
 
   const handleFrame = useCallback((imageData: ImageData) => {
     setIsProcessing(true);
-    const vitals = ppgProcessor.processFrame(imageData);
-    setBpm(vitals.bpm);
-    setSpo2(vitals.spo2);
-    setSystolic(vitals.systolic);
-    setDiastolic(vitals.diastolic);
-    setHasArrhythmia(vitals.hasArrhythmia);
-    setArrhythmiaType(vitals.arrhythmiaType);
-    setReadings(ppgProcessor.getReadings());
-  }, []);
+    try {
+      const vitals = ppgProcessor.processFrame(imageData);
+      setBpm(vitals.bpm);
+      setSpo2(vitals.spo2);
+      setSystolic(vitals.systolic);
+      setDiastolic(vitals.diastolic);
+      setHasArrhythmia(vitals.hasArrhythmia);
+      setArrhythmiaType(vitals.arrhythmiaType);
+      setReadings(ppgProcessor.getReadings());
+    } catch (error) {
+      console.error('Error processing frame:', error);
+      toast({
+        variant: "destructive",
+        title: "Error en el procesamiento",
+        description: "Error al procesar la imagen de la cámara."
+      });
+    }
+  }, [toast]);
 
   return (
     <div className="space-y-6">
