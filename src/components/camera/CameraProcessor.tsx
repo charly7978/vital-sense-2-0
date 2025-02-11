@@ -16,12 +16,22 @@ const CameraProcessor: React.FC<CameraProcessorProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const processingRef = useRef(false);
+  const frameCountRef = useRef(0);
 
   useEffect(() => {
     let animationFrameId: number;
+    const frameInterval = 1000 / 30; // Target 30 FPS
+    let lastFrameTime = 0;
 
-    const processFrame = () => {
+    const processFrame = (timestamp: number) => {
       if (!isActive || !cameraInitialized || processingRef.current) {
+        animationFrameId = requestAnimationFrame(processFrame);
+        return;
+      }
+
+      // Control frame rate
+      if (timestamp - lastFrameTime < frameInterval) {
+        animationFrameId = requestAnimationFrame(processFrame);
         return;
       }
 
@@ -34,12 +44,21 @@ const CameraProcessor: React.FC<CameraProcessorProps> = ({
           processingRef.current = true;
 
           try {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            context.drawImage(video, 0, 0);
+            // Update canvas dimensions if needed
+            if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+              canvas.width = video.videoWidth;
+              canvas.height = video.videoHeight;
+            }
 
+            context.drawImage(video, 0, 0);
             const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-            onFrame(imageData);
+            
+            frameCountRef.current++;
+            if (frameCountRef.current % 2 === 0) { // Process every other frame
+              onFrame(imageData);
+            }
+
+            lastFrameTime = timestamp;
           } catch (error) {
             console.error('Error processing frame:', error);
           } finally {
@@ -48,13 +67,11 @@ const CameraProcessor: React.FC<CameraProcessorProps> = ({
         }
       }
 
-      if (isActive && cameraInitialized) {
-        animationFrameId = requestAnimationFrame(processFrame);
-      }
+      animationFrameId = requestAnimationFrame(processFrame);
     };
 
     if (isActive && cameraInitialized) {
-      processFrame();
+      animationFrameId = requestAnimationFrame(processFrame);
     }
 
     return () => {

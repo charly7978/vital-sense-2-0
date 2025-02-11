@@ -6,6 +6,7 @@ import CameraProcessor from './camera/CameraProcessor';
 import CameraDisplay from './camera/CameraDisplay';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface CameraViewProps {
   onFrame: (imageData: ImageData) => void;
@@ -19,6 +20,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   const [isAndroid, setIsAndroid] = useState(false);
   const [cameraInitialized, setCameraInitialized] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     const userAgent = window.navigator.userAgent.toLowerCase();
@@ -50,6 +52,11 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
       console.log('Camera stopped successfully');
     } catch (error) {
       console.error('Error stopping camera:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Error al detener la cámara"
+      });
     }
   };
 
@@ -61,10 +68,17 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
     streamRef.current = stream;
     if (webcamRef.current && webcamRef.current.video) {
       webcamRef.current.video.srcObject = stream;
+      // Ensure video is playing
+      webcamRef.current.video.play().catch(console.error);
     }
     setCameraInitialized(true);
     console.log('Camera started successfully');
     setError(null);
+    
+    toast({
+      title: "Cámara iniciada",
+      description: "La cámara se ha iniciado correctamente"
+    });
   };
 
   useEffect(() => {
@@ -76,19 +90,6 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
       stopCamera();
     };
   }, [isActive]);
-
-  if (error) {
-    return (
-      <div className="p-4">
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            {error}
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
 
   return (
     <>
