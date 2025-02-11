@@ -1,7 +1,8 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Heart, Droplets, Activity, AlertTriangle } from 'lucide-react';
+import { Heart, Droplets, Activity, AlertTriangle, PlayCircle, StopCircle } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
 import CameraView from './CameraView';
 import VitalChart from './VitalChart';
 import { PPGProcessor } from '../utils/ppgProcessor';
@@ -19,6 +20,7 @@ const HeartRateMonitor: React.FC = () => {
   const [arrhythmiaType, setArrhythmiaType] = useState<string>('Normal');
   const [readings, setReadings] = useState<VitalReading[]>([]);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [isStarted, setIsStarted] = useState<boolean>(false);
   const { toast } = useToast();
 
   // Guardar las mediciones en Supabase
@@ -91,6 +93,16 @@ const HeartRateMonitor: React.FC = () => {
     }
   }, [toast]);
 
+  const toggleMeasurement = () => {
+    setIsStarted(!isStarted);
+    if (!isStarted) {
+      toast({
+        title: "Iniciando medición",
+        description: "Por favor, mantenga su dedo frente a la cámara."
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -148,9 +160,30 @@ const HeartRateMonitor: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4 shadow-lg">
-        <CameraView onFrame={handleFrame} />
+      <div className="flex justify-center mb-4">
+        <Button
+          onClick={toggleMeasurement}
+          className={`px-6 py-3 text-lg ${isStarted ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}
+        >
+          {isStarted ? (
+            <>
+              <StopCircle className="mr-2" />
+              Detener Medición
+            </>
+          ) : (
+            <>
+              <PlayCircle className="mr-2" />
+              Iniciar Medición
+            </>
+          )}
+        </Button>
       </div>
+
+      {isStarted && (
+        <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4 shadow-lg">
+          <CameraView onFrame={handleFrame} />
+        </div>
+      )}
       
       <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4 shadow-lg">
         <h3 className="text-lg font-medium mb-4 text-gray-100">Señal PPG en Tiempo Real</h3>
