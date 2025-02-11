@@ -13,7 +13,9 @@ interface CameraDisplayProps {
 }
 
 interface TrackWithTorch extends MediaStreamTrack {
-  applyConstraints(constraints: MediaTrackConstraints & { advanced?: { torch?: boolean }[] }): Promise<void>;
+  applyConstraints(constraints: MediaTrackConstraints & { 
+    advanced?: { torch?: boolean }[] 
+  }): Promise<void>;
 }
 
 const CameraDisplay: React.FC<CameraDisplayProps> = ({
@@ -24,11 +26,11 @@ const CameraDisplay: React.FC<CameraDisplayProps> = ({
   isAndroid,
 }) => {
   useEffect(() => {
-    const enableFlashlight = async () => {
-      if (!isAndroid || !isActive || !webcamRef.current?.video) return;
+    if (!isAndroid || !isActive || !webcamRef.current?.video?.srcObject) return;
 
+    const enableFlashlight = async () => {
       try {
-        const stream = webcamRef.current.video.srcObject as MediaStream;
+        const stream = webcamRef.current?.video?.srcObject as MediaStream;
         if (!stream) {
           console.log('No hay stream disponible para la linterna');
           return;
@@ -43,27 +45,22 @@ const CameraDisplay: React.FC<CameraDisplayProps> = ({
         await track.applyConstraints({
           advanced: [{ torch: true }]
         });
-        console.log('Linterna activada correctamente');
+        console.log('Linterna activada');
       } catch (error) {
         console.error('Error al activar la linterna:', error);
       }
     };
 
-    // Pequeña demora para asegurar que el stream esté listo
-    const timeoutId = setTimeout(() => {
-      enableFlashlight();
-    }, 1000);
+    const timeoutId = setTimeout(enableFlashlight, 1000);
 
     return () => {
       clearTimeout(timeoutId);
-      if (isAndroid && webcamRef.current?.video) {
-        const stream = webcamRef.current.video.srcObject as MediaStream;
-        const track = stream?.getVideoTracks()[0] as TrackWithTorch;
-        if (track) {
-          track.applyConstraints({
-            advanced: [{ torch: false }]
-          }).catch(console.error);
-        }
+      const stream = webcamRef.current?.video?.srcObject as MediaStream;
+      const track = stream?.getVideoTracks()[0] as TrackWithTorch;
+      if (track) {
+        track.applyConstraints({
+          advanced: [{ torch: false }]
+        }).catch(console.error);
       }
     };
   }, [isActive, isAndroid, webcamRef]);
@@ -89,7 +86,8 @@ const CameraDisplay: React.FC<CameraDisplayProps> = ({
             videoConstraints={{
               width: { ideal: 640 },
               height: { ideal: 480 },
-              facingMode: isAndroid ? 'environment' : 'user'
+              facingMode: isAndroid ? { exact: 'environment' } : 'user',
+              frameRate: { ideal: 30 }
             }}
           />
         )}

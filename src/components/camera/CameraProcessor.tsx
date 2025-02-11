@@ -18,13 +18,18 @@ const CameraProcessor: React.FC<CameraProcessorProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const processingRef = useRef(false);
   const { toast } = useToast();
+  const frameCountRef = useRef(0);
 
   useEffect(() => {
     let animationFrameId: number;
-    let isProcessing = false;
+    let lastProcessTime = 0;
+    const PROCESS_INTERVAL = 33; // ~30 FPS
 
     const processFrame = () => {
-      if (!isActive || !cameraInitialized || isProcessing) {
+      const now = Date.now();
+      
+      if (!isActive || !cameraInitialized || processingRef.current || 
+          now - lastProcessTime < PROCESS_INTERVAL) {
         animationFrameId = requestAnimationFrame(processFrame);
         return;
       }
@@ -38,18 +43,26 @@ const CameraProcessor: React.FC<CameraProcessorProps> = ({
         return;
       }
 
-      isProcessing = true;
+      processingRef.current = true;
+      lastProcessTime = now;
 
       try {
-        // Ensure canvas dimensions match video
+        // Asegurar que las dimensiones coincidan
         if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
           canvas.width = video.videoWidth;
           canvas.height = video.videoHeight;
-          console.log('Canvas dimensions actualizadas:', canvas.width, canvas.height);
+          console.log('Dimensiones de canvas actualizadas:', canvas.width, canvas.height);
         }
 
         context.drawImage(video, 0, 0);
         const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+        
+        frameCountRef.current++;
+        if (frameCountRef.current % 30 === 0) {
+          console.log('Procesando frame:', frameCountRef.current, 
+                      'Dimensiones:', canvas.width, 'x', canvas.height);
+        }
+        
         onFrame(imageData);
 
       } catch (error) {
@@ -60,7 +73,7 @@ const CameraProcessor: React.FC<CameraProcessorProps> = ({
           description: "Error al procesar imagen de la cámara"
         });
       } finally {
-        isProcessing = false;
+        processingRef.current = false;
       }
 
       animationFrameId = requestAnimationFrame(processFrame);

@@ -22,28 +22,30 @@ const CameraInitializer: React.FC<CameraInitializerProps> = ({
       try {
         if (!isActive) return;
 
-        // Stop any existing streams first
-        if (currentStream) {
-          currentStream.getTracks().forEach(track => track.stop());
-        }
-
-        // Request camera access with basic settings
-        const stream = await navigator.mediaDevices.getUserMedia({
+        const constraints = {
           video: {
             width: { ideal: 640 },
-            height: { ideal: 480 }
+            height: { ideal: 480 },
+            frameRate: { ideal: 30 }
           }
-        });
+        };
 
-        // Validate stream
-        if (!stream.getVideoTracks().length) {
-          throw new Error('No se encontró un track de video válido');
+        console.log('Intentando inicializar cámara con constraints:', constraints);
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        if (!stream) {
+          throw new Error('No se pudo obtener stream de la cámara');
         }
 
+        const videoTrack = stream.getVideoTracks()[0];
+        if (!videoTrack) {
+          throw new Error('No se encontró track de video');
+        }
+
+        console.log('Cámara inicializada exitosamente:', videoTrack.getSettings());
         currentStream = stream;
-        console.log('Cámara inicializada:', stream.getVideoTracks()[0].getSettings());
-        onError(null);
         onInitialized(stream);
+        onError(null);
 
         toast({
           title: "Cámara iniciada",
@@ -55,21 +57,20 @@ const CameraInitializer: React.FC<CameraInitializerProps> = ({
         onError('Error al iniciar la cámara. Por favor, verifica los permisos.');
         toast({
           variant: "destructive",
-          title: "Error",
-          description: "No se pudo iniciar la cámara. Verifica los permisos."
+          title: "Error de cámara",
+          description: error.message || "No se pudo iniciar la cámara"
         });
       }
     };
 
-    // Initialize camera when component becomes active
     if (isActive) {
+      console.log('Iniciando cámara...');
       initCamera();
     }
 
-    // Cleanup function
     return () => {
       if (currentStream) {
-        console.log('Limpiando streams de cámara');
+        console.log('Deteniendo streams de cámara');
         currentStream.getTracks().forEach(track => {
           track.stop();
           console.log('Track detenido:', track.label);
