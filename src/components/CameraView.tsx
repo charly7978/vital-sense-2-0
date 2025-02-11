@@ -15,6 +15,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [isAndroid, setIsAndroid] = useState(false);
+  const [cameraInitialized, setCameraInitialized] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
@@ -32,6 +33,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
       if (webcamRef.current?.stream) {
         webcamRef.current.stream.getTracks().forEach(track => track.stop());
       }
+      setCameraInitialized(false);
       console.log('Camera stopped successfully');
     } catch (error) {
       console.error('Error stopping camera:', error);
@@ -48,6 +50,11 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
         }
       }
 
+      // Solo inicializar la cámara si isActive es true
+      if (!isActive) {
+        return;
+      }
+
       const constraints: MediaStreamConstraints = {
         video: {
           facingMode: isAndroid ? 'environment' : 'user',
@@ -55,9 +62,8 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
           height: { ideal: 480 },
           ...(isAndroid && {
             advanced: [{
-              // En Android, intentamos habilitar la linterna
               torch: true
-            } as any] // Usamos 'any' aquí porque el tipo MediaTrackConstraints no incluye 'torch'
+            } as any]
           })
         }
       };
@@ -67,7 +73,6 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
       
       if (isAndroid) {
         const videoTrack = stream.getVideoTracks()[0];
-        // Intentamos habilitar la linterna después de obtener el stream
         try {
           await videoTrack.applyConstraints({
             advanced: [{ torch: true } as any]
@@ -82,6 +87,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
         webcamRef.current.video.srcObject = stream;
       }
       
+      setCameraInitialized(true);
       console.log('Camera started successfully');
       setError(null);
     } catch (error) {
@@ -91,22 +97,24 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   };
 
   useEffect(() => {
-    if (isActive) {
+    if (isActive && !cameraInitialized) {
       startCamera();
-    } else {
+    } else if (!isActive && cameraInitialized) {
       stopCamera();
     }
 
     return () => {
-      stopCamera();
+      if (cameraInitialized) {
+        stopCamera();
+      }
     };
-  }, [isActive, isAndroid]);
+  }, [isActive, isAndroid, cameraInitialized]);
 
   useEffect(() => {
     let animationFrameId: number;
 
     const processFrame = () => {
-      if (!isActive) return;
+      if (!isActive || !cameraInitialized) return;
 
       if (webcamRef.current && canvasRef.current) {
         const video = webcamRef.current.video;
@@ -127,12 +135,12 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
         }
       }
 
-      if (isActive) {
+      if (isActive && cameraInitialized) {
         animationFrameId = requestAnimationFrame(processFrame);
       }
     };
 
-    if (isActive) {
+    if (isActive && cameraInitialized) {
       processFrame();
     }
 
@@ -141,7 +149,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
         cancelAnimationFrame(animationFrameId);
       }
     };
-  }, [isActive, onFrame]);
+  }, [isActive, onFrame, cameraInitialized]);
 
   return (
     <div className="relative w-full max-w-md mx-auto">
@@ -157,15 +165,17 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
             <Camera className="w-8 h-8 text-gray-400" />
           </div>
         )}
-        <Webcam
-          ref={webcamRef}
-          className="w-full h-full object-cover"
-          videoConstraints={{
-            facingMode: isAndroid ? 'environment' : 'user',
-            width: 640,
-            height: 480
-          }}
-        />
+        {isActive && cameraInitialized && (
+          <Webcam
+            ref={webcamRef}
+            className="w-full h-full object-cover"
+            videoConstraints={{
+              facingMode: isAndroid ? 'environment' : 'user',
+              width: 640,
+              height: 480
+            }}
+          />
+        )}
         <canvas ref={canvasRef} className="hidden" />
       </div>
       
