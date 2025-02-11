@@ -77,7 +77,9 @@ export class PPGProcessor {
     // Detección de picos mejorada con validación de calidad
     if (this.isRealPeak(normalizedValue, now)) {
       console.log('Peak detected at:', now);
-      this.beepPlayer.playBeep();
+      this.beepPlayer.playBeep().catch(err => {
+        console.error('Error reproduciendo beep:', err);
+      });
       this.lastPeakTime = now;
       this.peakTimes.push(now);
       
@@ -200,6 +202,13 @@ export class PPGProcessor {
                   currentValue > avgSignal && 
                   currentValue > this.signalBuffer[this.signalBuffer.length - 2] &&
                   this.validatePeakShape(currentValue);
+    
+    if (isPeak) {
+      // Intentar reproducir el beep cuando se detecta un pico real
+      this.beepPlayer.playBeep().catch(err => {
+        console.error('Error reproduciendo beep:', err);
+      });
+    }
     
     return isPeak;
   }
