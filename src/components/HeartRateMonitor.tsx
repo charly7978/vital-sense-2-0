@@ -390,6 +390,8 @@ const HeartRateMonitor: React.FC = () => {
           onSettingsChange={handleSensitivityChange}
         />
 
+        <BPCalibrationForm />
+
         <CalibrationPanel 
           settings={defaultCalibrationSettings}
           onSettingChange={handleCalibrationChange}

@@ -50,6 +50,54 @@ export type Database = {
           },
         ]
       }
+      blood_pressure_calibration: {
+        Row: {
+          age: number | null
+          calibration_date: string | null
+          calibration_quality: number | null
+          created_at: string | null
+          diastolic_reference: number
+          environmental_conditions: Json | null
+          height: number | null
+          id: string
+          is_active: boolean | null
+          notes: string | null
+          systolic_reference: number
+          user_id: string | null
+          weight: number | null
+        }
+        Insert: {
+          age?: number | null
+          calibration_date?: string | null
+          calibration_quality?: number | null
+          created_at?: string | null
+          diastolic_reference: number
+          environmental_conditions?: Json | null
+          height?: number | null
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          systolic_reference: number
+          user_id?: string | null
+          weight?: number | null
+        }
+        Update: {
+          age?: number | null
+          calibration_date?: string | null
+          calibration_quality?: number | null
+          created_at?: string | null
+          diastolic_reference?: number
+          environmental_conditions?: Json | null
+          height?: number | null
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          systolic_reference?: number
+          user_id?: string | null
+          weight?: number | null
+        }
+        Relationships: []
+      }
       calibration_history: {
         Row: {
           calibration_id: string | null

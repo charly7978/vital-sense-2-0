@@ -56,3 +56,17 @@ export interface CalibrationSettings {
     description: string;
   };
 }
+
+export interface BPCalibrationData {
+  id?: string;
+  systolic_reference: number;
+  diastolic_reference: number;
+  age?: number;
+  weight?: number;
+  height?: number;
+  calibration_date?: string;
+  is_active?: boolean;
+  calibration_quality?: number;
+  notes?: string;
+  environmental_conditions?: Record<string, any>;
+}
