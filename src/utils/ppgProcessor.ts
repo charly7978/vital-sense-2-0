@@ -186,43 +186,63 @@ export class PPGProcessor {
   }
 
   private isRealPeak(currentValue: number, now: number): boolean {
+    // No permitir picos demasiado cercanos (previene dobles detecciones)
     if (now - this.lastPeakTime < this.minPeakDistance) {
       return false;
     }
 
-    // Detección de picos adaptativa mejorada
-    const avgSignal = this.signalBuffer.reduce((a, b) => a + b, 0) / this.signalBuffer.length;
-    this.adaptiveThreshold = this.adaptiveThreshold * 0.95 + Math.abs(avgSignal) * 0.05;
-    
-    // Umbral dinámico basado en la variabilidad de la señal
-    const threshold = this.adaptiveThreshold * 0.7;
-    
-    // Validación adicional de calidad de pico usando derivadas
-    const isPeak = currentValue > threshold && 
-                  currentValue > avgSignal && 
+    // Necesitamos al menos 3 muestras para detectar un pico
+    if (this.signalBuffer.length < 3) {
+      return false;
+    }
+
+    // Calcular promedio móvil para referencia
+    const recentValues = this.signalBuffer.slice(-5);
+    const avgValue = recentValues.reduce((a, b) => a + b, 0) / recentValues.length;
+
+    // Ajustar umbral dinámicamente basado en la amplitud de la señal
+    const threshold = Math.max(avgValue * 0.6, this.adaptiveThreshold * 0.7);
+
+    // Verificar que sea un pico real comparando con valores adyacentes
+    const isPeak = currentValue > threshold &&
                   currentValue > this.signalBuffer[this.signalBuffer.length - 2] &&
+                  currentValue > this.signalBuffer[this.signalBuffer.length - 3] &&
                   this.validatePeakShape(currentValue);
-    
+
     if (isPeak) {
-      // Intentar reproducir el beep cuando se detecta un pico real
+      // Actualizar umbral adaptativo
+      this.adaptiveThreshold = this.adaptiveThreshold * 0.95 + currentValue * 0.05;
+      
+      // Reproducir beep inmediatamente al detectar pico
       this.beepPlayer.playBeep().catch(err => {
-        console.error('Error reproduciendo beep:', err);
+        console.error('Error al reproducir beep:', err);
+      });
+      
+      console.log('Pico detectado:', {
+        valor: currentValue,
+        umbral: threshold,
+        tiempoDesdeUltimoPico: now - this.lastPeakTime
       });
     }
-    
+
     return isPeak;
   }
 
   private validatePeakShape(currentValue: number): boolean {
-    if (this.signalBuffer.length < 3) return false;
+    const samples = this.signalBuffer.slice(-4);
     
-    // Calcular derivadas
-    const derivative1 = currentValue - this.signalBuffer[this.signalBuffer.length - 2];
-    const derivative2 = this.signalBuffer[this.signalBuffer.length - 2] - 
-                       this.signalBuffer[this.signalBuffer.length - 3];
+    // Verificar pendiente positiva seguida de pendiente negativa
+    const derivative1 = samples[2] - samples[1];
+    const derivative2 = samples[3] - samples[2];
     
-    // Verificar forma del pico (debe tener pendiente positiva seguida de negativa)
-    return derivative1 < 0 && derivative2 > 0;
+    // Un pico real debe tener una pendiente positiva seguida de una negativa
+    const hasCorrectShape = derivative1 > 0 && derivative2 < 0;
+    
+    // La amplitud del pico debe ser significativa
+    const peakAmplitude = Math.abs(currentValue - Math.min(...samples));
+    const hasSignificantAmplitude = peakAmplitude > this.adaptiveThreshold * 0.3;
+    
+    return hasCorrectShape && hasSignificantAmplitude;
   }
 
   getReadings(): VitalReading[] {
