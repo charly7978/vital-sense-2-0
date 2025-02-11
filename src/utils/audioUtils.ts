@@ -39,16 +39,16 @@ export class BeepPlayer {
 
       this.oscillator = this.audioContext.createOscillator();
       
-      // Diferentes sonidos según el tipo
+      // Sonido más suave y realista para el latido
       switch (type) {
         case 'heartbeat':
-          this.oscillator.frequency.value = 1000;
+          this.oscillator.frequency.value = 60;
           break;
         case 'warning':
           this.oscillator.frequency.value = 440;
           break;
         case 'success':
-          this.oscillator.frequency.value = 1500;
+          this.oscillator.frequency.value = 880;
           break;
       }
       
@@ -58,22 +58,22 @@ export class BeepPlayer {
       this.gainNode.gain.cancelScheduledValues(now);
       this.gainNode.gain.setValueAtTime(0, now);
       
-      // Diferentes duraciones según el tipo
-      if (type === 'warning') {
-        this.gainNode.gain.linearRampToValueAtTime(0.5, now + 0.01);
+      // Para el latido, hacer un sonido más suave y corto
+      if (type === 'heartbeat') {
+        this.gainNode.gain.linearRampToValueAtTime(0.1, now + 0.01);
+        this.gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+        this.oscillator.start(now);
+        this.oscillator.stop(now + 0.1);
+      } else if (type === 'warning') {
+        this.gainNode.gain.linearRampToValueAtTime(0.3, now + 0.01);
         this.gainNode.gain.linearRampToValueAtTime(0, now + 0.3);
         this.oscillator.start(now);
         this.oscillator.stop(now + 0.3);
-      } else if (type === 'success') {
-        this.gainNode.gain.linearRampToValueAtTime(0.5, now + 0.01);
+      } else {
+        this.gainNode.gain.linearRampToValueAtTime(0.3, now + 0.01);
         this.gainNode.gain.linearRampToValueAtTime(0, now + 0.15);
         this.oscillator.start(now);
         this.oscillator.stop(now + 0.15);
-      } else {
-        this.gainNode.gain.linearRampToValueAtTime(0.3, now + 0.005);
-        this.gainNode.gain.linearRampToValueAtTime(0, now + 0.05);
-        this.oscillator.start(now);
-        this.oscillator.stop(now + 0.05);
       }
 
       setTimeout(() => {
@@ -87,4 +87,3 @@ export class BeepPlayer {
     }
   }
 }
-
