@@ -40,4 +40,3 @@ export interface CalibrationSettings {
     description: string;
   };
 }
-

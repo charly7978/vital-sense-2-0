@@ -25,40 +25,117 @@ const defaultSensitivitySettings: SensitivitySettings = {
 };
 
 const defaultCalibrationSettings: CalibrationSettings = {
+  measurementDuration: {
+    value: 30,
+    min: 10,
+    max: 60,
+    step: 5,
+    description: "Duración de la medición en segundos. Aumentar para mayor precisión, disminuir para respuesta más rápida."
+  },
+  minFramesForCalculation: {
+    value: 30,
+    min: 10,
+    max: 100,
+    step: 5,
+    description: "Cantidad mínima de frames para iniciar cálculos. Aumentar para mayor estabilidad."
+  },
+  minPeaksForValidHR: {
+    value: 3,
+    min: 2,
+    max: 10,
+    step: 1,
+    description: "Picos mínimos necesarios para calcular frecuencia cardíaca válida."
+  },
+  minPeakDistance: {
+    value: 500,
+    min: 200,
+    max: 1000,
+    step: 50,
+    description: "Distancia mínima entre picos en ms. Ajustar según frecuencia cardíaca esperada."
+  },
+  maxPeakDistance: {
+    value: 1500,
+    min: 1000,
+    max: 2000,
+    step: 50,
+    description: "Distancia máxima entre picos en ms. Ajustar según frecuencia cardíaca esperada."
+  },
+  peakThresholdFactor: {
+    value: 0.5,
+    min: 0.1,
+    max: 1.0,
+    step: 0.1,
+    description: "Factor de umbral para detección de picos. Mayor valor = detección más estricta."
+  },
   minRedValue: {
     value: 20,
     min: 0,
     max: 100,
     step: 1,
-    description: "Valor mínimo de componente rojo para detectar presencia del dedo. Aumentar si hay falsos positivos, disminuir si no detecta el dedo."
+    description: "Valor mínimo de componente rojo para detectar dedo."
+  },
+  minRedDominance: {
+    value: 1.5,
+    min: 1.0,
+    max: 3.0,
+    step: 0.1,
+    description: "Dominancia mínima del canal rojo sobre otros canales."
+  },
+  minValidPixelsRatio: {
+    value: 0.3,
+    min: 0.1,
+    max: 1.0,
+    step: 0.1,
+    description: "Ratio mínimo de píxeles válidos en el frame."
+  },
+  minBrightness: {
+    value: 30,
+    min: 0,
+    max: 100,
+    step: 5,
+    description: "Brillo mínimo necesario para medición válida."
+  },
+  minValidReadings: {
+    value: 10,
+    min: 5,
+    max: 30,
+    step: 5,
+    description: "Lecturas válidas mínimas para calcular métricas."
+  },
+  fingerDetectionDelay: {
+    value: 1000,
+    min: 500,
+    max: 3000,
+    step: 100,
+    description: "Retraso en ms para confirmar detección del dedo."
+  },
+  minSpO2: {
+    value: 80,
+    min: 70,
+    max: 100,
+    step: 1,
+    description: "SpO2 mínimo considerado válido."
   },
   qualityThreshold: {
     value: 0.3,
     min: 0,
     max: 1,
     step: 0.05,
-    description: "Umbral de calidad mínima de la señal. Aumentar para mayor precisión pero menor sensibilidad."
+    description: "Umbral de calidad mínima de la señal."
   },
   signalAmplification: {
     value: 1.2,
     min: 1,
     max: 5,
     step: 0.1,
-    description: "Factor de amplificación de la señal PPG. Aumentar para señales débiles, disminuir si hay saturación."
+    description: "Factor de amplificación de la señal PPG."
   },
   noiseReduction: {
     value: 1,
     min: 0,
     max: 5,
     step: 0.1,
-    description: "Factor de reducción de ruido. Aumentar para señales ruidosas, disminuir si se pierde detalle."
-  },
-  peakDetection: {
-    value: 1,
-    min: 0.1,
-    max: 2,
-    step: 0.1,
-    description: "Sensibilidad en la detección de picos. Aumentar para detectar picos más sutiles, disminuir para ignorar ruido."
+    description: "Factor de reducción de ruido."
   }
 };
 
