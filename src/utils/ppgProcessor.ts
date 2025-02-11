@@ -1,3 +1,4 @@
+
 import { VitalReading, PPGData, SensitivitySettings, ProcessingSettings } from './types';
 import { BeepPlayer } from './audioUtils';
 import { SignalProcessor } from './signalProcessing';
@@ -29,7 +30,7 @@ export class PPGProcessor {
     noiseReduction: 1,
     peakDetection: 1
   };
-  private processingSettings: ProcessingSettings = {
+  public readonly processingSettings: ProcessingSettings = {
     MEASUREMENT_DURATION: 40,
     MIN_FRAMES_FOR_CALCULATION: 30,
     MIN_PEAKS_FOR_VALID_HR: 3,

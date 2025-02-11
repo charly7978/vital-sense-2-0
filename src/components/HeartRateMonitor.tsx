@@ -8,6 +8,7 @@ import BPCalibrationForm from './BPCalibrationForm';
 import VitalSignsDisplay from './vitals/VitalSignsDisplay';
 import SignalQualityIndicator from './vitals/SignalQualityIndicator';
 import MeasurementControls from './vitals/MeasurementControls';
+import ProcessingSettingsPanel from './ProcessingSettingsPanel';
 import { PPGProcessor } from '../utils/ppgProcessor';
 import { useVitals } from '@/contexts/VitalsContext';
 import type { SensitivitySettings } from '../utils/types';
@@ -45,7 +46,7 @@ const HeartRateMonitor: React.FC = () => {
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-6xl mx-auto">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-7xl mx-auto p-4">
       <div className="space-y-4">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-xl font-semibold text-gray-100">Monitor de Signos Vitales</h2>
@@ -70,6 +71,8 @@ const HeartRateMonitor: React.FC = () => {
             </div>
           )}
         </div>
+
+        <ProcessingSettingsPanel settings={ppgProcessor.processingSettings} />
       </div>
 
       <div className="space-y-4">
