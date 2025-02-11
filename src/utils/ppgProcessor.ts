@@ -29,6 +29,9 @@ export class PPGProcessor {
   private trainingData: number[][] = [];
   private targetData: number[][] = [];
   private frameCount: number = 0;
+  private lastValidBpm: number = 0;
+  private lastValidSystolic: number = 120;
+  private lastValidDiastolic: number = 80;
   
   private sensitivitySettings: SensitivitySettings = {
     signalAmplification: 1.5,
@@ -61,6 +64,43 @@ export class PPGProcessor {
     this.signalFilter = new SignalFilter(this.samplingRate);
     this.frequencyAnalyzer = new SignalFrequencyAnalyzer(this.samplingRate);
     this.mlModel = new MLModel();
+  }
+
+  private validateVitalSigns(bpm: number, systolic: number, diastolic: number): {
+    bpm: number;
+    systolic: number;
+    diastolic: number;
+  } {
+    // Validar BPM (40-200 es un rango normal para humanos)
+    const validBpm = bpm >= 40 && bpm <= 200 ? bpm : this.lastValidBpm || 0;
+    
+    // Validar presión sistólica (90-180 es un rango normal)
+    const validSystolic = systolic >= 90 && systolic <= 180 ? 
+      systolic : this.lastValidSystolic;
+    
+    // Validar presión diastólica (60-120 es un rango normal)
+    const validDiastolic = diastolic >= 60 && diastolic <= 120 ? 
+      diastolic : this.lastValidDiastolic;
+    
+    // Asegurar que sistólica > diastólica
+    if (validSystolic <= validDiastolic) {
+      return {
+        bpm: validBpm,
+        systolic: this.lastValidSystolic,
+        diastolic: this.lastValidDiastolic
+      };
+    }
+
+    // Actualizar últimos valores válidos
+    this.lastValidBpm = validBpm;
+    this.lastValidSystolic = validSystolic;
+    this.lastValidDiastolic = validDiastolic;
+
+    return {
+      bpm: validBpm,
+      systolic: validSystolic,
+      diastolic: validDiastolic
+    };
   }
 
   private async updateSettingsWithML(calculatedBpm: number, spo2: number, signalQuality: number) {
@@ -170,8 +210,8 @@ export class PPGProcessor {
       };
     }
     
-    const amplifiedRed = Math.max(red * this.sensitivitySettings.signalAmplification, red * 1.2);
-    const amplifiedIr = Math.max(ir * this.sensitivitySettings.signalAmplification, ir * 1.2);
+    const amplifiedRed = red * this.sensitivitySettings.signalAmplification;
+    const amplifiedIr = ir * this.sensitivitySettings.signalAmplification;
     
     this.redBuffer.push(amplifiedRed);
     this.irBuffer.push(amplifiedIr);
@@ -212,42 +252,49 @@ export class PPGProcessor {
       });
     }
 
-    // Calculate heart rate using frequency analysis
+    // Calcular frecuencia cardíaca usando análisis de frecuencia
     const { frequencies, magnitudes } = this.frequencyAnalyzer.performFFT(filteredRed);
     const dominantFreqIndex = magnitudes.indexOf(Math.max(...magnitudes));
     const dominantFreq = frequencies[dominantFreqIndex];
     const calculatedBpm = dominantFreq * 60;
     
-    // Calculate intervals for HRV analysis
+    // Calcular intervalos para análisis HRV
     const intervals = [];
     for (let i = 1; i < this.peakTimes.length; i++) {
       intervals.push(this.peakTimes[i] - this.peakTimes[i-1]);
     }
     
-    // Get HRV analysis
+    // Obtener análisis HRV
     const hrvAnalysis = this.signalProcessor.analyzeHRV(intervals);
     
-    // Calculate SpO2
+    // Calcular SpO2
     const spo2Result = this.signalProcessor.calculateSpO2(this.redBuffer, this.irBuffer);
     
-    // Calculate blood pressure using PTT and PPG features
+    // Calcular presión arterial usando PTT y características PPG
     const bp = this.signalProcessor.estimateBloodPressure(filteredRed, this.peakTimes);
     
-    // Analyze signal quality
+    // Analizar calidad de la señal
     const signalQuality = this.signalProcessor.analyzeSignalQuality(filteredRed);
+
+    // Validar y ajustar los signos vitales
+    const validatedVitals = this.validateVitalSigns(
+      calculatedBpm,
+      bp.systolic,
+      bp.diastolic
+    );
     
     // Cada 30 frames (aprox. 1 segundo) intentamos mejorar los parámetros
-    if (this.frameCount % 30 === 0) {
-      this.saveTrainingData(calculatedBpm, spo2Result.spo2, signalQuality);
+    if (this.frameCount % 30 === 0 && validatedVitals.bpm > 0) {
+      this.saveTrainingData(validatedVitals.bpm, spo2Result.spo2, signalQuality);
       await this.trainMLModel();
-      await this.updateSettingsWithML(calculatedBpm, spo2Result.spo2, signalQuality);
+      await this.updateSettingsWithML(validatedVitals.bpm, spo2Result.spo2, signalQuality);
     }
 
     return {
-      bpm: Math.round(calculatedBpm),
-      spo2: spo2Result.spo2,
-      systolic: bp.systolic,
-      diastolic: bp.diastolic,
+      bpm: validatedVitals.bpm,
+      spo2: Math.min(100, Math.max(75, spo2Result.spo2)),
+      systolic: validatedVitals.systolic,
+      diastolic: validatedVitals.diastolic,
       hasArrhythmia: hrvAnalysis.hasArrhythmia,
       arrhythmiaType: hrvAnalysis.type,
       signalQuality,
