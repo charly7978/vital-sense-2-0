@@ -1,4 +1,4 @@
-import { VitalReading, UserCalibration } from './types';
+import { VitalReading, UserCalibration, PPGData } from './types';
 import { BeepPlayer } from './audioUtils';
 import { SignalProcessor } from './signalProcessing';
 
@@ -30,15 +30,7 @@ export class PPGProcessor {
     this.signalProcessor.updateCalibrationConstants(data);
   }
 
-  processFrame(imageData: ImageData): { 
-    bpm: number; 
-    spo2: number; 
-    systolic: number;
-    diastolic: number;
-    hasArrhythmia: boolean;
-    arrhythmiaType: string;
-    signalQuality: number;
-  } | null {
+  processFrame(imageData: ImageData): PPGData | null {
     const now = Date.now();
     
     // Extracción mejorada de señales roja e infrarroja
@@ -59,7 +51,10 @@ export class PPGProcessor {
         diastolic: 0,
         hasArrhythmia: false,
         arrhythmiaType: 'Normal',
-        signalQuality: 0
+        signalQuality: 0,
+        confidence: 0,
+        readings: [],
+        isPeak: false
       };
     }
     
@@ -88,18 +83,7 @@ export class PPGProcessor {
     }
 
     // Detección de picos mejorada con validación de calidad
-    if (this.isRealPeak(normalizedValue, now)) {
-      console.log('Peak detected at:', now);
-      this.beepPlayer.playBeep().catch(err => {
-        console.error('Error reproduciendo beep:', err);
-      });
-      this.lastPeakTime = now;
-      this.peakTimes.push(now);
-      
-      if (this.peakTimes.length > 10) {
-        this.peakTimes.shift();
-      }
-    }
+    const isPeak = this.isRealPeak(normalizedValue, now);
 
     // Análisis FFT para BPM más preciso
     const { frequencies, magnitudes } = this.signalProcessor.performFFT(filteredRed);
@@ -138,7 +122,10 @@ export class PPGProcessor {
       diastolic: bp.diastolic,
       hasArrhythmia: hrvAnalysis.hasArrhythmia,
       arrhythmiaType: hrvAnalysis.type,
-      signalQuality
+      signalQuality,
+      confidence: signalQuality * 100,
+      readings: this.readings,
+      isPeak
     };
   }
 
