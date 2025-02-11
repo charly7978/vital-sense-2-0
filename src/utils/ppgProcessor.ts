@@ -313,4 +313,9 @@ export class PPGProcessor {
   getReadings(): VitalReading[] {
     return this.readings;
   }
+
+  updateSensitivitySettings(settings: SensitivitySettings) {
+    this.sensitivitySettings = settings;
+    console.log('Sensitivity settings updated:', settings);
+  }
 }

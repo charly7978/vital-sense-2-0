@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useCallback } from 'react';
 import { BeepPlayer } from '../utils/audioUtils';
 import { PPGProcessor } from '../utils/ppgProcessor';
 import { useToast } from "@/hooks/use-toast";
-import type { VitalReading } from '../utils/types';
+import type { VitalReading, SensitivitySettings } from '../utils/types';
 
 const beepPlayer = new BeepPlayer();
 const ppgProcessor = new PPGProcessor();
@@ -20,8 +20,10 @@ interface VitalsContextType {
   isStarted: boolean;
   measurementProgress: number;
   measurementQuality: number;
+  sensitivitySettings: SensitivitySettings;
   toggleMeasurement: () => void;
   processFrame: (imageData: ImageData) => void;
+  updateSensitivitySettings: (settings: SensitivitySettings) => void;
 }
 
 const VitalsContext = createContext<VitalsContextType | undefined>(undefined);
@@ -41,8 +43,18 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [measurementProgress, setMeasurementProgress] = useState(0);
   const [measurementQuality, setMeasurementQuality] = useState(0);
   const [measurementStartTime, setMeasurementStartTime] = useState<number | null>(null);
+  const [sensitivitySettings, setSensitivitySettings] = useState<SensitivitySettings>({
+    signalAmplification: 1.5,
+    noiseReduction: 1.2,
+    peakDetection: 1.3
+  });
   
   const { toast } = useToast();
+
+  const updateSensitivitySettings = useCallback((newSettings: SensitivitySettings) => {
+    setSensitivitySettings(newSettings);
+    ppgProcessor.updateSensitivitySettings(newSettings);
+  }, []);
 
   const processFrame = useCallback(async (imageData: ImageData) => {
     if (!isStarted) return;
@@ -131,8 +143,10 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     isStarted,
     measurementProgress,
     measurementQuality,
+    sensitivitySettings,
     toggleMeasurement,
-    processFrame
+    processFrame,
+    updateSensitivitySettings
   };
 
   return <VitalsContext.Provider value={value}>{children}</VitalsContext.Provider>;
