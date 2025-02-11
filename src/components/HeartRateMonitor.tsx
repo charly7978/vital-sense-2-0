@@ -53,8 +53,10 @@ const HeartRateMonitor: React.FC = () => {
           diastolic: calibrationData[0].reference_bp_diastolic,
           deviceType: calibrationData[0].reference_device_type,
           is_active: calibrationData[0].is_active,
-          calibration_constants: calibrationData[0].calibration_constants,
-          calibration_history: calibrationData[0].calibration_history,
+          calibration_constants: calibrationData[0].calibration_constants || {},
+          calibration_history: Array.isArray(calibrationData[0].calibration_history) 
+            ? calibrationData[0].calibration_history 
+            : [],
           last_calibration_quality: calibrationData[0].last_calibration_quality,
           calibration_date: calibrationData[0].calibration_date,
           user_id: calibrationData[0].user_id
@@ -184,8 +186,10 @@ const HeartRateMonitor: React.FC = () => {
           diastolic: newCalibration[0].reference_bp_diastolic,
           deviceType: newCalibration[0].reference_device_type,
           is_active: newCalibration[0].is_active,
-          calibration_constants: newCalibration[0].calibration_constants,
-          calibration_history: newCalibration[0].calibration_history,
+          calibration_constants: newCalibration[0].calibration_constants || {},
+          calibration_history: Array.isArray(newCalibration[0].calibration_history) 
+            ? newCalibration[0].calibration_history 
+            : [],
           last_calibration_quality: newCalibration[0].last_calibration_quality,
           calibration_date: newCalibration[0].calibration_date,
           user_id: newCalibration[0].user_id
@@ -322,4 +326,3 @@ const HeartRateMonitor: React.FC = () => {
 };
 
 export default HeartRateMonitor;
-
