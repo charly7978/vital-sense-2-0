@@ -29,10 +29,10 @@ const HeartRateMonitor: React.FC = () => {
       if (bpm > 0 && spo2 > 0) {
         try {
           const vitalSignsData = {
-            heart_rate: bpm,
-            spo2: spo2,
-            systolic: systolic,
-            diastolic: diastolic,
+            heart_rate: Math.round(bpm),
+            spo2: Math.round(spo2),
+            systolic: Math.round(systolic),
+            diastolic: Math.round(diastolic),
             has_arrhythmia: hasArrhythmia,
             arrhythmia_details: { type: arrhythmiaType },
             ppg_data: JSON.stringify({ readings }),
@@ -73,16 +73,20 @@ const HeartRateMonitor: React.FC = () => {
   }, [bpm, spo2, systolic, diastolic, hasArrhythmia, arrhythmiaType, readings, isProcessing, toast]);
 
   const handleFrame = useCallback((imageData: ImageData) => {
+    if (!isStarted) return;
+    
     setIsProcessing(true);
     try {
       const vitals = ppgProcessor.processFrame(imageData);
-      setBpm(vitals.bpm);
-      setSpo2(vitals.spo2);
-      setSystolic(vitals.systolic);
-      setDiastolic(vitals.diastolic);
-      setHasArrhythmia(vitals.hasArrhythmia);
-      setArrhythmiaType(vitals.arrhythmiaType);
-      setReadings(ppgProcessor.getReadings());
+      if (vitals) {
+        setBpm(vitals.bpm || 0);
+        setSpo2(vitals.spo2 || 0);
+        setSystolic(vitals.systolic || 0);
+        setDiastolic(vitals.diastolic || 0);
+        setHasArrhythmia(vitals.hasArrhythmia || false);
+        setArrhythmiaType(vitals.arrhythmiaType || 'Normal');
+        setReadings(ppgProcessor.getReadings());
+      }
     } catch (error) {
       console.error('Error processing frame:', error);
       toast({
@@ -91,7 +95,7 @@ const HeartRateMonitor: React.FC = () => {
         description: "Error al procesar la imagen de la cámara."
       });
     }
-  }, [toast]);
+  }, [isStarted, toast]);
 
   const toggleMeasurement = () => {
     setIsStarted(!isStarted);
@@ -100,6 +104,8 @@ const HeartRateMonitor: React.FC = () => {
         title: "Iniciando medición",
         description: "Por favor, mantenga su dedo frente a la cámara."
       });
+    } else {
+      setIsProcessing(false);
     }
   };
 
@@ -113,7 +119,7 @@ const HeartRateMonitor: React.FC = () => {
               <h2 className="text-xl font-semibold text-gray-100">Heart Rate</h2>
             </div>
             <div className="flex items-baseline space-x-2">
-              <span className="text-4xl font-bold text-gray-100">{bpm}</span>
+              <span className="text-4xl font-bold text-gray-100">{Math.round(bpm) || 0}</span>
               <span className="text-sm text-gray-300">BPM</span>
             </div>
           </div>
@@ -126,7 +132,7 @@ const HeartRateMonitor: React.FC = () => {
               <h2 className="text-xl font-semibold text-gray-100">SpO2</h2>
             </div>
             <div className="flex items-baseline space-x-2">
-              <span className="text-4xl font-bold text-gray-100">{spo2}</span>
+              <span className="text-4xl font-bold text-gray-100">{Math.round(spo2) || 0}</span>
               <span className="text-sm text-gray-300">%</span>
             </div>
           </div>
@@ -139,7 +145,7 @@ const HeartRateMonitor: React.FC = () => {
               <h2 className="text-xl font-semibold text-gray-100">Blood Pressure</h2>
             </div>
             <div className="flex items-baseline space-x-2">
-              <span className="text-4xl font-bold text-gray-100">{systolic}/{diastolic}</span>
+              <span className="text-4xl font-bold text-gray-100">{Math.round(systolic) || 0}/{Math.round(diastolic) || 0}</span>
               <span className="text-sm text-gray-300">mmHg</span>
             </div>
           </div>

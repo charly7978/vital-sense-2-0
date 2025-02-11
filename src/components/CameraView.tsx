@@ -36,6 +36,8 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame }) => {
   }, []);
 
   useEffect(() => {
+    let animationFrameId: number;
+
     const processFrame = () => {
       if (webcamRef.current && canvasRef.current) {
         const video = webcamRef.current.video;
@@ -61,7 +63,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame }) => {
         }
       }
       if (isInitialized) {
-        requestAnimationFrame(processFrame);
+        animationFrameId = requestAnimationFrame(processFrame);
       }
     };
 
@@ -70,6 +72,9 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame }) => {
     }
 
     return () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
       if (webcamRef.current?.stream) {
         webcamRef.current.stream.getTracks().forEach(track => track.stop());
       }
