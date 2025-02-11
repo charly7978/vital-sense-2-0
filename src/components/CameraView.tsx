@@ -17,6 +17,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   const streamRef = useRef<MediaStream | null>(null);
   const { toast } = useToast();
   const animationFrameRef = useRef<number>();
+  const processingRef = useRef(false);
 
   useEffect(() => {
     const userAgent = window.navigator.userAgent.toLowerCase();
@@ -24,7 +25,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   }, []);
 
   const processFrame = () => {
-    if (!isActive || !webcamRef.current?.video || !canvasRef.current) return;
+    if (!isActive || !webcamRef.current?.video || !canvasRef.current || !processingRef.current) return;
 
     const video = webcamRef.current.video;
     const canvas = canvasRef.current;
@@ -44,8 +45,33 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
     const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
     onFrame(imageData);
 
-    animationFrameRef.current = requestAnimationFrame(processFrame);
+    if (processingRef.current) {
+      animationFrameRef.current = requestAnimationFrame(processFrame);
+    }
   };
+
+  // Manejo específico del ciclo de procesamiento de frames
+  useEffect(() => {
+    if (!isActive) {
+      processingRef.current = false;
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = undefined;
+      }
+      return;
+    }
+
+    processingRef.current = true;
+    animationFrameRef.current = requestAnimationFrame(processFrame);
+
+    return () => {
+      processingRef.current = false;
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = undefined;
+      }
+    };
+  }, [isActive]);
 
   useEffect(() => {
     let mounted = true;
@@ -72,29 +98,30 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
         }
 
         streamRef.current = stream;
-        
-        if (webcamRef.current?.video) {
-          webcamRef.current.video.srcObject = stream;
-          await webcamRef.current.video.play();
-          animationFrameRef.current = requestAnimationFrame(processFrame);
-        }
-
         setError(null);
 
-        // Enable flashlight for Android devices
+        // Verificar y habilitar el flash solo si está disponible
         if (isAndroid) {
-          const track = stream.getVideoTracks()[0];
-          await track.applyConstraints({
-            advanced: [{ torch: true }] as any[]
-          });
+          try {
+            const track = stream.getVideoTracks()[0];
+            const capabilities = track.getCapabilities();
+            if (capabilities.torch) {
+              await track.applyConstraints({
+                advanced: [{ torch: true }]
+              });
+            }
+          } catch (flashError) {
+            console.warn('Flash no disponible:', flashError);
+          }
         }
       } catch (err) {
-        console.error('Camera error:', err);
-        setError(err.message || 'Error al iniciar la cámara');
+        console.warn('Error de cámara:', err);
+        const errorMessage = err instanceof Error ? err.message : 'Error al iniciar la cámara';
+        setError(errorMessage);
         toast({
           variant: "destructive",
           title: "Error de cámara",
-          description: err.message || "No se pudo iniciar la cámara"
+          description: errorMessage
         });
       }
     };
@@ -103,9 +130,6 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
 
     return () => {
       mounted = false;
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => {
           track.stop();
@@ -113,7 +137,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
         streamRef.current = null;
       }
     };
-  }, [isActive, isAndroid, toast, onFrame]);
+  }, [isActive, isAndroid, toast]);
 
   return (
     <div className="relative w-full max-w-md mx-auto">
