@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Heart, Droplets, Activity, AlertTriangle } from 'lucide-react';
+import { cn } from "@/lib/utils";
 
 interface VitalSignsDisplayProps {
   bpm: number;
@@ -24,7 +25,15 @@ const VitalSignsDisplay: React.FC<VitalSignsDisplayProps> = ({
       <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4 shadow-lg">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <Heart className="w-6 h-6 text-[#ea384c]" />
+            <div className="relative">
+              <Heart className={cn(
+                "w-6 h-6 text-[#ea384c]",
+                bpm > 0 && "animate-[pulse_1s_ease-in-out_infinite]"
+              )} />
+              {bpm > 0 && (
+                <div className="absolute -inset-1 bg-[#ea384c]/20 rounded-full animate-[ping_1s_ease-in-out_infinite]" />
+              )}
+            </div>
             <h2 className="text-xl font-semibold text-gray-100">Heart Rate</h2>
           </div>
           <div className="flex items-baseline space-x-2">
