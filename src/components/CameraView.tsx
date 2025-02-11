@@ -3,6 +3,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import Webcam from 'react-webcam';
 import { useToast } from "@/hooks/use-toast";
 import { Camera } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface CameraViewProps {
   onFrame: (imageData: ImageData) => void;
@@ -15,6 +16,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   const animationFrameRef = useRef<number | null>(null);
   const { toast } = useToast();
   const [videoInitialized, setVideoInitialized] = useState(false);
+  const isMobile = useIsMobile();
 
   const processFrame = () => {
     if (!isActive || !webcamRef.current?.video || !canvasRef.current) {
@@ -77,6 +79,15 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
     };
   }, [isActive]);
 
+  const getCameraFacingMode = () => {
+    // En Android, usa la cámara trasera
+    if (isMobile && /android/i.test(navigator.userAgent)) {
+      return "environment";
+    }
+    // Para otros dispositivos, usa la cámara frontal
+    return "user";
+  };
+
   return (
     <div className="relative w-full max-w-md mx-auto">
       <div className="relative aspect-video rounded-2xl overflow-hidden bg-black/5 backdrop-blur-sm">
@@ -92,7 +103,12 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
             videoConstraints={{
               width: 640,
               height: 480,
-              facingMode: "user"
+              facingMode: getCameraFacingMode(),
+              advanced: [
+                {
+                  torch: true // Activar la linterna en dispositivos que lo soporten
+                }
+              ]
             }}
           />
         )}
