@@ -6,37 +6,40 @@ declare global {
 }
 
 let isLoading = false;
+let loadAttempts = 0;
+const MAX_ATTEMPTS = 3;
 
 export const loadOpenCV = (): Promise<void> => {
   return new Promise((resolve, reject) => {
-    // If OpenCV is already loaded and initialized, resolve immediately
     if (window.cv) {
       console.log('OpenCV.js already loaded');
       resolve();
       return;
     }
 
-    // Prevent concurrent loads
     if (isLoading) {
       console.log('OpenCV.js is already loading');
       reject(new Error('OpenCV.js is already loading'));
       return;
     }
 
-    isLoading = true;
+    if (loadAttempts >= MAX_ATTEMPTS) {
+      reject(new Error('Máximo número de intentos de carga alcanzado'));
+      return;
+    }
 
-    // Remove any existing OpenCV script elements
+    isLoading = true;
+    loadAttempts++;
+
     const existingScripts = document.querySelectorAll('script[src*="opencv.js"]');
     existingScripts.forEach(script => {
       script.remove();
     });
 
-    // Clear any existing cv object and WASM module
     if (window.cv) {
       delete window.cv;
     }
 
-    // Clear any Module object that might exist from a previous load
     if ('Module' in window) {
       delete (window as any).Module;
     }
@@ -50,9 +53,10 @@ export const loadOpenCV = (): Promise<void> => {
       isLoading = false;
     };
 
+    let timeoutId: number;
+
     script.addEventListener('load', () => {
-      // Wait a short moment for WASM initialization
-      setTimeout(() => {
+      timeoutId = window.setTimeout(() => {
         if (window.cv) {
           console.log('OpenCV.js loaded successfully');
           cleanup();
@@ -61,11 +65,14 @@ export const loadOpenCV = (): Promise<void> => {
           cleanup();
           reject(new Error('OpenCV.js failed to initialize'));
         }
-      }, 100);
+      }, 1000);
     });
     
     script.addEventListener('error', () => {
       cleanup();
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
       reject(new Error('Failed to load OpenCV.js'));
     });
 
@@ -76,3 +83,4 @@ export const loadOpenCV = (): Promise<void> => {
 export const isOpenCVLoaded = (): boolean => {
   return typeof window !== 'undefined' && !!window.cv;
 };
+

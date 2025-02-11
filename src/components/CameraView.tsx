@@ -1,10 +1,12 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import Webcam from 'react-webcam';
-import { loadOpenCV } from '@/utils/opencvLoader';
+import { loadOpenCV, isOpenCVLoaded } from '@/utils/opencvLoader';
 import CameraInitializer from './camera/CameraInitializer';
 import CameraProcessor from './camera/CameraProcessor';
 import CameraDisplay from './camera/CameraDisplay';
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertTriangle } from "lucide-react";
 
 interface CameraViewProps {
   onFrame: (imageData: ImageData) => void;
@@ -18,19 +20,28 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   const [isAndroid, setIsAndroid] = useState(false);
   const [cameraInitialized, setCameraInitialized] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
+  const [loadingOpenCV, setLoadingOpenCV] = useState(true);
 
   useEffect(() => {
     const initOpenCV = async () => {
+      setLoadingOpenCV(true);
       try {
         await loadOpenCV();
         console.log('OpenCV initialized successfully');
+        setLoadingOpenCV(false);
+        setError(null);
       } catch (err) {
         console.error('Error initializing OpenCV:', err);
-        setError('Error al cargar OpenCV. Por favor, recarga la página.');
+        setError('Error al cargar OpenCV. Por favor, recarga la página y asegúrate de tener una conexión estable a internet.');
+        setLoadingOpenCV(false);
       }
     };
 
-    initOpenCV();
+    if (!isOpenCVLoaded()) {
+      initOpenCV();
+    } else {
+      setLoadingOpenCV(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -67,7 +78,6 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   };
 
   const handleCameraInitialized = (stream: MediaStream) => {
-    // If we already have a stream, clean it up first
     if (streamRef.current) {
       stopCamera();
     }
@@ -93,6 +103,32 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
     };
   }, [isActive, cameraInitialized]);
 
+  if (loadingOpenCV) {
+    return (
+      <div className="p-4">
+        <Alert variant="default" className="bg-yellow-500/10 border-yellow-500/50">
+          <AlertTriangle className="h-4 w-4 text-yellow-500" />
+          <AlertDescription className="text-yellow-100">
+            Cargando OpenCV, por favor espere...
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4">
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            {error}
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   return (
     <>
       <CameraInitializer
@@ -103,7 +139,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
       <CameraProcessor
         videoRef={videoRef}
         onFrame={onFrame}
-        isActive={isActive}
+        isActive={isActive && !loadingOpenCV}
         cameraInitialized={cameraInitialized}
       />
       <CameraDisplay
@@ -118,3 +154,4 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
 };
 
 export default CameraView;
+
