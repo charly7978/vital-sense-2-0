@@ -1,5 +1,6 @@
 
 import React, { useRef, useEffect } from 'react';
+import { isOpenCVLoaded } from '@/utils/opencvLoader';
 
 interface CameraProcessorProps {
   videoRef: React.RefObject<HTMLVideoElement>;
@@ -21,7 +22,7 @@ const CameraProcessor: React.FC<CameraProcessorProps> = ({
     let animationFrameId: number;
 
     const processFrame = () => {
-      if (!isActive || !cameraInitialized || processingRef.current) {
+      if (!isActive || !cameraInitialized || !isOpenCVLoaded() || processingRef.current) {
         return;
       }
 
@@ -39,7 +40,21 @@ const CameraProcessor: React.FC<CameraProcessorProps> = ({
             context.drawImage(video, 0, 0);
 
             const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-            onFrame(imageData);
+            if (window.cv) {
+              const src = window.cv.matFromImageData(imageData);
+              const gray = new window.cv.Mat();
+              window.cv.cvtColor(src, gray, window.cv.COLOR_RGBA2GRAY);
+              const processedImageData = new ImageData(
+                new Uint8ClampedArray(gray.data),
+                canvas.width,
+                canvas.height
+              );
+              onFrame(processedImageData);
+              src.delete();
+              gray.delete();
+            } else {
+              onFrame(imageData);
+            }
           } catch (error) {
             console.error('Error processing frame:', error);
           } finally {
