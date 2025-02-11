@@ -18,6 +18,7 @@ const CameraProcessor: React.FC<CameraProcessorProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const processingRef = useRef(false);
   const frameCountRef = useRef(0);
+  const initializationAttemptsRef = useRef(0);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -47,49 +48,54 @@ const CameraProcessor: React.FC<CameraProcessorProps> = ({
         return;
       }
 
-      // Solo procesar cuando el video está realmente listo
-      if (video.readyState === video.HAVE_ENOUGH_DATA && 
-          video.videoWidth > 0 && 
-          video.videoHeight > 0) {
-        
-        processingRef.current = true;
-
-        try {
-          // Update canvas dimensions if needed
-          if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            console.log('Canvas dimensions updated:', {
-              width: canvas.width,
-              height: canvas.height
+      // Check if video is actually playing and has valid dimensions
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        if (video.videoWidth === 0 || video.videoHeight === 0) {
+          initializationAttemptsRef.current++;
+          if (initializationAttemptsRef.current > 50) { // About 2 seconds at 30fps
+            console.error('Video dimensions still invalid after multiple attempts');
+            toast({
+              variant: "destructive",
+              title: "Error",
+              description: "Error al inicializar la cámara. Por favor, recarga la página."
             });
+            return;
           }
+        } else {
+          processingRef.current = true;
+          initializationAttemptsRef.current = 0;
 
-          context.drawImage(video, 0, 0);
-          const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-          
-          frameCountRef.current++;
-          if (frameCountRef.current % 2 === 0) { // Process every other frame
-            onFrame(imageData);
+          try {
+            // Update canvas dimensions if needed
+            if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+              canvas.width = video.videoWidth;
+              canvas.height = video.videoHeight;
+              console.log('Canvas dimensions updated:', {
+                width: canvas.width,
+                height: canvas.height
+              });
+            }
+
+            context.drawImage(video, 0, 0);
+            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+            
+            frameCountRef.current++;
+            if (frameCountRef.current % 2 === 0) { // Process every other frame
+              onFrame(imageData);
+            }
+
+            lastFrameTime = timestamp;
+          } catch (error) {
+            console.error('Error processing frame:', error);
+            toast({
+              variant: "destructive",
+              title: "Error",
+              description: "Error al procesar imagen de la cámara"
+            });
+          } finally {
+            processingRef.current = false;
           }
-
-          lastFrameTime = timestamp;
-        } catch (error) {
-          console.error('Error processing frame:', error);
-          toast({
-            variant: "destructive",
-            title: "Error",
-            description: "Error al procesar imagen de la cámara"
-          });
-        } finally {
-          processingRef.current = false;
         }
-      } else {
-        console.log('Video not fully ready:', {
-          readyState: video.readyState,
-          width: video.videoWidth,
-          height: video.videoHeight
-        });
       }
 
       animationFrameId = requestAnimationFrame(processFrame);
@@ -111,3 +117,4 @@ const CameraProcessor: React.FC<CameraProcessorProps> = ({
 };
 
 export default CameraProcessor;
+

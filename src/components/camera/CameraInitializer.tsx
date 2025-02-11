@@ -61,29 +61,46 @@ const CameraInitializer: React.FC<CameraInitializerProps> = ({
 
       console.log('Camera permissions granted, initializing stream...');
 
+      // Simplified constraints for better Windows compatibility
       const constraints: MediaStreamConstraints = {
         video: {
-          facingMode: isAndroid ? 'environment' : 'user',
           width: { ideal: 640 },
-          height: { ideal: 480 }
-        }
+          height: { ideal: 480 },
+          frameRate: { ideal: 30 }
+        },
+        audio: false
       };
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      console.log('Camera stream obtained successfully');
       
+      if (!stream) {
+        throw new Error('No se pudo obtener el stream de la cámara');
+      }
+
+      const videoTrack = stream.getVideoTracks()[0];
+      if (!videoTrack) {
+        throw new Error('No se encontró un track de video');
+      }
+
+      // Log video track settings for debugging
+      const settings = videoTrack.getSettings();
+      console.log('Video track settings:', settings);
+
       if (!isActive) {
         stream.getTracks().forEach(track => track.stop());
         console.log('Camera deactivated during initialization');
         return;
       }
 
+      // Ensure we have valid dimensions before proceeding
+      if (settings.width === 0 || settings.height === 0) {
+        throw new Error('Dimensiones de video inválidas');
+      }
+
       setCurrentStream(stream);
 
       if (isAndroid) {
-        const videoTrack = stream.getVideoTracks()[0];
         const capabilities = videoTrack.getCapabilities() as ExtendedCapabilities;
-        
         if (capabilities?.torch) {
           try {
             const advancedConstraint: ExtendedConstraints = { torch: true };
@@ -109,7 +126,7 @@ const CameraInitializer: React.FC<CameraInitializerProps> = ({
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Error al iniciar la cámara. Verifica los permisos."
+        description: "Error al iniciar la cámara. Verifica los permisos y asegúrate de que no haya otras aplicaciones usando la cámara."
       });
     }
   }, [isActive, isAndroid, onInitialized, onError, stopCurrentStream, toast]);
@@ -118,9 +135,10 @@ const CameraInitializer: React.FC<CameraInitializerProps> = ({
     let initTimeout: NodeJS.Timeout;
 
     if (isActive) {
+      // Add a small delay before initialization
       initTimeout = setTimeout(() => {
         initializeCamera();
-      }, 100);
+      }, 500); // Increased delay for better initialization
     } else {
       stopCurrentStream();
     }
@@ -135,3 +153,4 @@ const CameraInitializer: React.FC<CameraInitializerProps> = ({
 };
 
 export default CameraInitializer;
+
