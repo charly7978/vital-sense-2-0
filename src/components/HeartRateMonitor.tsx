@@ -34,43 +34,43 @@ const HeartRateMonitor: React.FC = () => {
         <div className="flex items-center justify-between bg-black/5 backdrop-blur-sm rounded-xl p-4">
           <div className="flex items-center space-x-2">
             <Heart className="w-6 h-6 text-[#ea384c]" />
-            <h2 className="text-xl font-semibold">Heart Rate</h2>
+            <h2 className="text-xl font-semibold text-gray-100">Heart Rate</h2>
           </div>
           <div className="flex items-baseline space-x-2">
-            <span className="text-4xl font-bold">{bpm}</span>
-            <span className="text-sm text-gray-400">BPM</span>
+            <span className="text-4xl font-bold text-gray-100">{bpm}</span>
+            <span className="text-sm text-gray-300">BPM</span>
           </div>
         </div>
 
         <div className="flex items-center justify-between bg-black/5 backdrop-blur-sm rounded-xl p-4">
           <div className="flex items-center space-x-2">
             <Droplets className="w-6 h-6 text-[#3b82f6]" />
-            <h2 className="text-xl font-semibold">SpO2</h2>
+            <h2 className="text-xl font-semibold text-gray-100">SpO2</h2>
           </div>
           <div className="flex items-baseline space-x-2">
-            <span className="text-4xl font-bold">{spo2}</span>
-            <span className="text-sm text-gray-400">%</span>
+            <span className="text-4xl font-bold text-gray-100">{spo2}</span>
+            <span className="text-sm text-gray-300">%</span>
           </div>
         </div>
 
         <div className="flex items-center justify-between bg-black/5 backdrop-blur-sm rounded-xl p-4">
           <div className="flex items-center space-x-2">
             <Activity className="w-6 h-6 text-[#10b981]" />
-            <h2 className="text-xl font-semibold">Blood Pressure</h2>
+            <h2 className="text-xl font-semibold text-gray-100">Blood Pressure</h2>
           </div>
           <div className="flex items-baseline space-x-2">
-            <span className="text-4xl font-bold">{systolic}/{diastolic}</span>
-            <span className="text-sm text-gray-400">mmHg</span>
+            <span className="text-4xl font-bold text-gray-100">{systolic}/{diastolic}</span>
+            <span className="text-sm text-gray-300">mmHg</span>
           </div>
         </div>
 
         <div className="flex items-center justify-between bg-black/5 backdrop-blur-sm rounded-xl p-4">
           <div className="flex items-center space-x-2">
             <AlertTriangle className={`w-6 h-6 ${hasArrhythmia ? 'text-[#f59e0b]' : 'text-[#10b981]'}`} />
-            <h2 className="text-xl font-semibold">Rhythm</h2>
+            <h2 className="text-xl font-semibold text-gray-100">Rhythm</h2>
           </div>
           <div className="flex items-baseline space-x-2">
-            <span className={`text-xl font-bold ${hasArrhythmia ? 'text-[#f59e0b]' : 'text-[#10b981]'}`}>
+            <span className={`text-xl font-bold ${hasArrhythmia ? 'text-[#f59e0b]' : 'text-gray-100'}`}>
               {arrhythmiaType}
             </span>
           </div>
@@ -80,7 +80,7 @@ const HeartRateMonitor: React.FC = () => {
       <CameraView onFrame={handleFrame} />
       
       <div className="bg-gradient-to-br from-black/5 to-black/10 backdrop-blur-lg rounded-xl p-6">
-        <h3 className="text-lg font-medium mb-4">Real-time PPG Signal</h3>
+        <h3 className="text-lg font-medium mb-4 text-gray-100">Real-time PPG Signal</h3>
         <VitalChart data={readings} color="#ea384c" />
       </div>
     </div>
