@@ -51,9 +51,9 @@ export class SignalExtractor {
       const height = imageData.height;
       const centerX = Math.floor(width / 2);
       const centerY = Math.floor(height / 2);
-      const regionSize = Math.min(150, Math.floor(Math.min(width, height) / 2));
+      const regionSize = Math.min(100, Math.floor(Math.min(width, height) / 2));
       
-      // Analizar región central
+      // Analizar región central más pequeña
       for (let y = centerY - regionSize; y < centerY + regionSize; y++) {
         for (let x = centerX - regionSize; x < centerX + regionSize; x++) {
           if (x >= 0 && x < width && y >= 0 && y < height) {
@@ -62,22 +62,22 @@ export class SignalExtractor {
             const green = imageData.data[i+1];
             const blue = imageData.data[i+2];
             
-            if (red > this.processingSettings.minRedValue) {
+            // Reducir umbral mínimo para detección de dedo
+            if (red > 15) {
               validRedPixels++;
             }
             
             maxRedIntensity = Math.max(maxRedIntensity, red);
             minRedIntensity = Math.min(minRedIntensity, red);
             
-            if (red < this.processingSettings.minRedValue) darkPixelCount++;
+            if (red < 15) darkPixelCount++;
             if (red > this.maxIntensity) saturationCount++;
             
-            // Verificar dominancia del canal rojo
+            // Relajar criterio de dominancia del rojo
             const redDominance = red / ((green + blue) / 2);
-            if (redDominance >= this.processingSettings.minRedDominance && 
-                red >= this.processingSettings.minRedValue) {
+            if (redDominance >= 1.2 && red >= 15) {
               redSum += red;
-              irSum += (green * 0.8 + blue * 0.2);
+              irSum += (green + blue) / 2;
               pixelCount++;
             }
           }
@@ -88,8 +88,8 @@ export class SignalExtractor {
       const validPixelsRatio = pixelCount / totalPixels;
       const redDominanceRatio = validRedPixels / totalPixels;
 
-      // Log detallado cada 30 frames
-      if (this.frameCount % 30 === 0) {
+      // Log más frecuente para debugging
+      if (this.frameCount % 10 === 0) {
         console.log('Análisis de señal:', {
           frameCount: this.frameCount,
           validPixelsRatio,
@@ -103,12 +103,12 @@ export class SignalExtractor {
         });
       }
       
-      if (validPixelsRatio < this.processingSettings.minValidPixelsRatio || 
-          redDominanceRatio < 0.1) {
+      // Relajar criterios de detección
+      if (validPixelsRatio < 0.1 || redDominanceRatio < 0.05) {
         console.log('Dedo no detectado:', {
           validPixelsRatio,
           redDominanceRatio,
-          minRequired: this.processingSettings.minValidPixelsRatio
+          minRequired: 0.1
         });
         return {
           red: 0,
@@ -121,21 +121,18 @@ export class SignalExtractor {
       const avgRed = redSum / pixelCount;
       const avgIr = irSum / pixelCount;
       
-      // Calcular calidad de la señal
       const quality = Math.max(0, Math.min(1, 
-        validPixelsRatio >= this.processingSettings.minValidPixelsRatio ? 
+        validPixelsRatio >= 0.1 ? 
         1 - ((saturationCount + darkPixelCount) / totalPixels) : 0
       ));
       
       const perfusionIndex = avgRed > 0 ? 
         ((maxRedIntensity - minRedIntensity) / avgRed) * 100 : 0;
 
-      // Actualizar últimos valores válidos si la calidad supera el umbral mínimo
-      if (quality > this.qualityThreshold && avgRed >= this.processingSettings.minBrightness) {
+      if (quality > this.qualityThreshold && avgRed >= 15) {
         this.lastRed = avgRed;
         this.lastIr = avgIr;
         
-        // Log cuando encontramos una buena señal
         if (this.frameCount % 10 === 0) {
           console.log('Señal válida detectada:', {
             quality,
