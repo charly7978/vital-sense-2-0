@@ -23,6 +23,11 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   const [loadingOpenCV, setLoadingOpenCV] = useState(true);
 
   useEffect(() => {
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    setIsAndroid(userAgent.includes('android'));
+  }, []);
+
+  useEffect(() => {
     const initOpenCV = async () => {
       setLoadingOpenCV(true);
       try {
@@ -42,11 +47,6 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
     } else {
       setLoadingOpenCV(false);
     }
-  }, []);
-
-  useEffect(() => {
-    const userAgent = window.navigator.userAgent.toLowerCase();
-    setIsAndroid(userAgent.includes('android'));
   }, []);
 
   useEffect(() => {
@@ -92,16 +92,14 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   };
 
   useEffect(() => {
-    if (!isActive && cameraInitialized) {
+    if (!isActive) {
       stopCamera();
     }
 
     return () => {
-      if (cameraInitialized) {
-        stopCamera();
-      }
+      stopCamera();
     };
-  }, [isActive, cameraInitialized]);
+  }, [isActive]);
 
   if (loadingOpenCV) {
     return (
@@ -154,4 +152,3 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
 };
 
 export default CameraView;
-

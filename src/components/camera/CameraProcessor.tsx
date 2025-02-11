@@ -16,12 +16,15 @@ const CameraProcessor: React.FC<CameraProcessorProps> = ({
   cameraInitialized,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const processingRef = useRef(false);
 
   useEffect(() => {
     let animationFrameId: number;
 
     const processFrame = () => {
-      if (!isActive || !cameraInitialized || !isOpenCVLoaded()) return;
+      if (!isActive || !cameraInitialized || !isOpenCVLoaded() || processingRef.current) {
+        return;
+      }
 
       if (videoRef.current && canvasRef.current) {
         const video = videoRef.current;
@@ -29,11 +32,13 @@ const CameraProcessor: React.FC<CameraProcessorProps> = ({
         const context = canvas.getContext('2d');
 
         if (video && context && video.readyState === video.HAVE_ENOUGH_DATA) {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          context.drawImage(video, 0, 0);
+          processingRef.current = true;
 
           try {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0);
+
             const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
             if (window.cv) {
               const src = window.cv.matFromImageData(imageData);
@@ -52,6 +57,8 @@ const CameraProcessor: React.FC<CameraProcessorProps> = ({
             }
           } catch (error) {
             console.error('Error processing frame:', error);
+          } finally {
+            processingRef.current = false;
           }
         }
       }
@@ -76,4 +83,3 @@ const CameraProcessor: React.FC<CameraProcessorProps> = ({
 };
 
 export default CameraProcessor;
-
