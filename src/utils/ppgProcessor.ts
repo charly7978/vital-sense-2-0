@@ -1,3 +1,4 @@
+
 import { VitalReading } from './types';
 import { BeepPlayer } from './audioUtils';
 
@@ -14,6 +15,9 @@ export class PPGProcessor {
   private lastPeakValue = 0;
   private baseline = 0;
   private adaptiveThreshold = 0;
+  private readonly minPeakDistance = 500; // Mínimo 500ms entre picos (120 BPM máximo)
+  private readonly signalBuffer: number[] = [];
+  private readonly bufferSize = 10;
   
   constructor() {
     this.beepPlayer = new BeepPlayer();
@@ -41,27 +45,34 @@ export class PPGProcessor {
       this.readings = this.readings.slice(-this.windowSize);
     }
 
+    // Buffer para suavizar la señal
+    this.signalBuffer.push(normalizedValue);
+    if (this.signalBuffer.length > this.bufferSize) {
+      this.signalBuffer.shift();
+    }
+
     // Detect peaks and play beep
     if (this.readings.length > 2) {
       const currentReading = this.readings[this.readings.length - 1];
       const prevReading = this.readings[this.readings.length - 2];
       
-      if (this.isPeak(currentReading.value, prevReading.value)) {
+      if (this.isRealPeak(currentReading.value, prevReading.value, now)) {
+        console.log('Peak detected at:', now);
         this.beepPlayer.playBeep();
         this.lastPeakTime = now;
       }
     }
 
-    // Calculate vitals
-    const bpm = this.calculateBPM();
+    // Calculate real BPM based on peak intervals
+    const bpm = this.calculateRealBPM();
     
     return {
       bpm: Math.round(bpm),
-      spo2: 95 + Math.random() * 3, // This needs real implementation
-      systolic: 120, // This needs real implementation
-      diastolic: 80, // This needs real implementation
+      spo2: 0, // Ya no simulamos SpO2
+      systolic: 0, // Ya no simulamos presión arterial
+      diastolic: 0,
       hasArrhythmia: false,
-      arrhythmiaType: 'Normal'
+      arrhythmiaType: 'Medición no disponible'
     };
   }
 
@@ -69,7 +80,7 @@ export class PPGProcessor {
     let redSum = 0;
     let pixelCount = 0;
     
-    // Only process the center region of the image
+    // Solo procesamos la región central de la imagen
     const width = imageData.width;
     const height = imageData.height;
     const centerX = Math.floor(width / 2);
@@ -80,7 +91,7 @@ export class PPGProcessor {
       for (let x = centerX - regionSize; x < centerX + regionSize; x++) {
         if (x >= 0 && x < width && y >= 0 && y < height) {
           const i = (y * width + x) * 4;
-          redSum += imageData.data[i]; // Red channel
+          redSum += imageData.data[i]; // Canal rojo
           pixelCount++;
         }
       }
@@ -90,48 +101,64 @@ export class PPGProcessor {
   }
 
   private normalizeSignal(value: number): number {
-    // Update baseline with moving average
+    // Actualizar línea base con promedio móvil
     this.baseline = this.baseline * 0.95 + value * 0.05;
     
-    // Normalize around baseline
+    // Normalizar alrededor de la línea base
     return value - this.baseline;
   }
 
-  private isPeak(currentValue: number, prevValue: number): boolean {
-    // Update adaptive threshold
-    this.adaptiveThreshold = this.adaptiveThreshold * 0.95 + Math.abs(currentValue) * 0.05;
-    
-    // Peak detection with adaptive thresholding
-    const threshold = this.adaptiveThreshold * 0.7;
-    const now = Date.now();
-    
-    if (currentValue > threshold && 
-        currentValue > prevValue && 
-        now - this.lastPeakTime > 300) { // Minimum 300ms between peaks (200 BPM max)
-      return true;
+  private isRealPeak(currentValue: number, prevValue: number, now: number): boolean {
+    // Solo detectar picos si ha pasado suficiente tiempo desde el último
+    if (now - this.lastPeakTime < this.minPeakDistance) {
+      return false;
     }
+
+    // Calcular el promedio de la señal en el buffer
+    const avgSignal = this.signalBuffer.reduce((a, b) => a + b, 0) / this.signalBuffer.length;
     
-    return false;
+    // Actualizar umbral adaptativo
+    this.adaptiveThreshold = this.adaptiveThreshold * 0.95 + Math.abs(avgSignal) * 0.05;
+    
+    // Umbral dinámico para detección de picos
+    const threshold = this.adaptiveThreshold * 0.7;
+    
+    // Un pico real debe ser mayor que el umbral y mayor que el valor anterior
+    return currentValue > threshold && 
+           currentValue > prevValue && 
+           currentValue > avgSignal;
   }
 
-  private calculateBPM(): number {
+  private calculateRealBPM(): number {
     if (this.readings.length < 2) return 0;
     
-    const recentReadings = this.readings.slice(-60); // Last 2 seconds at 30fps
-    let peakCount = 0;
-    let lastPeakIndex = -1;
+    // Encontrar todos los picos en los últimos 10 segundos
+    const recentReadings = this.readings.slice(-300); // últimos 10 segundos a 30fps
+    const peakTimes: number[] = [];
     
     for (let i = 1; i < recentReadings.length - 1; i++) {
-      if (this.isPeak(recentReadings[i].value, recentReadings[i-1].value)) {
-        peakCount++;
-        lastPeakIndex = i;
+      if (this.isRealPeak(
+        recentReadings[i].value,
+        recentReadings[i-1].value,
+        recentReadings[i].timestamp
+      )) {
+        peakTimes.push(recentReadings[i].timestamp);
       }
     }
     
-    if (peakCount < 2) return 0;
+    // Calcular BPM basado en intervalos entre picos
+    if (peakTimes.length < 2) return 0;
     
-    const timeSpan = (recentReadings[recentReadings.length - 1].timestamp - recentReadings[0].timestamp) / 1000;
-    return (peakCount * 60) / timeSpan;
+    const intervals: number[] = [];
+    for (let i = 1; i < peakTimes.length; i++) {
+      intervals.push(peakTimes[i] - peakTimes[i-1]);
+    }
+    
+    // Calcular el promedio de intervalos
+    const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+    
+    // Convertir a BPM
+    return avgInterval > 0 ? 60000 / avgInterval : 0;
   }
 
   getReadings(): VitalReading[] {
