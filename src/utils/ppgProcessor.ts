@@ -1,3 +1,4 @@
+
 import { VitalReading, PPGData, SensitivitySettings, ProcessingSettings } from './types';
 import { BeepPlayer } from './audioUtils';
 import { SignalProcessor } from './signalProcessing';
@@ -63,12 +64,11 @@ export class PPGProcessor {
     this.mlModel = new MLModel();
   }
 
-  private async updateSettingsWithML(bpm: number, spo2: number, signalQuality: number) {
+  private async updateSettingsWithML(calculatedBpm: number, spo2: number, signalQuality: number) {
     try {
-      const inputFeatures = [bpm, spo2, signalQuality];
+      const inputFeatures = [calculatedBpm, spo2, signalQuality];
       const optimizedSettings = await this.mlModel.predictOptimizedSettings(inputFeatures);
 
-      // Actualizamos settings solo si los valores son razonables
       if (optimizedSettings[0] >= 10 && optimizedSettings[0] <= 30) {
         this.processingSettings.MIN_RED_VALUE = optimizedSettings[0];
       }
@@ -95,17 +95,15 @@ export class PPGProcessor {
     }
   }
 
-  private saveTrainingData(bpm: number, spo2: number, signalQuality: number) {
-    // Guardamos datos solo si son válidos
-    if (bpm > 0 && spo2 > 0 && signalQuality > 0) {
-      this.trainingData.push([bpm, spo2, signalQuality]);
+  private saveTrainingData(calculatedBpm: number, spo2: number, signalQuality: number) {
+    if (calculatedBpm > 0 && spo2 > 0 && signalQuality > 0) {
+      this.trainingData.push([calculatedBpm, spo2, signalQuality]);
       this.targetData.push([
         this.processingSettings.MIN_RED_VALUE,
         this.processingSettings.PEAK_THRESHOLD_FACTOR,
         this.processingSettings.MIN_VALID_PIXELS_RATIO
       ]);
 
-      // Limitamos el tamaño del buffer de entrenamiento
       if (this.trainingData.length > 100) {
         this.trainingData.shift();
         this.targetData.shift();
