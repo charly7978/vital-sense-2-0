@@ -13,22 +13,20 @@ const queryClient = new QueryClient();
 
 const App = () => {
   return (
-    <React.StrictMode>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <VitalsProvider>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <VitalsProvider>
+          <BrowserRouter>
             <Toaster />
             <Sonner />
-            <BrowserRouter>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
-          </VitalsProvider>
-        </TooltipProvider>
-      </QueryClientProvider>
-    </React.StrictMode>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </VitalsProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
   );
 };
 
