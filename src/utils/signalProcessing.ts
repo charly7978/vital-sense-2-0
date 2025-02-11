@@ -3,6 +3,13 @@ import FFT from 'fft.js';
 export class SignalProcessor {
   private readonly windowSize: number;
   private calibrationConstants: any = {};
+  private readonly sampleRate = 30;
+  private readonly spO2CalibrationCoefficients = {
+    a: 110,  // Coeficiente de calibración empírica
+    b: 25,   // Pendiente de calibración empírica
+    c: 1,    // Factor de corrección de temperatura
+    perfusionIndexThreshold: 0.4  // Umbral mínimo de índice de perfusión
+  };
 
   constructor(windowSize: number) {
     this.windowSize = windowSize;
@@ -10,6 +17,14 @@ export class SignalProcessor {
 
   updateCalibrationConstants(calibrationData: any) {
     this.calibrationConstants = calibrationData.calibration_constants || {};
+    
+    // Actualizar coeficientes de SpO2 si están disponibles
+    if (calibrationData.spo2_calibration_data) {
+      const spo2Cal = calibrationData.spo2_calibration_data;
+      this.spO2CalibrationCoefficients.a = spo2Cal.a || 110;
+      this.spO2CalibrationCoefficients.b = spo2Cal.b || 25;
+      this.spO2CalibrationCoefficients.c = spo2Cal.c || 1;
+    }
   }
 
   lowPassFilter(signal: number[], cutoffFreq: number): number[] {
@@ -75,24 +90,63 @@ export class SignalProcessor {
     return { frequencies, magnitudes };
   }
 
-  calculateSpO2(redSignal: number[], irSignal: number[]): number {
-    if (redSignal.length !== irSignal.length || redSignal.length < 2) return 0;
+  calculateSpO2(redSignal: number[], irSignal: number[], perfusionIndex: number = 0): {
+    spo2: number;
+    confidence: number;
+  } {
+    if (redSignal.length !== irSignal.length || redSignal.length < 2) {
+      return { spo2: 0, confidence: 0 };
+    }
     
-    // Calcular AC y DC para ambas señales
-    const redAC = Math.max(...redSignal) - Math.min(...redSignal);
-    const redDC = redSignal.reduce((a, b) => a + b, 0) / redSignal.length;
-    const irAC = Math.max(...irSignal) - Math.min(...irSignal);
-    const irDC = irSignal.reduce((a, b) => a + b, 0) / irSignal.length;
+    // Aplicar filtro paso bajo para reducir ruido
+    const filteredRed = this.lowPassFilter(redSignal, 4);
+    const filteredIr = this.lowPassFilter(irSignal, 4);
     
-    // Calcular R (ratio-of-ratios)
-    const R = (redAC/redDC)/(irAC/irDC);
+    // Calcular AC y DC para ambas señales usando ventana deslizante
+    const windowSize = Math.min(30, filteredRed.length);
+    let redAC = 0, redDC = 0, irAC = 0, irDC = 0;
     
-    // Ecuación empírica calibrada para SpO2
-    // SpO2 = 110 - 25R (aproximación basada en estudios clínicos)
-    const spo2 = Math.round(110 - 25 * R);
+    for (let i = filteredRed.length - windowSize; i < filteredRed.length; i++) {
+      redDC += filteredRed[i];
+      irDC += filteredIr[i];
+      
+      if (i > filteredRed.length - windowSize + 1) {
+        redAC += Math.abs(filteredRed[i] - filteredRed[i-1]);
+        irAC += Math.abs(filteredIr[i] - filteredIr[i-1]);
+      }
+    }
     
-    // Limitar el rango a valores fisiológicamente posibles
-    return Math.min(Math.max(spo2, 70), 100);
+    redDC /= windowSize;
+    irDC /= windowSize;
+    redAC /= (windowSize - 1);
+    irAC /= (windowSize - 1);
+    
+    // Calcular R (ratio-of-ratios) con corrección de temperatura
+    const R = ((redAC * irDC) / (irAC * redDC)) * this.spO2CalibrationCoefficients.c;
+    
+    // Calcular SpO2 usando ecuación calibrada
+    let spo2 = Math.round(this.spO2CalibrationCoefficients.a - 
+                         this.spO2CalibrationCoefficients.b * R);
+    
+    // Calcular puntuación de confianza basada en múltiples factores
+    let confidence = 1.0;
+    
+    // Ajustar por índice de perfusión
+    if (perfusionIndex < this.spO2CalibrationCoefficients.perfusionIndexThreshold) {
+      confidence *= (perfusionIndex / this.spO2CalibrationCoefficients.perfusionIndexThreshold);
+    }
+    
+    // Ajustar por variabilidad de la señal
+    const signalStability = this.calculateSignalStability(filteredRed, filteredIr);
+    confidence *= signalStability;
+    
+    // Limitar SpO2 a rangos fisiológicamente posibles
+    spo2 = Math.min(Math.max(spo2, 70), 100);
+    
+    // Normalizar confianza a porcentaje
+    confidence = Math.min(Math.max(confidence * 100, 0), 100);
+    
+    return { spo2, confidence };
   }
 
   analyzeHRV(intervals: number[]): {
@@ -276,5 +330,20 @@ export class SignalProcessor {
     return meanDiff / maxSignal;
   }
 
-  private readonly sampleRate = 30;
+  private calculateSignalStability(redSignal: number[], irSignal: number[]): number {
+    const redVariance = this.calculateVariance(redSignal);
+    const irVariance = this.calculateVariance(irSignal);
+    
+    // Normalizar varianzas y convertir a medida de estabilidad
+    const maxVariance = Math.max(redVariance, irVariance);
+    if (maxVariance === 0) return 1.0;
+    
+    const stabilityScore = 1.0 - (Math.min(maxVariance, 1000) / 1000);
+    return Math.max(stabilityScore, 0.1);
+  }
+
+  private calculateVariance(signal: number[]): number {
+    const mean = signal.reduce((a, b) => a + b, 0) / signal.length;
+    return signal.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / signal.length;
+  }
 }

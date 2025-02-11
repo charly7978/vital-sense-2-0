@@ -397,11 +397,14 @@ export type Database = {
           calibration_history: Json | null
           height: number | null
           id: string
+          ir_wavelength_calibration: number | null
           is_active: boolean | null
           last_calibration_quality: number | null
+          red_wavelength_calibration: number | null
           reference_bp_diastolic: number | null
           reference_bp_systolic: number | null
           reference_device_type: string | null
+          spo2_calibration_data: Json | null
           user_id: string | null
           weight: number | null
         }
@@ -412,11 +415,14 @@ export type Database = {
           calibration_history?: Json | null
           height?: number | null
           id?: string
+          ir_wavelength_calibration?: number | null
           is_active?: boolean | null
           last_calibration_quality?: number | null
+          red_wavelength_calibration?: number | null
           reference_bp_diastolic?: number | null
           reference_bp_systolic?: number | null
           reference_device_type?: string | null
+          spo2_calibration_data?: Json | null
           user_id?: string | null
           weight?: number | null
         }
@@ -427,11 +433,14 @@ export type Database = {
           calibration_history?: Json | null
           height?: number | null
           id?: string
+          ir_wavelength_calibration?: number | null
           is_active?: boolean | null
           last_calibration_quality?: number | null
+          red_wavelength_calibration?: number | null
           reference_bp_diastolic?: number | null
           reference_bp_systolic?: number | null
           reference_device_type?: string | null
+          spo2_calibration_data?: Json | null
           user_id?: string | null
           weight?: number | null
         }
@@ -453,13 +462,17 @@ export type Database = {
           hrv_metrics: Json | null
           hrv_time_domain: Json | null
           id: string
+          ir_intensity: number[] | null
           light_conditions: Json | null
           measurement_quality: number | null
+          perfusion_index: number | null
           ppg_data: Json | null
           ppg_filtered_data: number[] | null
           ppg_raw_data: number[] | null
           ppg_signal_data: Json | null
+          red_intensity: number[] | null
           spo2: number | null
+          spo2_confidence_score: number | null
           systolic: number | null
           systolic_pressure: number | null
           user_id: string | null
@@ -479,13 +492,17 @@ export type Database = {
           hrv_metrics?: Json | null
           hrv_time_domain?: Json | null
           id?: string
+          ir_intensity?: number[] | null
           light_conditions?: Json | null
           measurement_quality?: number | null
+          perfusion_index?: number | null
           ppg_data?: Json | null
           ppg_filtered_data?: number[] | null
           ppg_raw_data?: number[] | null
           ppg_signal_data?: Json | null
+          red_intensity?: number[] | null
           spo2?: number | null
+          spo2_confidence_score?: number | null
           systolic?: number | null
           systolic_pressure?: number | null
           user_id?: string | null
@@ -505,13 +522,17 @@ export type Database = {
           hrv_metrics?: Json | null
           hrv_time_domain?: Json | null
           id?: string
+          ir_intensity?: number[] | null
           light_conditions?: Json | null
           measurement_quality?: number | null
+          perfusion_index?: number | null
           ppg_data?: Json | null
           ppg_filtered_data?: number[] | null
           ppg_raw_data?: number[] | null
           ppg_signal_data?: Json | null
+          red_intensity?: number[] | null
           spo2?: number | null
+          spo2_confidence_score?: number | null
           systolic?: number | null
           systolic_pressure?: number | null
           user_id?: string | null

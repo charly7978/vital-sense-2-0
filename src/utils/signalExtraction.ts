@@ -1,14 +1,15 @@
 
-import { SignalProcessor } from './signalProcessing';
-
 interface ExtractedSignals {
   red: number;
   ir: number;
   quality: number;
+  perfusionIndex: number;
 }
 
 export class SignalExtractor {
   private readonly qualityThreshold = 0.6;
+  private readonly minIntensity = 30;
+  private readonly maxIntensity = 250;
 
   extractChannels(imageData: ImageData): ExtractedSignals {
     let redSum = 0;
@@ -16,6 +17,8 @@ export class SignalExtractor {
     let pixelCount = 0;
     let saturationCount = 0;
     let darkPixelCount = 0;
+    let maxRedIntensity = 0;
+    let minRedIntensity = 255;
     
     const width = imageData.width;
     const height = imageData.height;
@@ -31,22 +34,34 @@ export class SignalExtractor {
           const green = imageData.data[i+1];
           const blue = imageData.data[i+2];
           
-          if (red < 30) darkPixelCount++;
-          if (red > 250) saturationCount++;
+          // Track min/max intensities for perfusion index
+          maxRedIntensity = Math.max(maxRedIntensity, red);
+          minRedIntensity = Math.min(minRedIntensity, red);
+          
+          if (red < this.minIntensity) darkPixelCount++;
+          if (red > this.maxIntensity) saturationCount++;
           
           redSum += red;
-          irSum += (green * 0.7 + blue * 0.3);
+          // Mejorar la separación de longitudes de onda IR
+          irSum += (green * 0.8 + blue * 0.2); // Ajuste de pesos para mejor separación espectral
           pixelCount++;
         }
       }
     }
     
     const quality = 1 - ((saturationCount + darkPixelCount) / pixelCount);
+    const avgRed = pixelCount > 0 ? redSum / pixelCount : 0;
+    const avgIr = pixelCount > 0 ? irSum / pixelCount : 0;
+    
+    // Calcular índice de perfusión (PI = AC/DC * 100)
+    const perfusionIndex = avgRed > 0 ? 
+      ((maxRedIntensity - minRedIntensity) / avgRed) * 100 : 0;
     
     return {
-      red: pixelCount > 0 ? redSum / pixelCount : 0,
-      ir: pixelCount > 0 ? irSum / pixelCount : 0,
-      quality
+      red: avgRed,
+      ir: avgIr,
+      quality,
+      perfusionIndex
     };
   }
 }
