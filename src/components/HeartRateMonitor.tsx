@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { Heart, Droplets, Activity, AlertTriangle, PlayCircle, StopCircle, Settings } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
@@ -73,6 +72,36 @@ const HeartRateMonitor: React.FC = () => {
     }
   };
 
+  const storeMeasurement = async (measurementData: any) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        console.error('No authenticated user found');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('vital_signs')
+        .insert([{
+          ...measurementData,
+          user_id: user.id
+        }]);
+
+      if (error) {
+        console.error('Error storing measurement:', error);
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error storing measurement:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No se pudieron guardar las mediciones"
+      });
+    }
+  };
+
   const handleFrame = useCallback((imageData: ImageData) => {
     if (!isStarted) return;
     
@@ -96,7 +125,7 @@ const HeartRateMonitor: React.FC = () => {
             systolic_pressure: vitals.systolic,
             diastolic_pressure: vitals.diastolic,
             arrhythmia_detected: vitals.hasArrhythmia,
-            measurement_quality: vitals.signalQuality || 0,
+            measurement_quality: vitals.confidence || 0,
             ppg_signal_data: {
               readings: ppgProcessor.getReadings()
             }
@@ -112,18 +141,6 @@ const HeartRateMonitor: React.FC = () => {
       });
     }
   }, [isStarted, toast]);
-
-  const storeMeasurement = async (measurementData: any) => {
-    try {
-      const { error } = await supabase
-        .from('vital_signs')
-        .insert([measurementData]);
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error storing measurement:', error);
-    }
-  };
 
   const toggleMeasurement = () => {
     if (!isCalibrated && !isStarted) {
