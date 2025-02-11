@@ -1,6 +1,7 @@
 
 import React from 'react';
 import HeartRateMonitor from '@/components/HeartRateMonitor';
+import { VitalsProvider } from '@/contexts/VitalsContext';
 
 const Index = () => {
   return (
@@ -16,7 +17,9 @@ const Index = () => {
         </header>
 
         <div className="bg-black/20 backdrop-blur-lg rounded-2xl shadow-xl p-4 sm:p-6 w-full max-w-4xl mx-auto">
-          <HeartRateMonitor />
+          <VitalsProvider>
+            <HeartRateMonitor />
+          </VitalsProvider>
         </div>
       </div>
     </div>
