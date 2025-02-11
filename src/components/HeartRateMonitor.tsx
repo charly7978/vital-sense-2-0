@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Heart, Droplets, Activity, AlertTriangle, PlayCircle, StopCircle, Hand, SignalHigh, SignalMedium, SignalLow } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
@@ -7,6 +8,7 @@ import CameraView from './CameraView';
 import VitalChart from './VitalChart';
 import SensitivityControls from './SensitivityControls';
 import CalibrationPanel from './CalibrationPanel';
+import BPCalibrationForm from './BPCalibrationForm';
 import { PPGProcessor } from '../utils/ppgProcessor';
 import { BeepPlayer } from '../utils/audioUtils';
 import type { VitalReading, PPGData, SensitivitySettings, CalibrationSettings } from '../utils/types';
