@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useState } from 'react';
 import Webcam from 'react-webcam';
 import { useToast } from "@/hooks/use-toast";
@@ -13,35 +14,49 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number | null>(null);
   const { toast } = useToast();
+  const [videoInitialized, setVideoInitialized] = useState(false);
 
   const processFrame = () => {
-    if (!isActive || !webcamRef.current?.video || !canvasRef.current) return;
+    if (!isActive || !webcamRef.current?.video || !canvasRef.current) {
+      animationFrameRef.current = requestAnimationFrame(processFrame);
+      return;
+    }
 
     const video = webcamRef.current.video;
     const canvas = canvasRef.current;
     const context = canvas.getContext('2d');
 
-    if (!context || video.readyState !== video.HAVE_ENOUGH_DATA) {
+    if (!context || video.readyState !== video.HAVE_ENOUGH_DATA || !video.videoWidth || !video.videoHeight) {
       animationFrameRef.current = requestAnimationFrame(processFrame);
       return;
     }
 
-    // Ajusta el tamaño del canvas
+    // Solo actualiza las dimensiones del canvas si han cambiado
     if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
+      setVideoInitialized(true);
     }
 
-    // Captura el frame y procesa
-    context.drawImage(video, 0, 0);
-    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-    onFrame(imageData);
+    try {
+      // Dibuja el frame
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      // Solo procesa si el canvas tiene dimensiones válidas
+      if (canvas.width > 0 && canvas.height > 0) {
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+        onFrame(imageData);
+      }
+    } catch (error) {
+      console.error('Error processing video frame:', error);
+    }
 
     animationFrameRef.current = requestAnimationFrame(processFrame);
   };
 
   useEffect(() => {
     if (isActive) {
+      setVideoInitialized(false);
       animationFrameRef.current = requestAnimationFrame(processFrame);
     } else {
       if (animationFrameRef.current) {
@@ -66,7 +81,15 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
           </div>
         )}
         {isActive && (
-          <Webcam ref={webcamRef} className="w-full h-full object-cover" />
+          <Webcam
+            ref={webcamRef}
+            className="w-full h-full object-cover"
+            videoConstraints={{
+              width: 640,
+              height: 480,
+              facingMode: "user"
+            }}
+          />
         )}
       </div>
       <canvas ref={canvasRef} className="hidden" />
