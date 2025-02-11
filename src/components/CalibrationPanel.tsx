@@ -33,7 +33,7 @@ const defaultSettings: CalibrationSettings = {
     description: "Umbral de calidad mínima de la señal. Aumentar para mayor precisión pero menor sensibilidad."
   },
   signalAmplification: {
-    value: 1.2,
+    value: 1.8,
     min: 1,
     max: 5,
     step: 0.1,
@@ -61,10 +61,10 @@ const defaultSettings: CalibrationSettings = {
     description: "Tamaño de la ventana de análisis en muestras. Aumentar para mayor estabilidad, disminuir para respuesta más rápida."
   },
   peakThreshold: {
-    value: 0.5,
+    value: 0.3,
     min: 0.1,
     max: 1,
-    step: 0.05,
+    step: 0.03,
     description: "Umbral para detección de picos. Aumentar si detecta falsos picos, disminuir si pierde picos reales."
   },
   kalmanQ: {
