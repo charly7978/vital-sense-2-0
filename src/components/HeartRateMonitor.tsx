@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Heart, Droplets, Activity, AlertTriangle, PlayCircle, StopCircle, Settings } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
@@ -125,7 +126,7 @@ const HeartRateMonitor: React.FC = () => {
             systolic_pressure: vitals.systolic,
             diastolic_pressure: vitals.diastolic,
             arrhythmia_detected: vitals.hasArrhythmia,
-            measurement_quality: vitals.confidence || 0,
+            measurement_quality: vitals.signalQuality || 0,
             ppg_signal_data: {
               readings: ppgProcessor.getReadings()
             }
