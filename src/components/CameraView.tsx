@@ -103,12 +103,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
             videoConstraints={{
               width: 640,
               height: 480,
-              facingMode: getCameraFacingMode(),
-              advanced: [
-                {
-                  torch: true // Activar la linterna en dispositivos que lo soporten
-                }
-              ]
+              facingMode: getCameraFacingMode()
             }}
           />
         )}
