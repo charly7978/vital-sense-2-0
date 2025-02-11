@@ -16,20 +16,18 @@ const CameraInitializer: React.FC<CameraInitializerProps> = ({
   const { toast } = useToast();
 
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
+    let currentStream: MediaStream | null = null;
 
     const initCamera = async () => {
       try {
         if (!isActive) return;
 
-        // Primero intentar detener cualquier stream existente
-        const existingStreams = await navigator.mediaDevices.getUserMedia({ video: true });
-        existingStreams.getTracks().forEach(track => track.stop());
+        // Stop any existing streams first
+        if (currentStream) {
+          currentStream.getTracks().forEach(track => track.stop());
+        }
 
-        // Esperar un momento antes de iniciar la nueva stream
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        // Solicitar acceso a la cámara con configuraciones básicas
+        // Request camera access with basic settings
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             width: { ideal: 640 },
@@ -37,13 +35,13 @@ const CameraInitializer: React.FC<CameraInitializerProps> = ({
           }
         });
 
-        // Verificar que el stream sea válido
-        const videoTrack = stream.getVideoTracks()[0];
-        if (!videoTrack) {
+        // Validate stream
+        if (!stream.getVideoTracks().length) {
           throw new Error('No se encontró un track de video válido');
         }
 
-        console.log('Cámara inicializada correctamente:', videoTrack.getSettings());
+        currentStream = stream;
+        console.log('Cámara inicializada:', stream.getVideoTracks()[0].getSettings());
         onError(null);
         onInitialized(stream);
 
@@ -54,21 +52,30 @@ const CameraInitializer: React.FC<CameraInitializerProps> = ({
 
       } catch (error) {
         console.error('Error al inicializar la cámara:', error);
-        onError('Error al iniciar la cámara. Por favor, verifica los permisos y reinicia la página.');
+        onError('Error al iniciar la cámara. Por favor, verifica los permisos.');
         toast({
           variant: "destructive",
           title: "Error",
-          description: "No se pudo iniciar la cámara. Verifica los permisos y asegúrate de que no haya otras aplicaciones usando la cámara."
+          description: "No se pudo iniciar la cámara. Verifica los permisos."
         });
       }
     };
 
+    // Initialize camera when component becomes active
     if (isActive) {
-      timeoutId = setTimeout(initCamera, 1000);
+      initCamera();
     }
 
+    // Cleanup function
     return () => {
-      clearTimeout(timeoutId);
+      if (currentStream) {
+        console.log('Limpiando streams de cámara');
+        currentStream.getTracks().forEach(track => {
+          track.stop();
+          console.log('Track detenido:', track.label);
+        });
+        currentStream = null;
+      }
     };
   }, [isActive, onInitialized, onError, toast]);
 

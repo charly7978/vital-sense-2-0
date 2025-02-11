@@ -12,7 +12,6 @@ interface CameraDisplayProps {
   isAndroid: boolean;
 }
 
-// Extended interface for the track with torch capability
 interface TrackWithTorch extends MediaStreamTrack {
   applyConstraints(constraints: MediaTrackConstraints & { advanced?: { torch?: boolean }[] }): Promise<void>;
 }
@@ -26,26 +25,37 @@ const CameraDisplay: React.FC<CameraDisplayProps> = ({
 }) => {
   useEffect(() => {
     const enableFlashlight = async () => {
-      if (isAndroid && isActive && webcamRef.current?.video) {
-        try {
-          const stream = webcamRef.current.video.srcObject as MediaStream;
-          const track = stream.getVideoTracks()[0] as TrackWithTorch;
-          
-          if (track) {
-            await track.applyConstraints({
-              advanced: [{ torch: true }]
-            });
-            console.log('Flashlight enabled successfully');
-          }
-        } catch (error) {
-          console.error('Error enabling flashlight:', error);
+      if (!isAndroid || !isActive || !webcamRef.current?.video) return;
+
+      try {
+        const stream = webcamRef.current.video.srcObject as MediaStream;
+        if (!stream) {
+          console.log('No hay stream disponible para la linterna');
+          return;
         }
+
+        const track = stream.getVideoTracks()[0] as TrackWithTorch;
+        if (!track) {
+          console.log('No hay track de video disponible');
+          return;
+        }
+
+        await track.applyConstraints({
+          advanced: [{ torch: true }]
+        });
+        console.log('Linterna activada correctamente');
+      } catch (error) {
+        console.error('Error al activar la linterna:', error);
       }
     };
 
-    enableFlashlight();
+    // Pequeña demora para asegurar que el stream esté listo
+    const timeoutId = setTimeout(() => {
+      enableFlashlight();
+    }, 1000);
 
     return () => {
+      clearTimeout(timeoutId);
       if (isAndroid && webcamRef.current?.video) {
         const stream = webcamRef.current.video.srcObject as MediaStream;
         const track = stream?.getVideoTracks()[0] as TrackWithTorch;

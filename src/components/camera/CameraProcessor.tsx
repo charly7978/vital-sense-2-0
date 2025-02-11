@@ -21,17 +21,10 @@ const CameraProcessor: React.FC<CameraProcessorProps> = ({
 
   useEffect(() => {
     let animationFrameId: number;
-    let lastProcessTime = 0;
-    const frameInterval = 33; // Aproximadamente 30 FPS
+    let isProcessing = false;
 
-    const processFrame = (timestamp: number) => {
-      if (!isActive || !cameraInitialized) {
-        animationFrameId = requestAnimationFrame(processFrame);
-        return;
-      }
-
-      // Controlar la tasa de frames
-      if (timestamp - lastProcessTime < frameInterval) {
+    const processFrame = () => {
+      if (!isActive || !cameraInitialized || isProcessing) {
         animationFrameId = requestAnimationFrame(processFrame);
         return;
       }
@@ -40,38 +33,34 @@ const CameraProcessor: React.FC<CameraProcessorProps> = ({
       const canvas = canvasRef.current;
       const context = canvas?.getContext('2d');
 
-      if (!video || !canvas || !context) {
+      if (!video || !canvas || !context || video.readyState !== video.HAVE_ENOUGH_DATA) {
         animationFrameId = requestAnimationFrame(processFrame);
         return;
       }
 
-      if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        if (!processingRef.current) {
-          processingRef.current = true;
+      isProcessing = true;
 
-          try {
-            // Asegurar que el canvas tenga las dimensiones correctas
-            if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-              canvas.width = video.videoWidth;
-              canvas.height = video.videoHeight;
-            }
-
-            context.drawImage(video, 0, 0);
-            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-            onFrame(imageData);
-            lastProcessTime = timestamp;
-
-          } catch (error) {
-            console.error('Error procesando frame:', error);
-            toast({
-              variant: "destructive",
-              title: "Error",
-              description: "Error al procesar imagen de la cámara"
-            });
-          } finally {
-            processingRef.current = false;
-          }
+      try {
+        // Ensure canvas dimensions match video
+        if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          console.log('Canvas dimensions actualizadas:', canvas.width, canvas.height);
         }
+
+        context.drawImage(video, 0, 0);
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+        onFrame(imageData);
+
+      } catch (error) {
+        console.error('Error procesando frame:', error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Error al procesar imagen de la cámara"
+        });
+      } finally {
+        isProcessing = false;
       }
 
       animationFrameId = requestAnimationFrame(processFrame);
@@ -87,7 +76,7 @@ const CameraProcessor: React.FC<CameraProcessorProps> = ({
         cancelAnimationFrame(animationFrameId);
       }
     };
-  }, [isActive, onFrame, cameraInitialized, videoRef, toast]);
+  }, [isActive, cameraInitialized, onFrame, videoRef, toast]);
 
   return <canvas ref={canvasRef} className="hidden" />;
 };
