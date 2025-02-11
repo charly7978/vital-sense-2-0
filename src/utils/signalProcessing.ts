@@ -5,10 +5,18 @@ export class SignalProcessor {
   private calibrationConstants: any = {};
   private readonly sampleRate = 30;
   private readonly spO2CalibrationCoefficients = {
-    a: 110,  // Coeficiente de calibración empírica
-    b: 25,   // Pendiente de calibración empírica
-    c: 1,    // Factor de corrección de temperatura
-    perfusionIndexThreshold: 0.4  // Umbral mínimo de índice de perfusión
+    a: 110,
+    b: 25,
+    c: 1,
+    perfusionIndexThreshold: 0.4
+  };
+
+  // Estado del filtro de Kalman
+  private kalmanState = {
+    x: 0, // Estimación del estado
+    p: 1, // Covarianza del error de estimación
+    q: 0.1, // Ruido del proceso
+    r: 1 // Ruido de la medición
   };
 
   constructor(windowSize: number) {
@@ -28,27 +36,31 @@ export class SignalProcessor {
   }
 
   lowPassFilter(signal: number[], cutoffFreq: number): number[] {
-    const filtered = [];
+    // Primero aplicamos el filtro de Kalman
+    const kalmanFiltered = signal.map(value => this.kalmanFilter(value));
+    
+    // Luego aplicamos el filtro paso bajo existente
+    const filtered: number[] = [];
     const rc = 1.0 / (cutoffFreq * 2 * Math.PI);
     const dt = 1.0 / this.sampleRate;
     const alpha = dt / (rc + dt);
     const windowSize = Math.min(10, signal.length);
     
-    // Aplicar ventana Hamming para mejorar la respuesta en frecuencia
-    for (let i = 0; i < signal.length; i++) {
+    // Aplicar ventana Hamming
+    for (let i = 0; i < kalmanFiltered.length; i++) {
       let sum = 0;
       let weightSum = 0;
       
       for (let j = Math.max(0, i - windowSize + 1); j <= i; j++) {
         const weight = 0.54 - 0.46 * Math.cos((2 * Math.PI * (j - i + windowSize)) / windowSize);
-        sum += signal[j] * weight;
+        sum += kalmanFiltered[j] * weight;
         weightSum += weight;
       }
       
       filtered[i] = sum / weightSum;
     }
     
-    // Aplicar filtro RC adicional para suavizar
+    // Aplicar filtro RC adicional
     let lastFiltered = filtered[0];
     for (let i = 1; i < signal.length; i++) {
       lastFiltered = lastFiltered + alpha * (filtered[i] - lastFiltered);
@@ -56,6 +68,26 @@ export class SignalProcessor {
     }
     
     return filtered;
+  }
+
+  private kalmanFilter(measurement: number): number {
+    // Predicción
+    const predictedState = this.kalmanState.x;
+    const predictedCovariance = this.kalmanState.p + this.kalmanState.q;
+
+    // Ganancia de Kalman
+    const kalmanGain = predictedCovariance / (predictedCovariance + this.kalmanState.r);
+
+    // Actualización
+    this.kalmanState.x = predictedState + kalmanGain * (measurement - predictedState);
+    this.kalmanState.p = (1 - kalmanGain) * predictedCovariance;
+
+    return this.kalmanState.x;
+  }
+
+  updateKalmanParameters(q: number, r: number) {
+    this.kalmanState.q = q;
+    this.kalmanState.r = r;
   }
 
   performFFT(signal: number[]): { frequencies: number[], magnitudes: number[] } {
