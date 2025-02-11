@@ -1,5 +1,5 @@
 
-import { VitalReading } from './types';
+import { VitalReading, UserCalibration } from './types';
 import { BeepPlayer } from './audioUtils';
 import { SignalProcessor } from './signalProcessing';
 
@@ -19,10 +19,16 @@ export class PPGProcessor {
   private baseline = 0;
   private adaptiveThreshold = 0;
   private readonly qualityThreshold = 0.6;
+  private calibrationData: UserCalibration | null = null;
   
   constructor() {
     this.beepPlayer = new BeepPlayer();
     this.signalProcessor = new SignalProcessor(this.windowSize);
+  }
+
+  setCalibrationData(data: UserCalibration) {
+    this.calibrationData = data;
+    this.signalProcessor.updateCalibrationConstants(data);
   }
 
   processFrame(imageData: ImageData): { 
@@ -99,8 +105,14 @@ export class PPGProcessor {
     // Cálculo de SpO2 usando ratio-of-ratios
     const spo2 = this.signalProcessor.calculateSpO2(this.redBuffer, this.irBuffer);
     
-    // Estimación de presión arterial usando características PPG
-    const bp = this.signalProcessor.estimateBloodPressure(filteredRed, this.peakTimes);
+    // Estimación de presión arterial usando características PPG y calibración
+    const bp = this.calibrationData ? 
+      this.signalProcessor.estimateBloodPressureWithCalibration(
+        filteredRed, 
+        this.peakTimes,
+        this.calibrationData
+      ) :
+      this.signalProcessor.estimateBloodPressure(filteredRed, this.peakTimes);
     
     // Calcular calidad general de la señal
     const signalQuality = this.signalProcessor.analyzeSignalQuality(filteredRed);
@@ -209,3 +221,4 @@ export class PPGProcessor {
     return this.readings;
   }
 }
+

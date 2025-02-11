@@ -34,3 +34,4 @@ export interface UserCalibration extends CalibrationData {
   lastCalibrationQuality: number;
   calibrationHistory: any[];
 }
+

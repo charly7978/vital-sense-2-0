@@ -11,20 +11,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import type { CalibrationData } from '@/utils/types';
 
 interface CalibrationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onComplete: (data: CalibrationData) => void;
-}
-
-interface CalibrationData {
-  age: number;
-  height: number;
-  weight: number;
-  systolic: number;
-  diastolic: number;
-  deviceType: string;
 }
 
 const CalibrationDialog: React.FC<CalibrationDialogProps> = ({
@@ -38,7 +30,8 @@ const CalibrationDialog: React.FC<CalibrationDialogProps> = ({
     weight: 0,
     systolic: 0,
     diastolic: 0,
-    deviceType: ''
+    deviceType: '',
+    calibrationDate: new Date()
   });
   const { toast } = useToast();
 
@@ -51,6 +44,52 @@ const CalibrationDialog: React.FC<CalibrationDialogProps> = ({
         variant: "destructive",
         title: "Error de validación",
         description: "Por favor complete todos los campos"
+      });
+      return;
+    }
+
+    // Validate ranges
+    if (formData.age < 18 || formData.age > 120) {
+      toast({
+        variant: "destructive",
+        title: "Error de validación",
+        description: "La edad debe estar entre 18 y 120 años"
+      });
+      return;
+    }
+
+    if (formData.height < 100 || formData.height > 250) {
+      toast({
+        variant: "destructive",
+        title: "Error de validación",
+        description: "La altura debe estar entre 100 y 250 cm"
+      });
+      return;
+    }
+
+    if (formData.weight < 30 || formData.weight > 300) {
+      toast({
+        variant: "destructive",
+        title: "Error de validación",
+        description: "El peso debe estar entre 30 y 300 kg"
+      });
+      return;
+    }
+
+    if (formData.systolic < 70 || formData.systolic > 200) {
+      toast({
+        variant: "destructive",
+        title: "Error de validación",
+        description: "La presión sistólica debe estar entre 70 y 200 mmHg"
+      });
+      return;
+    }
+
+    if (formData.diastolic < 40 || formData.diastolic > 130) {
+      toast({
+        variant: "destructive",
+        title: "Error de validación",
+        description: "La presión diastólica debe estar entre 40 y 130 mmHg"
       });
       return;
     }
@@ -87,6 +126,8 @@ const CalibrationDialog: React.FC<CalibrationDialogProps> = ({
                 value={formData.age}
                 onChange={handleInputChange}
                 className="bg-zinc-900"
+                min="18"
+                max="120"
               />
             </div>
             <div className="space-y-2">
@@ -98,6 +139,8 @@ const CalibrationDialog: React.FC<CalibrationDialogProps> = ({
                 value={formData.height}
                 onChange={handleInputChange}
                 className="bg-zinc-900"
+                min="100"
+                max="250"
               />
             </div>
           </div>
@@ -111,6 +154,8 @@ const CalibrationDialog: React.FC<CalibrationDialogProps> = ({
               value={formData.weight}
               onChange={handleInputChange}
               className="bg-zinc-900"
+              min="30"
+              max="300"
             />
           </div>
 
@@ -124,6 +169,8 @@ const CalibrationDialog: React.FC<CalibrationDialogProps> = ({
                 value={formData.systolic}
                 onChange={handleInputChange}
                 className="bg-zinc-900"
+                min="70"
+                max="200"
               />
             </div>
             <div className="space-y-2">
@@ -135,6 +182,8 @@ const CalibrationDialog: React.FC<CalibrationDialogProps> = ({
                 value={formData.diastolic}
                 onChange={handleInputChange}
                 className="bg-zinc-900"
+                min="40"
+                max="130"
               />
             </div>
           </div>
@@ -162,3 +211,4 @@ const CalibrationDialog: React.FC<CalibrationDialogProps> = ({
 };
 
 export default CalibrationDialog;
+

@@ -1,13 +1,13 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Heart, Droplets, Activity, AlertTriangle, PlayCircle, StopCircle, Settings } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Dialog } from "@/components/ui/dialog";
 import CameraView from './CameraView';
 import VitalChart from './VitalChart';
 import CalibrationDialog from './CalibrationDialog';
 import { PPGProcessor } from '../utils/ppgProcessor';
-import type { VitalReading } from '../utils/types';
+import type { VitalReading, CalibrationData } from '../utils/types';
 import { supabase } from '@/integrations/supabase/client';
 
 const ppgProcessor = new PPGProcessor();
@@ -32,14 +32,26 @@ const HeartRateMonitor: React.FC = () => {
 
   const checkCalibration = async () => {
     try {
-      const { data: calibrationData } = await supabase
+      const { data: calibrationData, error } = await supabase
         .from('user_calibration')
         .select('*')
+        .eq('is_active', true)
         .limit(1);
 
+      if (error) throw error;
+
       setIsCalibrated(!!calibrationData && calibrationData.length > 0);
+      
+      if (calibrationData && calibrationData.length > 0) {
+        ppgProcessor.setCalibrationData(calibrationData[0]);
+      }
     } catch (error) {
       console.error('Error checking calibration:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No se pudo verificar el estado de calibración"
+      });
     }
   };
 
@@ -57,6 +69,21 @@ const HeartRateMonitor: React.FC = () => {
         setHasArrhythmia(vitals.hasArrhythmia || false);
         setArrhythmiaType(vitals.arrhythmiaType || 'Normal');
         setReadings(ppgProcessor.getReadings());
+
+        // Store measurement in database
+        if (vitals.bpm > 0 && vitals.spo2 > 0) {
+          storeMeasurement({
+            heart_rate: vitals.bpm,
+            spo2: vitals.spo2,
+            systolic_pressure: vitals.systolic,
+            diastolic_pressure: vitals.diastolic,
+            arrhythmia_detected: vitals.hasArrhythmia,
+            measurement_quality: vitals.signalQuality || 0,
+            ppg_signal_data: {
+              readings: ppgProcessor.getReadings()
+            }
+          });
+        }
       }
     } catch (error) {
       console.error('Error processing frame:', error);
@@ -68,7 +95,28 @@ const HeartRateMonitor: React.FC = () => {
     }
   }, [isStarted, toast]);
 
+  const storeMeasurement = async (measurementData: any) => {
+    try {
+      const { error } = await supabase
+        .from('vital_signs')
+        .insert([measurementData]);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error storing measurement:', error);
+    }
+  };
+
   const toggleMeasurement = () => {
+    if (!isCalibrated && !isStarted) {
+      toast({
+        variant: "destructive",
+        title: "Calibración requerida",
+        description: "Por favor, realice la calibración antes de comenzar la medición."
+      });
+      return;
+    }
+
     setIsStarted(!isStarted);
     if (!isStarted) {
       toast({
@@ -80,24 +128,39 @@ const HeartRateMonitor: React.FC = () => {
     }
   };
 
-  const handleCalibrationComplete = async (calibrationData: any) => {
+  const handleCalibrationComplete = async (calibrationData: CalibrationData) => {
     try {
       const { error } = await supabase
         .from('user_calibration')
-        .insert({
+        .insert([{
           age: calibrationData.age,
           height: calibrationData.height,
           weight: calibrationData.weight,
           reference_bp_systolic: calibrationData.systolic,
           reference_bp_diastolic: calibrationData.diastolic,
           reference_device_type: calibrationData.deviceType,
-          is_active: true
-        });
+          is_active: true,
+          calibration_constants: {},
+          last_calibration_quality: 1.0,
+          calibration_history: []
+        }]);
 
       if (error) throw error;
 
       setIsCalibrated(true);
       setShowCalibration(false);
+      
+      // Update processor with new calibration
+      const { data: newCalibration } = await supabase
+        .from('user_calibration')
+        .select('*')
+        .eq('is_active', true)
+        .limit(1);
+
+      if (newCalibration && newCalibration.length > 0) {
+        ppgProcessor.setCalibrationData(newCalibration[0]);
+      }
+
       toast({
         title: "Calibración completada",
         description: "Los datos de calibración se han guardado correctamente."
@@ -227,3 +290,4 @@ const HeartRateMonitor: React.FC = () => {
 };
 
 export default HeartRateMonitor;
+
