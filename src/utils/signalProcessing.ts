@@ -1,4 +1,6 @@
 import FFT from 'fft.js';
+import { PTTProcessor } from './pttProcessor';
+import { PPGFeatureExtractor } from './ppgFeatureExtractor';
 
 export class SignalProcessor {
   private readonly windowSize: number;
@@ -19,8 +21,13 @@ export class SignalProcessor {
     r: 1 // Ruido de la medición
   };
 
+  private readonly pttProcessor: PTTProcessor;
+  private readonly featureExtractor: PPGFeatureExtractor;
+  
   constructor(windowSize: number) {
     this.windowSize = windowSize;
+    this.pttProcessor = new PTTProcessor();
+    this.featureExtractor = new PPGFeatureExtractor();
   }
 
   updateCalibrationConstants(calibrationData: any) {
@@ -252,42 +259,44 @@ export class SignalProcessor {
   } {
     if (peakTimes.length < 2) return { systolic: 0, diastolic: 0 };
     
-    // Cálculo mejorado del PTT (Pulse Transit Time)
-    const ptts: number[] = [];
-    for (let i = 1; i < peakTimes.length; i++) {
-      ptts.push(peakTimes[i] - peakTimes[i-1]);
+    // Get PTT and PPG features
+    const pttResult = this.pttProcessor.calculatePTT(signal);
+    const ppgFeatures = this.featureExtractor.extractFeatures(signal);
+    
+    if (!pttResult || !ppgFeatures) {
+      return { systolic: 0, diastolic: 0 };
     }
-    
-    const avgPTT = ptts.reduce((a, b) => a + b, 0) / ptts.length;
-    const pttVariability = Math.sqrt(
-      ptts.reduce((acc, ptt) => acc + Math.pow(ptt - avgPTT, 2), 0) / ptts.length
-    );
-    
-    // Análisis de la forma de onda PPG
-    const waveformFeatures = this.extractWaveformFeatures(signal);
-    const { 
-      systolicPeak, 
-      diastolicPeak, 
-      dicroticNotchTime,
-      augmentationIndex 
-    } = waveformFeatures;
-    
-    // Modelo predictivo mejorado basado en PTT y características de la onda
+
+    // Enhanced BP estimation using PTT and PPG features
+    const ptt = pttResult.ptt;
+    const { augmentationIndex, stiffnessIndex } = ppgFeatures;
+
+    // BP estimation coefficients (these would ideally come from calibration)
+    const coefficients = {
+      ptt: -0.5,      // PTT coefficient (inverse relationship)
+      aix: 20,        // Augmentation Index coefficient
+      si: 2,          // Stiffness Index coefficient
+      baselineSys: 120,
+      baselineDia: 80
+    };
+
+    // Calculate systolic pressure using multiple features
     const systolic = Math.round(
-      120 + // Línea base
-      (1000/avgPTT - 5) * 2.5 + // Contribución del PTT
-      augmentationIndex * 0.3 + // Contribución del índice de aumentación
-      (pttVariability / avgPTT) * 15 // Variabilidad del PTT
+      coefficients.baselineSys +
+      (coefficients.ptt * (1000/ptt - 5)) +
+      (coefficients.aix * augmentationIndex) +
+      (coefficients.si * stiffnessIndex)
     );
-    
+
+    // Calculate diastolic pressure
     const diastolic = Math.round(
-      80 + // Línea base
-      (diastolicPeak / systolicPeak - 0.5) * 20 + // Ratio de picos
-      dicroticNotchTime * 0.4 + // Tiempo de la muesca dicrótica
-      (pttVariability / avgPTT) * 10 // Variabilidad del PTT
+      coefficients.baselineDia +
+      (coefficients.ptt * (1000/ptt - 5) * 0.8) +
+      (coefficients.aix * augmentationIndex * 0.6) +
+      (coefficients.si * stiffnessIndex * 0.5)
     );
-    
-    // Limitar a rangos fisiológicamente posibles
+
+    // Ensure values are within physiological limits
     return {
       systolic: Math.min(Math.max(systolic, 90), 180),
       diastolic: Math.min(Math.max(diastolic, 60), 120)
