@@ -1,4 +1,3 @@
-
 import FFT from 'fft.js';
 
 export class SignalProcessor {
@@ -6,7 +5,9 @@ export class SignalProcessor {
   private readonly sampleRate = 30; // 30 fps
   
   constructor(size: number) {
-    this.fft = new FFT(size);
+    // Ensure size is a power of 2 by finding the next power of 2
+    const fftSize = Math.pow(2, Math.ceil(Math.log2(Math.max(size, 2))));
+    this.fft = new FFT(fftSize);
   }
 
   // Filtro de paso bajo
