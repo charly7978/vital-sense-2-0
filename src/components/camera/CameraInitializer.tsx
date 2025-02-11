@@ -13,6 +13,11 @@ interface ExtendedCapabilities extends MediaTrackCapabilities {
   torch?: boolean;
 }
 
+// Define custom interface for advanced constraints
+interface ExtendedConstraints extends MediaTrackConstraintSet {
+  torch?: boolean;
+}
+
 const CameraInitializer: React.FC<CameraInitializerProps> = ({
   onInitialized,
   isActive,
@@ -77,8 +82,9 @@ const CameraInitializer: React.FC<CameraInitializerProps> = ({
         
         if (capabilities?.torch) {
           try {
+            const advancedConstraint: ExtendedConstraints = { torch: true };
             await videoTrack.applyConstraints({
-              advanced: [{ torch: true }]
+              advanced: [advancedConstraint]
             });
             console.log('Torch activated successfully');
           } catch (e) {
