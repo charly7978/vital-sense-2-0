@@ -11,11 +11,8 @@ const Index = () => {
             Vital Signs Monitor
           </h1>
           <p className="text-sm sm:text-base text-gray-400">
-            Real-time health monitoring using advanced PPG algorithms
+            Real-time health monitoring using PPG analysis
           </p>
-          <div className="mt-2 inline-flex items-center px-3 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/20">
-            <span className="text-xs text-yellow-500">Simulation Mode</span>
-          </div>
         </header>
 
         <div className="bg-black/20 backdrop-blur-lg rounded-2xl shadow-xl p-4 sm:p-6 w-full max-w-4xl mx-auto">
