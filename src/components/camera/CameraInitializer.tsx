@@ -8,8 +8,11 @@ interface CameraInitializerProps {
   onError: (error: string) => void;
 }
 
-// Define custom interface to include torch capability
 interface ExtendedCapabilities extends MediaTrackCapabilities {
+  torch?: boolean;
+}
+
+interface ExtendedConstraints extends MediaTrackConstraintSet {
   torch?: boolean;
 }
 
@@ -38,7 +41,6 @@ const CameraInitializer: React.FC<CameraInitializerProps> = ({
 
   const initializeCamera = useCallback(async () => {
     try {
-      // Stop any existing stream before starting a new one
       stopCurrentStream();
 
       const permission = await CapCamera.checkPermissions();
@@ -59,17 +61,14 @@ const CameraInitializer: React.FC<CameraInitializerProps> = ({
         }
       };
 
-      console.log('Requesting camera stream with constraints:', constraints);
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       
       if (!isActive) {
-        // If component was deactivated while awaiting stream, cleanup
         stream.getTracks().forEach(track => track.stop());
         return;
       }
 
       setCurrentStream(stream);
-      console.log('Camera stream obtained successfully');
 
       if (isAndroid) {
         const videoTrack = stream.getVideoTracks()[0];
@@ -77,19 +76,19 @@ const CameraInitializer: React.FC<CameraInitializerProps> = ({
         
         if (capabilities?.torch) {
           try {
+            const advancedConstraint: ExtendedConstraints = { torch: true };
             await videoTrack.applyConstraints({
-              advanced: [{ torch: true }]
+              advanced: [advancedConstraint]
             });
-            console.log('Torch activated successfully');
           } catch (e) {
-            console.error('Error activating torch:', e);
+            console.error('Error activando la linterna:', e);
           }
         }
       }
 
       onInitialized(stream);
     } catch (error) {
-      console.error('Error initializing camera:', error);
+      console.error('Error iniciando la cámara:', error);
       onError('Error al iniciar la cámara. Por favor, verifica los permisos y reintenta.');
       stopCurrentStream();
     }
@@ -99,7 +98,6 @@ const CameraInitializer: React.FC<CameraInitializerProps> = ({
     let initTimeout: NodeJS.Timeout;
 
     if (isActive) {
-      // Add a small delay before initialization to ensure proper cleanup
       initTimeout = setTimeout(() => {
         initializeCamera();
       }, 100);
