@@ -1,38 +1,74 @@
 import React, { useRef, useEffect, useState } from 'react';
 import Webcam from 'react-webcam';
+import { useToast } from "@/hooks/use-toast";
+import { Camera } from 'lucide-react';
 
-const CameraView: React.FC<{ onFrame: (imageData: ImageData) => void, isActive: boolean }> = ({ onFrame, isActive }) => {
+interface CameraViewProps {
+  onFrame: (imageData: ImageData) => void;
+  isActive: boolean;
+}
+
+const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   const webcamRef = useRef<Webcam>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isAndroid, setIsAndroid] = useState(false);
-
-  useEffect(() => {
-    setIsAndroid(/android/i.test(navigator.userAgent));
-  }, []);
+  const animationFrameRef = useRef<number | null>(null);
+  const { toast } = useToast();
 
   const processFrame = () => {
     if (!isActive || !webcamRef.current?.video || !canvasRef.current) return;
+
     const video = webcamRef.current.video;
     const canvas = canvasRef.current;
     const context = canvas.getContext('2d');
 
     if (!context || video.readyState !== video.HAVE_ENOUGH_DATA) {
-      requestAnimationFrame(processFrame);
+      animationFrameRef.current = requestAnimationFrame(processFrame);
       return;
     }
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    context.drawImage(video, 0, 0);
-    onFrame(context.getImageData(0, 0, canvas.width, canvas.height));
+    // Ajusta el tamaño del canvas
+    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+    }
 
-    requestAnimationFrame(processFrame);
+    // Captura el frame y procesa
+    context.drawImage(video, 0, 0);
+    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+    onFrame(imageData);
+
+    animationFrameRef.current = requestAnimationFrame(processFrame);
   };
+
+  useEffect(() => {
+    if (isActive) {
+      animationFrameRef.current = requestAnimationFrame(processFrame);
+    } else {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+    }
+
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [isActive]);
 
   return (
     <div className="relative w-full max-w-md mx-auto">
-      <Webcam ref={webcamRef} className="w-full h-full object-cover"
-        videoConstraints={{ facingMode: isAndroid ? 'environment' : 'user' }} />
+      <div className="relative aspect-video rounded-2xl overflow-hidden bg-black/5 backdrop-blur-sm">
+        {!isActive && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Camera className="w-8 h-8 text-gray-400" />
+          </div>
+        )}
+        {isActive && (
+          <Webcam ref={webcamRef} className="w-full h-full object-cover" />
+        )}
+      </div>
       <canvas ref={canvasRef} className="hidden" />
     </div>
   );

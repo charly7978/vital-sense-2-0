@@ -1,19 +1,31 @@
-import { fft } from 'fft-js';
-
 export class SignalExtractor {
+  private readonly minIntensity = 45;
+  private readonly maxIntensity = 250;
+  private readonly smoothingWindow = 5;
   private lastRedValues: number[] = [];
   private lastIrValues: number[] = [];
+  private frameCount = 0;
 
-  private applyFFT(signal: number[]) {
-    return fft(signal).map(p => Math.sqrt(p[0] * p[0] + p[1] * p[1]));
-  }
+  private kalman = {
+    q: 0.1,
+    r: 0.8,
+    p: 1,
+    x: 0,
+    k: 0
+  };
 
-  private detectPeaks(signal: number[]) {
-    return signal.filter((v, i, arr) => v > arr[i - 1] && v > arr[i + 1]).length;
+  private applyKalmanFilter(measurement: number) {
+    this.kalman.p = this.kalman.p + this.kalman.q;
+    this.kalman.k = this.kalman.p / (this.kalman.p + this.kalman.r);
+    this.kalman.x = this.kalman.x + this.kalman.k * (measurement - this.kalman.x);
+    this.kalman.p = (1 - this.kalman.k) * this.kalman.p;
+    return this.kalman.x;
   }
 
   extractChannels(imageData: ImageData) {
+    this.frameCount++;
     let redSum = 0, irSum = 0, pixelCount = 0;
+
     const { width, height } = imageData;
     const centerX = Math.floor(width / 2);
     const centerY = Math.floor(height / 2);
@@ -26,7 +38,7 @@ export class SignalExtractor {
         const green = imageData.data[i + 1];
         const blue = imageData.data[i + 2];
 
-        if (red > 45) {
+        if (red > this.minIntensity) {
           redSum += red;
           irSum += (green + blue) / 2;
           pixelCount++;
@@ -34,25 +46,24 @@ export class SignalExtractor {
       }
     }
 
-    if (pixelCount === 0) return { bpm: 0, spo2: 0, bp: 0 };
+    if (pixelCount === 0) return { red: 0, ir: 0, quality: 0 };
 
     let avgRed = redSum / pixelCount;
     let avgIr = irSum / pixelCount;
+
     this.lastRedValues.push(avgRed);
     this.lastIrValues.push(avgIr);
-    if (this.lastRedValues.length > 100) this.lastRedValues.shift();
-    if (this.lastIrValues.length > 100) this.lastIrValues.shift();
+    if (this.lastRedValues.length > this.smoothingWindow) this.lastRedValues.shift();
+    if (this.lastIrValues.length > this.smoothingWindow) this.lastIrValues.shift();
 
-    const freqData = this.applyFFT(this.lastRedValues);
-    const peaks = this.detectPeaks(freqData);
-    const bpm = peaks * 6; // Escala a 60s
+    avgRed = this.applyKalmanFilter(
+      this.lastRedValues.reduce((a, b) => a + b, 0) / this.lastRedValues.length
+    );
 
-    const rRatio = avgRed / avgIr;
-    const spo2 = 110 - (rRatio * 25); 
+    avgIr = this.applyKalmanFilter(
+      this.lastIrValues.reduce((a, b) => a + b, 0) / this.lastIrValues.length
+    );
 
-    const ptt = 0.2 + (Math.random() * 0.05); 
-    const bp = 120 + (40 * (0.25 - ptt)); 
-
-    return { bpm, spo2, bp };
+    return { red: avgRed, ir: avgIr, quality: 1 };
   }
 }
