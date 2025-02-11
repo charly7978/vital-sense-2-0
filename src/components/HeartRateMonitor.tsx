@@ -9,7 +9,7 @@ import SensitivityControls from './SensitivityControls';
 import CalibrationPanel from './CalibrationPanel';
 import { PPGProcessor } from '../utils/ppgProcessor';
 import { BeepPlayer } from '../utils/audioUtils';
-import type { VitalReading, PPGData, SensitivitySettings } from '../utils/types';
+import type { VitalReading, PPGData, SensitivitySettings, CalibrationSettings } from '../utils/types';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 
@@ -22,6 +22,44 @@ const defaultSensitivitySettings: SensitivitySettings = {
   signalAmplification: 1,
   noiseReduction: 1,
   peakDetection: 1
+};
+
+const defaultCalibrationSettings: CalibrationSettings = {
+  minRedValue: {
+    value: 20,
+    min: 0,
+    max: 100,
+    step: 1,
+    description: "Valor mínimo de componente rojo para detectar presencia del dedo. Aumentar si hay falsos positivos, disminuir si no detecta el dedo."
+  },
+  qualityThreshold: {
+    value: 0.3,
+    min: 0,
+    max: 1,
+    step: 0.05,
+    description: "Umbral de calidad mínima de la señal. Aumentar para mayor precisión pero menor sensibilidad."
+  },
+  signalAmplification: {
+    value: 1.2,
+    min: 1,
+    max: 5,
+    step: 0.1,
+    description: "Factor de amplificación de la señal PPG. Aumentar para señales débiles, disminuir si hay saturación."
+  },
+  noiseReduction: {
+    value: 1,
+    min: 0,
+    max: 5,
+    step: 0.1,
+    description: "Factor de reducción de ruido. Aumentar para señales ruidosas, disminuir si se pierde detalle."
+  },
+  peakDetection: {
+    value: 1,
+    min: 0.1,
+    max: 2,
+    step: 0.1,
+    description: "Sensibilidad en la detección de picos. Aumentar para detectar picos más sutiles, disminuir para ignorar ruido."
+  }
 };
 
 const HeartRateMonitor: React.FC = () => {
@@ -38,6 +76,7 @@ const HeartRateMonitor: React.FC = () => {
   const [measurementQuality, setMeasurementQuality] = useState(0);
   const [measurementStartTime, setMeasurementStartTime] = useState<number | null>(null);
   const [sensitivitySettings, setSensitivitySettings] = useState<SensitivitySettings>(defaultSensitivitySettings);
+  const [calibrationSettings, setCalibrationSettings] = useState<CalibrationSettings>(defaultCalibrationSettings);
   const { toast } = useToast();
 
   const handleSensitivityChange = (newSettings: SensitivitySettings) => {
@@ -275,7 +314,7 @@ const HeartRateMonitor: React.FC = () => {
         />
 
         <CalibrationPanel 
-          settings={defaultSensitivitySettings}
+          settings={defaultCalibrationSettings}
           onSettingChange={handleCalibrationChange}
         />
 

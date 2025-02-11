@@ -1,3 +1,4 @@
+
 export interface VitalReading {
   [key: string]: number;
   timestamp: number;
@@ -24,6 +25,7 @@ export interface PPGData {
 }
 
 export interface SensitivitySettings {
+  [key: string]: number; // Add index signature
   signalAmplification: number;
   noiseReduction: number;
   peakDetection: number;
@@ -38,3 +40,4 @@ export interface CalibrationSettings {
     description: string;
   };
 }
+
