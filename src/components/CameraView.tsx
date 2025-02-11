@@ -14,6 +14,13 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isPlatformAndroid, setIsPlatformAndroid] = useState(false);
+
+  useEffect(() => {
+    // Detectar si estamos en Android
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    setIsPlatformAndroid(userAgent.includes('android'));
+  }, []);
 
   useEffect(() => {
     const checkPermissions = async () => {
@@ -29,6 +36,25 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame }) => {
           
           if (request.camera !== 'granted') {
             throw new Error('Permiso de cámara denegado');
+          }
+        }
+
+        // Si estamos en Android, intentamos habilitar el flash
+        if (isPlatformAndroid) {
+          try {
+            // Intenta encender el flash usando la API del navegador
+            const stream = await navigator.mediaDevices.getUserMedia({
+              video: {
+                facingMode: 'environment',
+                width: { ideal: 640 },
+                height: { ideal: 480 },
+                //@ts-ignore - La propiedad torch existe en Android
+                advanced: [{ torch: true }]
+              }
+            });
+            console.log('Flash enabled on Android');
+          } catch (flashError) {
+            console.error('Error enabling flash:', flashError);
           }
         }
         
@@ -54,7 +80,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame }) => {
     };
 
     checkPermissions();
-  }, []);
+  }, [isPlatformAndroid]);
 
   useEffect(() => {
     let animationFrameId: number;
@@ -135,7 +161,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame }) => {
           onUserMediaError={handleUserMediaError}
           className="w-full h-full object-cover"
           videoConstraints={{
-            facingMode: 'user',
+            facingMode: isPlatformAndroid ? 'environment' : 'user',
             width: 640,
             height: 480,
           }}

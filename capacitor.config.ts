@@ -12,7 +12,8 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: true,
     permissions: [
-      "android.permission.CAMERA"
+      "android.permission.CAMERA",
+      "android.permission.FLASHLIGHT"
     ]
   },
   plugins: {
