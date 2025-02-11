@@ -45,15 +45,20 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   }, [webcamRef.current]);
 
   const stopCamera = async () => {
+    if (!streamRef.current) return;
+
     try {
-      if (streamRef.current) {
-        const tracks = streamRef.current.getTracks();
-        tracks.forEach(track => track.stop());
-        streamRef.current = null;
-      }
+      const tracks = streamRef.current.getTracks();
+      tracks.forEach(track => {
+        track.stop();
+        streamRef.current?.removeTrack(track);
+      });
+      streamRef.current = null;
+      
       if (webcamRef.current?.stream) {
         webcamRef.current.stream.getTracks().forEach(track => track.stop());
       }
+      
       setCameraInitialized(false);
       console.log('Camera stopped successfully');
     } catch (error) {
@@ -62,6 +67,11 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   };
 
   const handleCameraInitialized = (stream: MediaStream) => {
+    // If we already have a stream, clean it up first
+    if (streamRef.current) {
+      stopCamera();
+    }
+
     streamRef.current = stream;
     if (webcamRef.current && webcamRef.current.video) {
       webcamRef.current.video.srcObject = stream;
@@ -108,4 +118,3 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
 };
 
 export default CameraView;
-
