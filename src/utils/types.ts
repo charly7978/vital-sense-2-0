@@ -1,6 +1,5 @@
-
 export interface VitalReading {
-  [key: string]: number;  // Add index signature to make it JSON compatible
+  [key: string]: number;
   timestamp: number;
   value: number;
 }
@@ -14,8 +13,14 @@ export interface PPGData {
   arrhythmiaType: string;
   confidence: number;
   readings: VitalReading[];
-  isPeak?: boolean;  // Add this property as optional
+  isPeak?: boolean;
   signalQuality: number;
+  hrvMetrics?: {
+    sdnn: number;
+    rmssd: number;
+    pnn50: number;
+    lfhf: number;
+  };
 }
 
 export interface CalibrationData {
@@ -28,15 +33,14 @@ export interface CalibrationData {
   calibrationDate?: Date;
 }
 
-// Updated to match database schema and fix missing properties
 export interface UserCalibration {
   id: string;
   age: number;
   height: number;
   weight: number;
-  systolic: number;             // Maps to reference_bp_systolic
-  diastolic: number;            // Maps to reference_bp_diastolic
-  deviceType: string;           // Maps to reference_device_type
+  systolic: number;
+  diastolic: number;
+  deviceType: string;
   is_active: boolean;
   calibration_constants: any;
   calibration_history: any[];
@@ -44,4 +48,3 @@ export interface UserCalibration {
   calibration_date?: string;
   user_id?: string;
 }
-

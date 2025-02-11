@@ -154,44 +154,64 @@ export class SignalProcessor {
     type: string;
     sdnn: number;
     rmssd: number;
+    pnn50: number;
+    lfhf: number;
   } {
     if (intervals.length < 2) {
-      return { hasArrhythmia: false, type: 'Normal', sdnn: 0, rmssd: 0 };
+      return { 
+        hasArrhythmia: false, 
+        type: 'Normal', 
+        sdnn: 0, 
+        rmssd: 0,
+        pnn50: 0,
+        lfhf: 0 
+      };
     }
 
-    // Cálculo de SDNN (Standard Deviation of NN intervals)
+    // Cálculo de métricas temporales de HRV
     const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+    
+    // SDNN (Standard Deviation of NN intervals)
     const sdnn = Math.sqrt(
       intervals.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (intervals.length - 1)
     );
-
-    // Cálculo de RMSSD (Root Mean Square of Successive Differences)
+    
+    // RMSSD (Root Mean Square of Successive Differences)
     let successiveDiff = 0;
+    let nn50 = 0; // Número de intervalos sucesivos que difieren por más de 50ms
     for (let i = 1; i < intervals.length; i++) {
-      successiveDiff += Math.pow(intervals[i] - intervals[i-1], 2);
+      const diff = Math.abs(intervals[i] - intervals[i-1]);
+      successiveDiff += Math.pow(diff, 2);
+      if (diff > 50) nn50++;
     }
     const rmssd = Math.sqrt(successiveDiff / (intervals.length - 1));
-
-    // Análisis avanzado de arritmias basado en métricas HRV validadas clínicamente
+    
+    // pNN50 (Porcentaje de intervalos NN que difieren por más de 50ms)
+    const pnn50 = (nn50 / (intervals.length - 1)) * 100;
+    
+    // Análisis en el dominio de la frecuencia
+    const { lf, hf } = this.calculateFrequencyDomainMetrics(intervals);
+    const lfhf = lf / hf; // Ratio LF/HF
+    
+    // Detección avanzada de arritmias
     let hasArrhythmia = false;
     let type = 'Normal';
     
     if (sdnn > 100 || rmssd > 50) {
       hasArrhythmia = true;
       
-      // Análisis del patrón de intervalos RR
-      const rrVariability = this.calculateRRVariability(intervals);
-      
-      if (mean < 600) { // > 100 BPM
-        type = 'Taquicardia';
-      } else if (mean > 1000) { // < 60 BPM
-        type = 'Bradicardia';
-      } else if (sdnn > 150 && rmssd > 70 && rrVariability > 0.2) {
+      if (pnn50 > 40 && lfhf > 2) {
         type = 'Fibrilación Auricular';
+      } else if (sdnn > 150 && rmssd < 30) {
+        type = 'Taquicardia Ventricular';
+      } else if (mean > 1000 && pnn50 < 10) { // Intervalos largos, baja variabilidad
+        type = 'Bradicardia Sinusal';
+      } else if (mean < 600 && lfhf > 3) { // Intervalos cortos, predominio simpático
+        type = 'Taquicardia Sinusal';
       }
     }
 
-    return { hasArrhythmia, type, sdnn, rmssd };
+    return { hasArrhythmia, type, sdnn, rmssd, pnn50, lfhf };
   }
 
   estimateBloodPressure(signal: number[], peakTimes: number[]): { 
@@ -200,30 +220,40 @@ export class SignalProcessor {
   } {
     if (peakTimes.length < 2) return { systolic: 0, diastolic: 0 };
     
-    // Análisis del contorno de la onda PPG
-    const avgPeakValue = Math.max(...signal);
-    const avgValleyValue = Math.min(...signal);
-    const pulseAmplitude = avgPeakValue - avgValleyValue;
-    
-    // Cálculo del tiempo de tránsito del pulso (PTT)
-    let avgPTT = 0;
+    // Cálculo mejorado del PTT (Pulse Transit Time)
+    const ptts: number[] = [];
     for (let i = 1; i < peakTimes.length; i++) {
-      avgPTT += peakTimes[i] - peakTimes[i-1];
+      ptts.push(peakTimes[i] - peakTimes[i-1]);
     }
-    avgPTT /= (peakTimes.length - 1);
     
-    // Análisis de la forma de onda
+    const avgPTT = ptts.reduce((a, b) => a + b, 0) / ptts.length;
+    const pttVariability = Math.sqrt(
+      ptts.reduce((acc, ptt) => acc + Math.pow(ptt - avgPTT, 2), 0) / ptts.length
+    );
+    
+    // Análisis de la forma de onda PPG
     const waveformFeatures = this.extractWaveformFeatures(signal);
+    const { 
+      systolicPeak, 
+      diastolicPeak, 
+      dicroticNotchTime,
+      augmentationIndex 
+    } = waveformFeatures;
     
-    // Modelo predictivo basado en características PPG validadas
-    const systolic = Math.round(120 + 
-      (1000/avgPTT - 5) * 2 + 
-      pulseAmplitude * 0.1 +
-      waveformFeatures.dicroticNotchHeight * 0.5);
-      
-    const diastolic = Math.round(80 + 
-      (pulseAmplitude - 50) * 0.5 +
-      waveformFeatures.dicroticNotchTime * 0.3);
+    // Modelo predictivo mejorado basado en PTT y características de la onda
+    const systolic = Math.round(
+      120 + // Línea base
+      (1000/avgPTT - 5) * 2.5 + // Contribución del PTT
+      augmentationIndex * 0.3 + // Contribución del índice de aumentación
+      (pttVariability / avgPTT) * 15 // Variabilidad del PTT
+    );
+    
+    const diastolic = Math.round(
+      80 + // Línea base
+      (diastolicPeak / systolicPeak - 0.5) * 20 + // Ratio de picos
+      dicroticNotchTime * 0.4 + // Tiempo de la muesca dicrótica
+      (pttVariability / avgPTT) * 10 // Variabilidad del PTT
+    );
     
     // Limitar a rangos fisiológicamente posibles
     return {
@@ -291,29 +321,39 @@ export class SignalProcessor {
   }
 
   private extractWaveformFeatures(signal: number[]): {
-    dicroticNotchHeight: number;
+    systolicPeak: number;
+    diastolicPeak: number;
     dicroticNotchTime: number;
+    augmentationIndex: number;
   } {
-    // Buscar el dicrotic notch en la señal PPG
-    let maxVal = Math.max(...signal);
-    let minVal = Math.min(...signal);
-    let threshold = (maxVal + minVal) / 2;
+    const systolicPeak = Math.max(...signal);
+    let diastolicPeak = 0;
+    let dicroticNotchTime = 0;
+    let notchValue = 0;
     
-    let notchHeight = 0;
-    let notchTime = 0;
-    
-    // Detectar el dicrotic notch
-    for (let i = Math.floor(signal.length * 0.3); i < Math.floor(signal.length * 0.7); i++) {
-      if (signal[i] < threshold && signal[i-1] >= threshold) {
-        notchHeight = signal[i];
-        notchTime = i;
+    // Buscar el dicrotic notch y pico diastólico
+    for (let i = signal.indexOf(systolicPeak); i < signal.length - 1; i++) {
+      if (signal[i] < signal[i+1] && signal[i] < signal[i-1]) {
+        notchValue = signal[i];
+        dicroticNotchTime = i;
         break;
       }
     }
     
+    // Buscar el pico diastólico después del dicrotic notch
+    if (dicroticNotchTime > 0) {
+      diastolicPeak = Math.max(...signal.slice(dicroticNotchTime));
+    }
+    
+    // Calcular el índice de aumentación
+    const augmentationIndex = diastolicPeak > 0 ? 
+      ((systolicPeak - notchValue) / (systolicPeak - diastolicPeak)) : 0;
+    
     return {
-      dicroticNotchHeight: notchHeight,
-      dicroticNotchTime: notchTime
+      systolicPeak,
+      diastolicPeak,
+      dicroticNotchTime,
+      augmentationIndex
     };
   }
 
@@ -345,5 +385,58 @@ export class SignalProcessor {
   private calculateVariance(signal: number[]): number {
     const mean = signal.reduce((a, b) => a + b, 0) / signal.length;
     return signal.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / signal.length;
+  }
+
+  private calculateFrequencyDomainMetrics(intervals: number[]): { lf: number; hf: number } {
+    // Remuestreo de los intervalos RR a una frecuencia constante
+    const samplingRate = 4; // Hz
+    const interpolatedSignal = this.interpolateRRIntervals(intervals, samplingRate);
+    
+    // Aplicar FFT
+    const fft = new FFT(Math.pow(2, Math.ceil(Math.log2(interpolatedSignal.length))));
+    const signal = fft.createComplexArray();
+    fft.realTransform(signal, interpolatedSignal);
+    
+    // Calcular potencia en bandas de frecuencia
+    let lfPower = 0; // 0.04-0.15 Hz (Low Frequency)
+    let hfPower = 0; // 0.15-0.4 Hz (High Frequency)
+    
+    const freqResolution = samplingRate / fft.size;
+    
+    for (let i = 0; i < fft.size/2; i++) {
+      const frequency = i * freqResolution;
+      const power = Math.sqrt(signal[2*i]**2 + signal[2*i+1]**2);
+      
+      if (frequency >= 0.04 && frequency < 0.15) {
+        lfPower += power;
+      } else if (frequency >= 0.15 && frequency < 0.4) {
+        hfPower += power;
+      }
+    }
+    
+    return { lf: lfPower, hf: hfPower };
+  }
+
+  private interpolateRRIntervals(intervals: number[], samplingRate: number): number[] {
+    const totalTime = intervals.reduce((a, b) => a + b, 0);
+    const numSamples = Math.floor(totalTime * samplingRate / 1000);
+    const interpolated = new Array(numSamples).fill(0);
+    
+    let currentTime = 0;
+    let intervalIndex = 0;
+    
+    for (let i = 0; i < numSamples; i++) {
+      const t = (i * 1000) / samplingRate;
+      
+      while (currentTime + intervals[intervalIndex] < t && intervalIndex < intervals.length - 1) {
+        currentTime += intervals[intervalIndex];
+        intervalIndex++;
+      }
+      
+      const alpha = (t - currentTime) / intervals[intervalIndex];
+      interpolated[i] = intervals[intervalIndex];
+    }
+    
+    return interpolated;
   }
 }

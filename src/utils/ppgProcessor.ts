@@ -129,7 +129,13 @@ export class PPGProcessor {
       signalQuality,
       confidence: spo2Result.confidence,
       readings: this.readings,
-      isPeak
+      isPeak,
+      hrvMetrics: {
+        sdnn: hrvAnalysis.sdnn,
+        rmssd: hrvAnalysis.rmssd,
+        pnn50: hrvAnalysis.pnn50,
+        lfhf: hrvAnalysis.lfhf
+      }
     };
   }
 
