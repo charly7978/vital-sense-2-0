@@ -1,4 +1,3 @@
-
 import { VitalReading, PPGData, SensitivitySettings } from './types';
 import { BeepPlayer } from './audioUtils';
 import { SignalProcessor } from './signalProcessing';
@@ -37,7 +36,6 @@ export class PPGProcessor {
 
   updateSensitivitySettings(settings: SensitivitySettings) {
     this.sensitivitySettings = settings;
-    this.signalProcessor.updateSensitivityConstants(settings);
   }
 
   processFrame(imageData: ImageData): PPGData | null {
@@ -93,12 +91,7 @@ export class PPGProcessor {
       this.signalBuffer.shift();
     }
 
-    const isPeak = this.peakDetector.isRealPeak(
-      normalizedValue, 
-      now, 
-      this.signalBuffer,
-      this.sensitivitySettings.peakDetection
-    );
+    const isPeak = this.peakDetector.isRealPeak(normalizedValue, now, this.signalBuffer);
 
     if (isPeak) {
       this.peakTimes.push(now);
@@ -153,4 +146,3 @@ export class PPGProcessor {
     return this.readings;
   }
 }
-

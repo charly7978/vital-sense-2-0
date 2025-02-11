@@ -12,6 +12,12 @@ export const loadOpenCV = (): Promise<void> => {
       return;
     }
 
+    // Remove any existing OpenCV script to prevent double loading
+    const existingScript = document.querySelector('script[src*="opencv.js"]');
+    if (existingScript) {
+      document.body.removeChild(existingScript);
+    }
+
     const script = document.createElement('script');
     script.setAttribute('async', '');
     script.setAttribute('type', 'text/javascript');
@@ -33,3 +39,4 @@ export const loadOpenCV = (): Promise<void> => {
 export const isOpenCVLoaded = (): boolean => {
   return typeof window !== 'undefined' && !!window.cv;
 };
+
