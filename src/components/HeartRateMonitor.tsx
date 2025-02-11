@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { Heart, Droplets, Activity, AlertTriangle, PlayCircle, StopCircle } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
@@ -185,11 +184,9 @@ const HeartRateMonitor: React.FC = () => {
         </Button>
       </div>
 
-      {isStarted && (
-        <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4 shadow-lg">
-          <CameraView onFrame={handleFrame} />
-        </div>
-      )}
+      <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4 shadow-lg">
+        <CameraView onFrame={handleFrame} isActive={isStarted} />
+      </div>
       
       <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4 shadow-lg">
         <h3 className="text-lg font-medium mb-4 text-gray-100">Señal PPG en Tiempo Real</h3>
