@@ -35,42 +35,61 @@ const CameraProcessor: React.FC<CameraProcessorProps> = ({
         return;
       }
 
-      if (videoRef.current && canvasRef.current) {
-        const video = videoRef.current;
-        const canvas = canvasRef.current;
-        const context = canvas.getContext('2d');
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const context = canvas?.getContext('2d');
 
-        if (video && context && video.readyState === video.HAVE_ENOUGH_DATA) {
-          processingRef.current = true;
+      if (!video || !canvas || !context) {
+        animationFrameId = requestAnimationFrame(processFrame);
+        return;
+      }
 
-          try {
-            // Update canvas dimensions if needed
-            if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-              canvas.width = video.videoWidth;
-              canvas.height = video.videoHeight;
-            }
+      // Ensure video has valid dimensions and data
+      if (video.readyState !== video.HAVE_ENOUGH_DATA || 
+          video.videoWidth === 0 || 
+          video.videoHeight === 0) {
+        console.log('Video not ready:', {
+          readyState: video.readyState,
+          width: video.videoWidth,
+          height: video.videoHeight
+        });
+        animationFrameId = requestAnimationFrame(processFrame);
+        return;
+      }
 
-            context.drawImage(video, 0, 0);
-            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-            
-            frameCountRef.current++;
-            if (frameCountRef.current % 2 === 0) { // Process every other frame
-              onFrame(imageData);
-            }
+      processingRef.current = true;
 
-            lastFrameTime = timestamp;
-          } catch (error) {
-            console.error('Error processing frame:', error);
-          } finally {
-            processingRef.current = false;
-          }
+      try {
+        // Update canvas dimensions if needed
+        if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          console.log('Canvas dimensions updated:', {
+            width: canvas.width,
+            height: canvas.height
+          });
         }
+
+        context.drawImage(video, 0, 0);
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+        
+        frameCountRef.current++;
+        if (frameCountRef.current % 2 === 0) { // Process every other frame
+          onFrame(imageData);
+        }
+
+        lastFrameTime = timestamp;
+      } catch (error) {
+        console.error('Error processing frame:', error);
+      } finally {
+        processingRef.current = false;
       }
 
       animationFrameId = requestAnimationFrame(processFrame);
     };
 
     if (isActive && cameraInitialized) {
+      console.log('Starting frame processing');
       animationFrameId = requestAnimationFrame(processFrame);
     }
 
