@@ -381,8 +381,11 @@ const HeartRateMonitor: React.FC = () => {
                 </div>
                 <Progress 
                   value={measurementQuality * 100} 
-                  className="h-2"
-                  variant={measurementQuality < 0.3 ? "destructive" : measurementQuality > 0.8 ? "default" : "warning"}
+                  className={cn(
+                    "h-2",
+                    measurementQuality < 0.3 ? "destructive" : 
+                    measurementQuality < 0.8 ? "warning" : ""
+                  )}
                 />
               </div>
             </div>
