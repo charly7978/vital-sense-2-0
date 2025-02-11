@@ -1,19 +1,16 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
-import { Heart, Droplets, Activity, AlertTriangle, PlayCircle, StopCircle, Hand, SignalHigh, SignalMedium, SignalLow } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import CameraView from './CameraView';
 import VitalChart from './VitalChart';
 import SensitivityControls from './SensitivityControls';
 import CalibrationPanel from './CalibrationPanel';
 import BPCalibrationForm from './BPCalibrationForm';
+import VitalSignsDisplay from './vitals/VitalSignsDisplay';
+import SignalQualityIndicator from './vitals/SignalQualityIndicator';
+import MeasurementControls from './vitals/MeasurementControls';
 import { PPGProcessor } from '../utils/ppgProcessor';
 import { BeepPlayer } from '../utils/audioUtils';
 import type { VitalReading, PPGData, SensitivitySettings, CalibrationSettings } from '../utils/types';
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Progress } from "@/components/ui/progress";
 
 const ppgProcessor = new PPGProcessor();
 const beepPlayer = new BeepPlayer();
@@ -253,138 +250,28 @@ const HeartRateMonitor: React.FC = () => {
     }
   };
 
-  const getSignalQualityIndicator = () => {
-    if (!isStarted) return null;
-    
-    if (measurementQuality === 0) {
-      return (
-        <div className="flex items-center space-x-2 text-gray-400 animate-pulse">
-          <Hand className="w-6 h-6" />
-          <span>No se detecta el dedo</span>
-        </div>
-      );
-    }
-    
-    if (measurementQuality < 0.3) {
-      return (
-        <div className="flex items-center space-x-2 text-red-500">
-          <SignalLow className="w-6 h-6" />
-          <span>Señal débil</span>
-        </div>
-      );
-    }
-    
-    if (measurementQuality < 0.8) {
-      return (
-        <div className="flex items-center space-x-2 text-yellow-500">
-          <SignalMedium className="w-6 h-6" />
-          <span>Señal regular</span>
-        </div>
-      );
-    }
-    
-    return (
-      <div className="flex items-center space-x-2 text-green-500">
-        <SignalHigh className="w-6 h-6 animate-pulse" />
-        <span>Señal excelente</span>
-      </div>
-    );
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold text-gray-100">Monitor de Signos Vitales</h2>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4 shadow-lg">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Heart className="w-6 h-6 text-[#ea384c]" />
-              <h2 className="text-xl font-semibold text-gray-100">Heart Rate</h2>
-            </div>
-            <div className="flex items-baseline space-x-2">
-              <span className="text-4xl font-bold text-gray-100">{Math.round(bpm) || 0}</span>
-              <span className="text-sm text-gray-300">BPM</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4 shadow-lg">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Droplets className="w-6 h-6 text-[#3b82f6]" />
-              <h2 className="text-xl font-semibold text-gray-100">SpO2</h2>
-            </div>
-            <div className="flex items-baseline space-x-2">
-              <span className="text-4xl font-bold text-gray-100">{Math.round(spo2) || 0}</span>
-              <span className="text-sm text-gray-300">%</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4 shadow-lg">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Activity className="w-6 h-6 text-[#10b981]" />
-              <h2 className="text-xl font-semibold text-gray-100">Blood Pressure</h2>
-            </div>
-            <div className="flex items-baseline space-x-2">
-              <span className="text-4xl font-bold text-gray-100">{Math.round(systolic) || 0}/{Math.round(diastolic) || 0}</span>
-              <span className="text-sm text-gray-300">mmHg</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4 shadow-lg">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <AlertTriangle className={`w-6 h-6 ${hasArrhythmia ? 'text-[#f59e0b]' : 'text-[#10b981]'}`} />
-              <h2 className="text-xl font-semibold text-gray-100">Rhythm</h2>
-            </div>
-            <div className="flex items-baseline">
-              <span className={`text-xl font-bold ${hasArrhythmia ? 'text-[#f59e0b]' : 'text-gray-100'}`}>
-                {arrhythmiaType}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <VitalSignsDisplay
+        bpm={bpm}
+        spo2={spo2}
+        systolic={systolic}
+        diastolic={diastolic}
+        hasArrhythmia={hasArrhythmia}
+        arrhythmiaType={arrhythmiaType}
+      />
 
       <div className="flex flex-col gap-4">
         {isStarted && (
-          <>
-            <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4">
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm text-gray-400">
-                  <span>Progreso de la medición</span>
-                  <span>{Math.round(measurementProgress)}%</span>
-                </div>
-                <Progress value={measurementProgress} className="h-2" />
-              </div>
-            </div>
-
-            <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4">
-              <div className="space-y-4">
-                {getSignalQualityIndicator()}
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm text-gray-400">
-                    <span>Calidad de la señal</span>
-                    <span>{Math.round(measurementQuality * 100)}%</span>
-                  </div>
-                  <Progress 
-                    value={measurementQuality * 100} 
-                    className={cn(
-                      "h-2",
-                      measurementQuality < 0.3 ? "destructive" : 
-                      measurementQuality < 0.8 ? "warning" : ""
-                    )}
-                  />
-                </div>
-              </div>
-            </div>
-          </>
+          <SignalQualityIndicator
+            isStarted={isStarted}
+            measurementQuality={measurementQuality}
+            measurementProgress={measurementProgress}
+          />
         )}
 
         <SensitivityControls 
@@ -399,24 +286,10 @@ const HeartRateMonitor: React.FC = () => {
           onSettingChange={handleCalibrationChange}
         />
 
-        <div className="flex justify-center">
-          <Button
-            onClick={toggleMeasurement}
-            className={`px-6 py-3 text-lg ${isStarted ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}
-          >
-            {isStarted ? (
-              <>
-                <StopCircle className="mr-2" />
-                Detener Medición
-              </>
-            ) : (
-              <>
-                <PlayCircle className="mr-2" />
-                Iniciar Medición
-              </>
-            )}
-          </Button>
-        </div>
+        <MeasurementControls
+          isStarted={isStarted}
+          onToggleMeasurement={toggleMeasurement}
+        />
       </div>
 
       <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4 shadow-lg">
