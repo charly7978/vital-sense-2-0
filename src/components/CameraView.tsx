@@ -1,6 +1,7 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import Webcam from 'react-webcam';
+import { Camera as CapCamera } from '@capacitor/camera';
 import { Camera, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -17,18 +18,30 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame }) => {
   useEffect(() => {
     const checkPermissions = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { 
-            facingMode: 'user',
-            width: { ideal: 640 },
-            height: { ideal: 480 }
-          } 
-        });
-        stream.getTracks().forEach(track => track.stop());
+        // Primero intentamos con Capacitor
+        try {
+          const permission = await CapCamera.checkPermissions();
+          if (permission.camera !== 'granted') {
+            const request = await CapCamera.requestPermissions();
+            if (request.camera !== 'granted') {
+              throw new Error('Permiso de cámara denegado');
+            }
+          }
+        } catch (capError) {
+          // Si falla Capacitor, intentamos con la API web
+          const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+              facingMode: 'user',
+              width: { ideal: 640 },
+              height: { ideal: 480 }
+            } 
+          });
+          stream.getTracks().forEach(track => track.stop());
+        }
         setError(null);
       } catch (err) {
         console.error('Error accessing camera:', err);
-        setError('No se pudo acceder a la cámara. Por favor, permite el acceso a la cámara en la configuración de tu navegador.');
+        setError('No se pudo acceder a la cámara. Por favor, permite el acceso a la cámara en la configuración de tu dispositivo.');
       }
     };
 
