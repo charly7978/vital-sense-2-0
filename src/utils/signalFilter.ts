@@ -13,6 +13,7 @@ export class SignalFilter {
   }
 
   lowPassFilter(signal: number[], cutoffFreq: number): number[] {
+    // Apply Kalman filter first
     const kalmanFiltered = signal.map(value => this.kalmanFilter(value));
     
     const filtered: number[] = [];
@@ -21,7 +22,7 @@ export class SignalFilter {
     const alpha = dt / (rc + dt);
     const windowSize = Math.min(10, signal.length);
     
-    // Aplicar ventana Hamming
+    // Apply Hamming window for better frequency response
     for (let i = 0; i < kalmanFiltered.length; i++) {
       let sum = 0;
       let weightSum = 0;
@@ -35,7 +36,7 @@ export class SignalFilter {
       filtered[i] = sum / weightSum;
     }
     
-    // Aplicar filtro RC adicional
+    // Apply additional RC filter for smoother output
     let lastFiltered = filtered[0];
     for (let i = 1; i < signal.length; i++) {
       lastFiltered = lastFiltered + alpha * (filtered[i] - lastFiltered);
@@ -46,10 +47,12 @@ export class SignalFilter {
   }
 
   private kalmanFilter(measurement: number): number {
+    // Prediction step
     const predictedState = this.kalmanState.x;
     const predictedCovariance = this.kalmanState.p + this.kalmanState.q;
-    const kalmanGain = predictedCovariance / (predictedCovariance + this.kalmanState.r);
     
+    // Update step
+    const kalmanGain = predictedCovariance / (predictedCovariance + this.kalmanState.r);
     this.kalmanState.x = predictedState + kalmanGain * (measurement - predictedState);
     this.kalmanState.p = (1 - kalmanGain) * predictedCovariance;
     
@@ -61,4 +64,3 @@ export class SignalFilter {
     this.kalmanState.r = r;
   }
 }
-

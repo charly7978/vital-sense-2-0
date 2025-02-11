@@ -105,7 +105,13 @@ export class PPGProcessor {
         signalQuality: 0,
         confidence: 0,
         readings: [],
-        isPeak: false
+        isPeak: false,
+        hrvMetrics: {
+          sdnn: 0,
+          rmssd: 0,
+          pnn50: 0,
+          lfhf: 0
+        }
       };
     }
     
@@ -151,21 +157,28 @@ export class PPGProcessor {
       });
     }
 
+    // Calculate heart rate using frequency analysis
     const { frequencies, magnitudes } = this.frequencyAnalyzer.performFFT(filteredRed);
     const dominantFreqIndex = magnitudes.indexOf(Math.max(...magnitudes));
     const dominantFreq = frequencies[dominantFreqIndex];
     const fftBpm = dominantFreq * 60;
     
+    // Calculate intervals for HRV analysis
     const intervals = [];
     for (let i = 1; i < this.peakTimes.length; i++) {
       intervals.push(this.peakTimes[i] - this.peakTimes[i-1]);
     }
     
+    // Get HRV analysis
     const hrvAnalysis = this.signalProcessor.analyzeHRV(intervals);
+    
+    // Calculate SpO2
     const spo2Result = this.signalProcessor.calculateSpO2(this.redBuffer, this.irBuffer, perfusionIndex);
     
+    // Calculate blood pressure using PTT and PPG features
     const bp = this.signalProcessor.estimateBloodPressure(filteredRed, this.peakTimes);
     
+    // Analyze signal quality
     const signalQuality = this.signalProcessor.analyzeSignalQuality(filteredRed);
     
     return {

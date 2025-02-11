@@ -13,11 +13,12 @@ export class SignalFrequencyAnalyzer {
     const phasors = fft.createComplexArray();
     const paddedSignal = [...signal];
     
+    // Zero padding
     while (paddedSignal.length < fft.size) {
       paddedSignal.push(0);
     }
     
-    // Aplicar ventana Hanning para reducir el efecto de fuga espectral
+    // Apply Hanning window to reduce spectral leakage
     for (let i = 0; i < paddedSignal.length; i++) {
       const hann = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (paddedSignal.length - 1)));
       paddedSignal[i] *= hann;
@@ -28,7 +29,7 @@ export class SignalFrequencyAnalyzer {
     const frequencies: number[] = [];
     const magnitudes: number[] = [];
     
-    // Análisis de frecuencias relevantes para el ritmo cardíaco (0.5-4 Hz)
+    // Analyze frequencies relevant for heart rate (0.5-4 Hz)
     const minFreqIdx = Math.floor(0.5 * fft.size / this.sampleRate);
     const maxFreqIdx = Math.ceil(4 * fft.size / this.sampleRate);
     
@@ -41,15 +42,15 @@ export class SignalFrequencyAnalyzer {
   }
 
   calculateFrequencyDomainMetrics(intervals: number[]): { lf: number; hf: number } {
-    const samplingRate = 4; // Hz
+    const samplingRate = 4; // Hz for resampling
     const interpolatedSignal = this.interpolateRRIntervals(intervals, samplingRate);
     
-    // Aplicar FFT
+    // Apply FFT
     const fft = new FFT(Math.pow(2, Math.ceil(Math.log2(interpolatedSignal.length))));
     const signal = fft.createComplexArray();
     fft.realTransform(signal, interpolatedSignal);
     
-    // Calcular potencia en bandas de frecuencia
+    // Calculate power in frequency bands
     let lfPower = 0; // 0.04-0.15 Hz (Low Frequency)
     let hfPower = 0; // 0.15-0.4 Hz (High Frequency)
     
@@ -92,4 +93,3 @@ export class SignalFrequencyAnalyzer {
     return interpolated;
   }
 }
-
