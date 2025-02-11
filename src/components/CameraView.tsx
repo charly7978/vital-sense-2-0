@@ -19,12 +19,23 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame }) => {
         const canvas = canvasRef.current;
         const context = canvas.getContext('2d');
 
-        if (video && context) {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          context.drawImage(video, 0, 0);
-          const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-          onFrame(imageData);
+        if (video && context && video.readyState === video.HAVE_ENOUGH_DATA) {
+          // Only process when video is ready and has dimensions
+          const videoWidth = video.videoWidth;
+          const videoHeight = video.videoHeight;
+          
+          if (videoWidth && videoHeight) {
+            canvas.width = videoWidth;
+            canvas.height = videoHeight;
+            context.drawImage(video, 0, 0);
+            
+            try {
+              const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+              onFrame(imageData);
+            } catch (error) {
+              console.error('Error processing frame:', error);
+            }
+          }
         }
       }
       requestAnimationFrame(processFrame);
