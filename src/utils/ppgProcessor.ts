@@ -1,9 +1,12 @@
+
 import { VitalReading, PPGData, SensitivitySettings, ProcessingSettings } from './types';
 import { BeepPlayer } from './audioUtils';
 import { SignalProcessor } from './signalProcessing';
 import { SignalExtractor } from './signalExtraction';
 import { PeakDetector } from './peakDetection';
 import { SignalNormalizer } from './signalNormalization';
+import { SignalFilter } from './signalFilter';
+import { SignalFrequencyAnalyzer } from './signalFrequencyAnalyzer';
 
 export class PPGProcessor {
   private readings: VitalReading[] = [];
@@ -16,6 +19,8 @@ export class PPGProcessor {
   private readonly signalExtractor: SignalExtractor;
   private readonly peakDetector: PeakDetector;
   private readonly signalNormalizer: SignalNormalizer;
+  private readonly signalFilter: SignalFilter;
+  private readonly frequencyAnalyzer: SignalFrequencyAnalyzer;
   private beepPlayer: BeepPlayer;
   private readonly signalBuffer: number[] = [];
   private readonly bufferSize = 30;
@@ -47,6 +52,8 @@ export class PPGProcessor {
     this.signalExtractor = new SignalExtractor();
     this.peakDetector = new PeakDetector();
     this.signalNormalizer = new SignalNormalizer();
+    this.signalFilter = new SignalFilter(this.samplingRate);
+    this.frequencyAnalyzer = new SignalFrequencyAnalyzer(this.samplingRate);
   }
 
   updateSensitivitySettings(settings: any) {
@@ -66,7 +73,7 @@ export class PPGProcessor {
       }
     });
 
-    this.signalProcessor.updateKalmanParameters(
+    this.signalFilter.updateKalmanParameters(
       settings.kalmanQ || 0.1,
       settings.kalmanR || 1
     );
@@ -113,7 +120,7 @@ export class PPGProcessor {
       this.irBuffer.shift();
     }
     
-    const filteredRed = this.signalProcessor.lowPassFilter(this.redBuffer, 
+    const filteredRed = this.signalFilter.lowPassFilter(this.redBuffer, 
       5 * this.sensitivitySettings.noiseReduction);
     const normalizedValue = this.signalNormalizer.normalizeSignal(
       filteredRed[filteredRed.length - 1]
@@ -144,7 +151,7 @@ export class PPGProcessor {
       });
     }
 
-    const { frequencies, magnitudes } = this.signalProcessor.performFFT(filteredRed);
+    const { frequencies, magnitudes } = this.frequencyAnalyzer.performFFT(filteredRed);
     const dominantFreqIndex = magnitudes.indexOf(Math.max(...magnitudes));
     const dominantFreq = frequencies[dominantFreqIndex];
     const fftBpm = dominantFreq * 60;
