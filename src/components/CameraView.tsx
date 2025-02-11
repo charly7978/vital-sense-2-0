@@ -17,6 +17,22 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   const { toast } = useToast();
   const [videoInitialized, setVideoInitialized] = useState(false);
   const isMobile = useIsMobile();
+  const isAndroid = /android/i.test(navigator.userAgent);
+
+  const getDeviceConstraints = () => {
+    const constraints: MediaTrackConstraints = {
+      width: 640,
+      height: 480,
+      facingMode: isAndroid ? "environment" : "user"
+    };
+
+    // Solo activar la linterna en Android
+    if (isAndroid) {
+      constraints.advanced = [{ torch: true }];
+    }
+
+    return constraints;
+  };
 
   const processFrame = () => {
     if (!isActive || !webcamRef.current?.video || !canvasRef.current) {
@@ -33,7 +49,6 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
       return;
     }
 
-    // Solo actualiza las dimensiones del canvas si han cambiado
     if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
@@ -41,10 +56,8 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
     }
 
     try {
-      // Dibuja el frame
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       
-      // Solo procesa si el canvas tiene dimensiones válidas
       if (canvas.width > 0 && canvas.height > 0) {
         const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
         onFrame(imageData);
@@ -64,8 +77,30 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   useEffect(() => {
     if (isActive) {
       setVideoInitialized(false);
+      // Intenta activar la linterna cuando se inicia la medición
+      if (isAndroid && webcamRef.current?.video?.srcObject) {
+        const track = (webcamRef.current.video.srcObject as MediaStream)
+          .getVideoTracks()[0];
+        
+        track.applyConstraints({
+          advanced: [{ torch: true }]
+        }).catch(error => {
+          console.log('No se pudo activar la linterna:', error);
+        });
+      }
       animationFrameRef.current = requestAnimationFrame(processFrame);
     } else {
+      // Desactiva la linterna cuando se detiene la medición
+      if (isAndroid && webcamRef.current?.video?.srcObject) {
+        const track = (webcamRef.current.video.srcObject as MediaStream)
+          .getVideoTracks()[0];
+        
+        track.applyConstraints({
+          advanced: [{ torch: false }]
+        }).catch(error => {
+          console.log('No se pudo desactivar la linterna:', error);
+        });
+      }
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
@@ -76,17 +111,18 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
+      // Asegurarse de que la linterna se apague al desmontar
+      if (isAndroid && webcamRef.current?.video?.srcObject) {
+        const track = (webcamRef.current.video.srcObject as MediaStream)
+          .getVideoTracks()[0];
+        track.applyConstraints({
+          advanced: [{ torch: false }]
+        }).catch(error => {
+          console.log('No se pudo desactivar la linterna:', error);
+        });
+      }
     };
   }, [isActive]);
-
-  const getCameraFacingMode = () => {
-    // En Android, usa la cámara trasera
-    if (isMobile && /android/i.test(navigator.userAgent)) {
-      return "environment";
-    }
-    // Para otros dispositivos, usa la cámara frontal
-    return "user";
-  };
 
   return (
     <div className="relative w-full max-w-md mx-auto">
@@ -100,11 +136,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
           <Webcam
             ref={webcamRef}
             className="w-full h-full object-cover"
-            videoConstraints={{
-              width: 640,
-              height: 480,
-              facingMode: getCameraFacingMode()
-            }}
+            videoConstraints={getDeviceConstraints()}
           />
         )}
       </div>
