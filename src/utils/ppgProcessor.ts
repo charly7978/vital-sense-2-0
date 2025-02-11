@@ -1,4 +1,3 @@
-
 import { VitalReading, PPGData, SensitivitySettings, ProcessingSettings } from './types';
 import { BeepPlayer } from './audioUtils';
 import { SignalProcessor } from './signalProcessing';
@@ -30,7 +29,7 @@ export class PPGProcessor {
     noiseReduction: 1,
     peakDetection: 1
   };
-  public readonly processingSettings: ProcessingSettings = {
+  public processingSettings: ProcessingSettings = {
     MEASUREMENT_DURATION: 40,
     MIN_FRAMES_FOR_CALCULATION: 30,
     MIN_PEAKS_FOR_VALID_HR: 3,
@@ -54,6 +53,11 @@ export class PPGProcessor {
     this.signalNormalizer = new SignalNormalizer();
     this.signalFilter = new SignalFilter(this.samplingRate);
     this.frequencyAnalyzer = new SignalFrequencyAnalyzer(this.samplingRate);
+  }
+
+  updateProcessingSettings(newSettings: ProcessingSettings) {
+    this.processingSettings = { ...this.processingSettings, ...newSettings };
+    console.log('Updated processing settings:', this.processingSettings);
   }
 
   updateSensitivitySettings(settings: any) {

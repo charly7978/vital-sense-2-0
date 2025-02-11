@@ -11,7 +11,7 @@ import MeasurementControls from './vitals/MeasurementControls';
 import ProcessingSettingsPanel from './ProcessingSettingsPanel';
 import { PPGProcessor } from '../utils/ppgProcessor';
 import { useVitals } from '@/contexts/VitalsContext';
-import type { SensitivitySettings } from '../utils/types';
+import type { SensitivitySettings, ProcessingSettings } from '../utils/types';
 
 const ppgProcessor = new PPGProcessor();
 
@@ -45,6 +45,10 @@ const HeartRateMonitor: React.FC = () => {
     ppgProcessor.updateSensitivitySettings(newSettings);
   };
 
+  const handleProcessingSettingsChange = (newSettings: ProcessingSettings) => {
+    ppgProcessor.updateProcessingSettings(newSettings);
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-7xl mx-auto p-4">
       <div className="space-y-4">
@@ -72,7 +76,10 @@ const HeartRateMonitor: React.FC = () => {
           )}
         </div>
 
-        <ProcessingSettingsPanel settings={ppgProcessor.processingSettings} />
+        <ProcessingSettingsPanel 
+          settings={ppgProcessor.processingSettings}
+          onSettingsChange={handleProcessingSettingsChange}
+        />
       </div>
 
       <div className="space-y-4">
