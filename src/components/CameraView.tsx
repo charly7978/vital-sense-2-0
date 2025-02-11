@@ -21,15 +21,16 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
 
   const getDeviceConstraints = () => {
     const constraints: MediaTrackConstraints = {
-      width: 640,
-      height: 480,
-      facingMode: isAndroid ? "environment" : "user"
+      width: { ideal: 1280 },
+      height: { ideal: 720 },
+      facingMode: isAndroid ? "environment" : "user",
+      // Configuración para mejor calidad de imagen
+      exposureMode: "manual",
+      exposureCompensation: 2.0, // Aumentar exposición
+      whiteBalanceMode: "manual",
+      brightness: 1.0,
+      contrast: 1.0
     };
-
-    // Solo activar la linterna en Android
-    if (isAndroid) {
-      constraints.advanced = [{ torch: true }];
-    }
 
     return constraints;
   };
@@ -75,51 +76,68 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   };
 
   useEffect(() => {
-    if (isActive) {
-      setVideoInitialized(false);
-      // Intenta activar la linterna cuando se inicia la medición
-      if (isAndroid && webcamRef.current?.video?.srcObject) {
-        const track = (webcamRef.current.video.srcObject as MediaStream)
-          .getVideoTracks()[0];
-        
-        track.applyConstraints({
-          advanced: [{ torch: true }]
-        }).catch(error => {
-          console.log('No se pudo activar la linterna:', error);
+    let mediaStream: MediaStream | null = null;
+
+    const setupCamera = async () => {
+      try {
+        if (isActive) {
+          const constraints = getDeviceConstraints();
+          mediaStream = await navigator.mediaDevices.getUserMedia({ 
+            video: constraints,
+            audio: false 
+          });
+
+          if (webcamRef.current) {
+            webcamRef.current.video!.srcObject = mediaStream;
+          }
+
+          // Aplicar configuraciones avanzadas si está disponible
+          const track = mediaStream.getVideoTracks()[0];
+          const capabilities = track.getCapabilities();
+          const settings: any = {};
+
+          // Intentar ajustar la exposición si está disponible
+          if (capabilities.exposureMode) {
+            settings.exposureMode = 'manual';
+          }
+          if (capabilities.exposureTime) {
+            settings.exposureTime = capabilities.exposureTime.max / 2;
+          }
+          if (capabilities.colorTemperature) {
+            settings.colorTemperature = 5000; // temperatura de color neutra
+          }
+
+          await track.applyConstraints(settings);
+          
+          setVideoInitialized(false);
+          animationFrameRef.current = requestAnimationFrame(processFrame);
+        } else {
+          if (mediaStream) {
+            mediaStream.getTracks().forEach(track => track.stop());
+          }
+          if (animationFrameRef.current) {
+            cancelAnimationFrame(animationFrameRef.current);
+            animationFrameRef.current = null;
+          }
+        }
+      } catch (error) {
+        console.error('Error setting up camera:', error);
+        toast({
+          variant: "destructive",
+          title: "Error de cámara",
+          description: "No se pudo inicializar la cámara correctamente."
         });
       }
-      animationFrameRef.current = requestAnimationFrame(processFrame);
-    } else {
-      // Desactiva la linterna cuando se detiene la medición
-      if (isAndroid && webcamRef.current?.video?.srcObject) {
-        const track = (webcamRef.current.video.srcObject as MediaStream)
-          .getVideoTracks()[0];
-        
-        track.applyConstraints({
-          advanced: [{ torch: false }]
-        }).catch(error => {
-          console.log('No se pudo desactivar la linterna:', error);
-        });
-      }
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
-    }
+    };
+
+    setupCamera();
 
     return () => {
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+      }
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
-      }
-      // Asegurarse de que la linterna se apague al desmontar
-      if (isAndroid && webcamRef.current?.video?.srcObject) {
-        const track = (webcamRef.current.video.srcObject as MediaStream)
-          .getVideoTracks()[0];
-        track.applyConstraints({
-          advanced: [{ torch: false }]
-        }).catch(error => {
-          console.log('No se pudo desactivar la linterna:', error);
-        });
       }
     };
   }, [isActive]);
@@ -137,6 +155,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
             ref={webcamRef}
             className="w-full h-full object-cover"
             videoConstraints={getDeviceConstraints()}
+            forceScreenshotSourceSize
           />
         )}
       </div>
