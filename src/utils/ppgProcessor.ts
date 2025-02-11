@@ -39,7 +39,7 @@ export class PPGProcessor {
   processFrame(imageData: ImageData): PPGData | null {
     const now = Date.now();
     
-    const { red, ir, quality } = this.signalExtractor.extractChannels(imageData);
+    const { red, ir, quality, perfusionIndex } = this.signalExtractor.extractChannels(imageData);
     
     if (quality < this.qualityThreshold || red < 50) {
       console.log('No se detecta dedo o señal de baja calidad', { red, quality });
@@ -107,7 +107,7 @@ export class PPGProcessor {
     }
     
     const hrvAnalysis = this.signalProcessor.analyzeHRV(intervals);
-    const spo2 = this.signalProcessor.calculateSpO2(this.redBuffer, this.irBuffer);
+    const spo2Result = this.signalProcessor.calculateSpO2(this.redBuffer, this.irBuffer, perfusionIndex);
     
     const bp = this.calibrationData ? 
       this.signalProcessor.estimateBloodPressureWithCalibration(
@@ -121,13 +121,13 @@ export class PPGProcessor {
     
     return {
       bpm: Math.round(fftBpm),
-      spo2,
+      spo2: spo2Result.spo2,
       systolic: bp.systolic,
       diastolic: bp.diastolic,
       hasArrhythmia: hrvAnalysis.hasArrhythmia,
       arrhythmiaType: hrvAnalysis.type,
       signalQuality,
-      confidence: signalQuality * 100,
+      confidence: spo2Result.confidence,
       readings: this.readings,
       isPeak
     };
