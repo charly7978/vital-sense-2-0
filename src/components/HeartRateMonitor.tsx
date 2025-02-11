@@ -110,27 +110,39 @@ const HeartRateMonitor: React.FC = () => {
     try {
       const vitals = ppgProcessor.processFrame(imageData);
       if (vitals) {
-        setBpm(vitals.bpm || 0);
-        setSpo2(vitals.spo2 || 0);
-        setSystolic(vitals.systolic || 0);
-        setDiastolic(vitals.diastolic || 0);
-        setHasArrhythmia(vitals.hasArrhythmia || false);
-        setArrhythmiaType(vitals.arrhythmiaType || 'Normal');
-        setReadings(ppgProcessor.getReadings());
+        // Solo almacenar y mostrar mediciones cuando hay señal válida
+        if (vitals.signalQuality > 0) {
+          setBpm(vitals.bpm || 0);
+          setSpo2(vitals.spo2 || 0);
+          setSystolic(vitals.systolic || 0);
+          setDiastolic(vitals.diastolic || 0);
+          setHasArrhythmia(vitals.hasArrhythmia || false);
+          setArrhythmiaType(vitals.arrhythmiaType || 'Normal');
+          setReadings(ppgProcessor.getReadings());
 
-        // Store measurement in database
-        if (vitals.bpm > 0 && vitals.spo2 > 0) {
-          storeMeasurement({
-            heart_rate: vitals.bpm,
-            spo2: vitals.spo2,
-            systolic_pressure: vitals.systolic,
-            diastolic_pressure: vitals.diastolic,
-            arrhythmia_detected: vitals.hasArrhythmia,
-            measurement_quality: vitals.signalQuality || 0,
-            ppg_signal_data: {
-              readings: ppgProcessor.getReadings()
-            }
-          });
+          // Store measurement in database only if values are valid
+          if (vitals.bpm > 0 && vitals.spo2 > 0) {
+            storeMeasurement({
+              heart_rate: vitals.bpm,
+              spo2: vitals.spo2,
+              systolic_pressure: vitals.systolic,
+              diastolic_pressure: vitals.diastolic,
+              arrhythmia_detected: vitals.hasArrhythmia,
+              measurement_quality: vitals.signalQuality,
+              ppg_signal_data: {
+                readings: ppgProcessor.getReadings()
+              }
+            });
+          }
+        } else {
+          // Resetear valores cuando no hay señal válida
+          setBpm(0);
+          setSpo2(0);
+          setSystolic(0);
+          setDiastolic(0);
+          setHasArrhythmia(false);
+          setArrhythmiaType('Normal');
+          setReadings([]);
         }
       }
     } catch (error) {
@@ -327,6 +339,13 @@ const HeartRateMonitor: React.FC = () => {
 
       <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4 shadow-lg">
         <CameraView onFrame={handleFrame} isActive={isStarted} />
+        {isStarted && bpm === 0 && (
+          <div className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+            <p className="text-yellow-300 text-sm text-center">
+              No se detecta el dedo en la cámara. Por favor, coloque su dedo correctamente sobre el lente.
+            </p>
+          </div>
+        )}
       </div>
       
       <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4 shadow-lg">

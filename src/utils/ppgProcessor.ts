@@ -44,10 +44,23 @@ export class PPGProcessor {
     // Extracción mejorada de señales roja e infrarroja
     const { red, ir, quality } = this.extractChannels(imageData);
     
-    // Verificar calidad de señal antes de procesar
-    if (quality < this.qualityThreshold) {
-      console.log('Señal de baja calidad, esperando mejor colocación del dedo');
-      return null;
+    // Verificación más estricta de la presencia del dedo
+    if (quality < this.qualityThreshold || red < 50) {
+      console.log('No se detecta dedo o señal de baja calidad', { red, quality });
+      // Resetear buffers cuando no hay dedo
+      this.redBuffer = [];
+      this.irBuffer = [];
+      this.readings = [];
+      this.peakTimes = [];
+      return {
+        bpm: 0,
+        spo2: 0,
+        systolic: 0,
+        diastolic: 0,
+        hasArrhythmia: false,
+        arrhythmiaType: 'Normal',
+        signalQuality: 0
+      };
     }
     
     this.redBuffer.push(red);
@@ -138,14 +151,14 @@ export class PPGProcessor {
     let irSum = 0;
     let pixelCount = 0;
     let saturationCount = 0;
+    let darkPixelCount = 0;
     
     const width = imageData.width;
     const height = imageData.height;
     const centerX = Math.floor(width / 2);
     const centerY = Math.floor(height / 2);
-    const regionSize = 50; // Área de interés optimizada
+    const regionSize = 50;
     
-    // Análisis optimizado de la región central
     for (let y = centerY - regionSize; y < centerY + regionSize; y++) {
       for (let x = centerX - regionSize; x < centerX + regionSize; x++) {
         if (x >= 0 && x < width && y >= 0 && y < height) {
@@ -154,19 +167,19 @@ export class PPGProcessor {
           const green = imageData.data[i+1];
           const blue = imageData.data[i+2];
           
-          // Detectar saturación
-          if (red > 250 || red < 5) saturationCount++;
+          // Mejorar detección de dedo
+          if (red < 30) darkPixelCount++;
+          if (red > 250) saturationCount++;
           
           redSum += red;
-          // Aproximación mejorada para IR usando verde y azul
           irSum += (green * 0.7 + blue * 0.3);
           pixelCount++;
         }
       }
     }
     
-    // Calcular calidad basada en saturación
-    const quality = 1 - (saturationCount / pixelCount);
+    // Calcular calidad basada en saturación y píxeles oscuros
+    const quality = 1 - ((saturationCount + darkPixelCount) / pixelCount);
     
     return {
       red: pixelCount > 0 ? redSum / pixelCount : 0,
