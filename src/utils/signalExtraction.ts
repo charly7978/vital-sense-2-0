@@ -1,66 +1,174 @@
 
-import { playBeep } from "@/assets/beep";
-import FFT from 'fft.js';
+import { ProcessingSettings } from './types';
+
+interface ExtractedSignals {
+  red: number;
+  ir: number;
+  quality: number;
+  perfusionIndex: number;
+}
 
 export class SignalExtractor {
-  private lastRedValues: number[] = [];
+  private readonly qualityThreshold = 0.5; // Increased from 0.4
+  private readonly minIntensity = 50; // Increased from 40
+  private readonly maxIntensity = 250;
+  private lastRed = 0;
+  private lastIr = 0;
+  private frameCount = 0;
+  private processingSettings: ProcessingSettings = {
+    measurementDuration: 30,
+    minFramesForCalculation: 30,
+    minPeaksForValidHR: 3,
+    minPeakDistance: 500,
+    maxPeakDistance: 1500,
+    peakThresholdFactor: 0.5,
+    minRedValue: 50, // Increased from 40
+    minRedDominance: 2.5, // Increased from 2.0
+    minValidPixelsRatio: 0.45, // Increased from 0.4
+    minBrightness: 55, // Increased from 45
+    minValidReadings: 10,
+    fingerDetectionDelay: 1000,
+    minSpO2: 80
+  };
 
-  private detectPeaks(signal: number[]) {
-    return signal.filter((v, i, arr) => v > arr[i - 1] && v > arr[i + 1]).length;
+  updateSettings(settings: Partial<ProcessingSettings>) {
+    this.processingSettings = { ...this.processingSettings, ...settings };
   }
 
-  private applyFFT(signal: number[]): number[] {
-    const fft = new FFT(Math.pow(2, Math.ceil(Math.log2(signal.length))));
-    const phasors = fft.createComplexArray();
-    
-    // Preparar la señal con padding de ceros si es necesario
-    const paddedSignal = [...signal];
-    while (paddedSignal.length < fft.size) {
-      paddedSignal.push(0);
-    }
-    
-    fft.realTransform(phasors, paddedSignal);
-    
-    // Calcular magnitudes
-    const magnitudes: number[] = [];
-    for (let i = 0; i < fft.size/2; i++) {
-      magnitudes.push(Math.sqrt(phasors[2*i]**2 + phasors[2*i+1]**2));
-    }
-    
-    return magnitudes;
-  }
-
-  extractChannels(imageData: ImageData) {
-    let redSum = 0, pixelCount = 0;
-    const { width, height } = imageData;
-    const centerX = Math.floor(width / 2);
-    const centerY = Math.floor(height / 2);
-    const regionSize = 50;
-
-    for (let y = centerY - regionSize; y < centerY + regionSize; y++) {
-      for (let x = centerX - regionSize; x < centerX + regionSize; x++) {
-        const i = (y * width + x) * 4;
-        const red = imageData.data[i];
-
-        if (red > 45) {
-          redSum += red;
-          pixelCount++;
+  extractChannels(imageData: ImageData): ExtractedSignals {
+    this.frameCount++;
+    try {
+      let redSum = 0;
+      let irSum = 0;
+      let pixelCount = 0;
+      let saturationCount = 0;
+      let darkPixelCount = 0;
+      let maxRedIntensity = 0;
+      let minRedIntensity = 255;
+      let validRedPixels = 0;
+      
+      const width = imageData.width;
+      const height = imageData.height;
+      const centerX = Math.floor(width / 2);
+      const centerY = Math.floor(height / 2);
+      const regionSize = Math.min(40, Math.floor(Math.min(width, height) / 2)); // Reduced from 60
+      
+      for (let y = centerY - regionSize; y < centerY + regionSize; y++) {
+        for (let x = centerX - regionSize; x < centerX + regionSize; x++) {
+          if (x >= 0 && x < width && y >= 0 && y < height) {
+            const i = (y * width + x) * 4;
+            const red = imageData.data[i];
+            const green = imageData.data[i+1];
+            const blue = imageData.data[i+2];
+            
+            if (red > this.minIntensity) {
+              validRedPixels++;
+            }
+            
+            maxRedIntensity = Math.max(maxRedIntensity, red);
+            minRedIntensity = Math.min(minRedIntensity, red);
+            
+            if (red < this.minIntensity) darkPixelCount++;
+            if (red > this.maxIntensity) saturationCount++;
+            
+            // Criterio más estricto para dominancia del rojo
+            const redDominance = red / ((green + blue) / 2);
+            if (redDominance >= 2.5 && red >= this.minIntensity) { // Increased from 2.0
+              redSum += red;
+              irSum += (green + blue) / 2;
+              pixelCount++;
+            }
+          }
         }
       }
+
+      const totalPixels = 4 * regionSize * regionSize;
+      const validPixelsRatio = pixelCount / totalPixels;
+      const redDominanceRatio = validRedPixels / totalPixels;
+
+      if (this.frameCount % 5 === 0) {
+        console.log('Análisis de señal detallado:', {
+          frameCount: this.frameCount,
+          validPixelsRatio,
+          redDominanceRatio,
+          maxRedIntensity,
+          minRedIntensity,
+          darkPixelCount,
+          saturationCount,
+          pixelCount,
+          avgRed: pixelCount > 0 ? redSum / pixelCount : 0,
+          regionSize,
+          thresholds: {
+            minIntensity: this.minIntensity,
+            qualityThreshold: this.qualityThreshold,
+            minRedDominance: 2.5
+          }
+        });
+      }
+      
+      // Criterios más estrictos para detección de dedo
+      if (validPixelsRatio < 0.45 || redDominanceRatio < 0.4) { // Increased both thresholds
+        console.log('Dedo no detectado - criterios no cumplidos:', {
+          validPixelsRatio,
+          redDominanceRatio,
+          minRequired: 0.45
+        });
+        return {
+          red: 0,
+          ir: 0,
+          quality: 0,
+          perfusionIndex: 0
+        };
+      }
+
+      const avgRed = pixelCount > 0 ? redSum / pixelCount : 0;
+      const avgIr = pixelCount > 0 ? irSum / pixelCount : 0;
+      
+      // Calidad basada en múltiples factores
+      const quality = Math.max(0, Math.min(1, 
+        validPixelsRatio >= 0.45 ? 
+        (1 - ((saturationCount + darkPixelCount) / totalPixels)) * 
+        (avgRed > this.minIntensity ? 1 : 0.5) * 
+        (redDominanceRatio >= 0.4 ? 1 : 0.5) : 0
+      ));
+      
+      const perfusionIndex = avgRed > 0 ? 
+        ((maxRedIntensity - minRedIntensity) / avgRed) * 100 : 0;
+
+      if (quality > this.qualityThreshold && avgRed >= this.minIntensity) {
+        this.lastRed = avgRed;
+        this.lastIr = avgIr;
+        
+        if (this.frameCount % 5 === 0) {
+          console.log('Señal válida detectada:', {
+            quality,
+            perfusionIndex,
+            avgRed,
+            avgIr,
+            redDominance: avgRed / avgIr
+          });
+        }
+      } else if (this.frameCount % 5 === 0) {
+        console.log('No se detecta dedo o señal de baja calidad', {
+          red: avgRed,
+          quality
+        });
+      }
+      
+      return {
+        red: avgRed,
+        ir: avgIr,
+        quality,
+        perfusionIndex
+      };
+    } catch (error) {
+      console.error('Error en extracción de señal:', error);
+      return {
+        red: this.lastRed,
+        ir: this.lastIr,
+        quality: 0,
+        perfusionIndex: 0
+      };
     }
-
-    if (pixelCount === 0) return { bpm: 0 };
-
-    let avgRed = redSum / pixelCount;
-    this.lastRedValues.push(avgRed);
-    if (this.lastRedValues.length > 100) this.lastRedValues.shift();
-
-    const freqData = this.applyFFT(this.lastRedValues);
-    const peaks = this.detectPeaks(freqData);
-    const bpm = peaks * 6; // Escala a 60s
-
-    if (peaks > 0) playBeep(); // 🔊 Sonido cada latido detectado
-
-    return { bpm };
   }
 }
