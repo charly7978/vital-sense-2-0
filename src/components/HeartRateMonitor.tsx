@@ -1,10 +1,11 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Heart, Droplets, Activity, AlertTriangle } from 'lucide-react';
 import CameraView from './CameraView';
 import VitalChart from './VitalChart';
 import { PPGProcessor } from '../utils/ppgProcessor';
 import type { VitalReading } from '../utils/types';
+import { supabase } from '@/integrations/supabase/client';
 
 const ppgProcessor = new PPGProcessor();
 
@@ -16,8 +17,44 @@ const HeartRateMonitor: React.FC = () => {
   const [hasArrhythmia, setHasArrhythmia] = useState<boolean>(false);
   const [arrhythmiaType, setArrhythmiaType] = useState<string>('Normal');
   const [readings, setReadings] = useState<VitalReading[]>([]);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+
+  // Guardar las mediciones en Supabase
+  useEffect(() => {
+    const saveVitalSigns = async () => {
+      if (bpm > 0 && spo2 > 0) {
+        try {
+          const { error } = await supabase
+            .from('vital_signs')
+            .insert([
+              {
+                heart_rate: bpm,
+                spo2: spo2,
+                systolic: systolic,
+                diastolic: diastolic,
+                has_arrhythmia: hasArrhythmia,
+                arrhythmia_details: { type: arrhythmiaType },
+                ppg_data: { readings: readings },
+                measurement_quality: 1.0
+              }
+            ]);
+
+          if (error) {
+            console.error('Error saving vital signs:', error);
+          }
+        } catch (error) {
+          console.error('Error in saveVitalSigns:', error);
+        }
+      }
+    };
+
+    if (isProcessing && bpm > 0) {
+      saveVitalSigns();
+    }
+  }, [bpm, spo2, systolic, diastolic, hasArrhythmia, arrhythmiaType, readings, isProcessing]);
 
   const handleFrame = useCallback((imageData: ImageData) => {
+    setIsProcessing(true);
     const vitals = ppgProcessor.processFrame(imageData);
     setBpm(vitals.bpm);
     setSpo2(vitals.spo2);
@@ -90,7 +127,7 @@ const HeartRateMonitor: React.FC = () => {
       </div>
       
       <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4 shadow-lg">
-        <h3 className="text-lg font-medium mb-4 text-gray-100">Real-time PPG Signal</h3>
+        <h3 className="text-lg font-medium mb-4 text-gray-100">Señal PPG en Tiempo Real</h3>
         <VitalChart data={readings} color="#ea384c" />
       </div>
     </div>
