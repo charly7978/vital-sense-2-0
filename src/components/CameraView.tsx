@@ -4,8 +4,6 @@ import Webcam from 'react-webcam';
 import CameraInitializer from './camera/CameraInitializer';
 import CameraProcessor from './camera/CameraProcessor';
 import CameraDisplay from './camera/CameraDisplay';
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface CameraViewProps {
@@ -33,62 +31,38 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
     }
   }, [webcamRef.current]);
 
-  const stopCamera = async () => {
-    if (!streamRef.current) return;
-
-    try {
-      const tracks = streamRef.current.getTracks();
-      tracks.forEach(track => {
+  const handleCameraInitialized = (stream: MediaStream) => {
+    // Detener cualquier stream existente
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => {
         track.stop();
         streamRef.current?.removeTrack(track);
       });
-      streamRef.current = null;
-      
-      if (webcamRef.current?.stream) {
-        webcamRef.current.stream.getTracks().forEach(track => track.stop());
-      }
-      
-      setCameraInitialized(false);
-      console.log('Camera stopped successfully');
-    } catch (error) {
-      console.error('Error stopping camera:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Error al detener la cámara"
-      });
-    }
-  };
-
-  const handleCameraInitialized = (stream: MediaStream) => {
-    if (streamRef.current) {
-      stopCamera();
     }
 
     streamRef.current = stream;
-    if (webcamRef.current && webcamRef.current.video) {
+    if (webcamRef.current?.video) {
       webcamRef.current.video.srcObject = stream;
-      // Ensure video is playing
       webcamRef.current.video.play().catch(console.error);
     }
     setCameraInitialized(true);
-    console.log('Camera started successfully');
     setError(null);
-    
-    toast({
-      title: "Cámara iniciada",
-      description: "La cámara se ha iniciado correctamente"
-    });
   };
 
   useEffect(() => {
-    if (!isActive) {
-      stopCamera();
-    }
-
     return () => {
-      stopCamera();
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
     };
+  }, []);
+
+  useEffect(() => {
+    if (!isActive && streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+      setCameraInitialized(false);
+    }
   }, [isActive]);
 
   return (

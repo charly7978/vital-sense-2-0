@@ -33,31 +33,29 @@ const CameraDisplay: React.FC<CameraDisplayProps> = ({
             <Camera className="w-8 h-8 text-gray-400" />
           </div>
         )}
-        {isActive && cameraInitialized && (
+        {isActive && (
           <Webcam
             ref={webcamRef}
             className="w-full h-full object-cover"
             videoConstraints={{
-              facingMode: isAndroid ? 'environment' : 'user',
-              width: 640,
-              height: 480
+              width: { ideal: 640 },
+              height: { ideal: 480 },
+              facingMode: isAndroid ? 'environment' : 'user'
             }}
           />
         )}
       </div>
       
-      {isActive && (
-        <div className="absolute bottom-4 left-4 right-4">
-          <div className="px-4 py-2 rounded-lg bg-white/10 backdrop-blur-lg border border-white/20">
-            <p className="text-sm text-white">
-              {isAndroid 
-                ? "Coloca tu dedo sobre el lente de la cámara asegurándote de cubrir el flash"
-                : "Coloca tu dedo sobre la cámara frontal"
-              }
-            </p>
-          </div>
+      <div className="absolute bottom-4 left-4 right-4">
+        <div className="px-4 py-2 rounded-lg bg-white/10 backdrop-blur-lg border border-white/20">
+          <p className="text-sm text-white">
+            {isAndroid 
+              ? "Coloca tu dedo sobre el lente de la cámara asegurándote de cubrir el flash"
+              : "Coloca tu dedo sobre la cámara"
+            }
+          </p>
         </div>
-      )}
+      </div>
     </div>
   );
 };
