@@ -1,3 +1,4 @@
+
 import { VitalReading, UserCalibration, PPGData } from './types';
 import { BeepPlayer } from './audioUtils';
 import { SignalProcessor } from './signalProcessing';
@@ -84,6 +85,25 @@ export class PPGProcessor {
 
     // Detección de picos mejorada con validación de calidad
     const isPeak = this.isRealPeak(normalizedValue, now);
+
+    if (isPeak) {
+      this.lastPeakTime = now;
+      this.peakTimes.push(now);
+      
+      if (this.peakTimes.length > 10) {
+        this.peakTimes.shift();
+      }
+      
+      // Reproducir beep inmediatamente al detectar pico
+      this.beepPlayer.playBeep().catch(err => {
+        console.error('Error al reproducir beep:', err);
+      });
+      
+      console.log('Pico detectado:', {
+        valor: normalizedValue,
+        tiempoDesdeUltimoPico: now - this.lastPeakTime
+      });
+    }
 
     // Análisis FFT para BPM más preciso
     const { frequencies, magnitudes } = this.signalProcessor.performFFT(filteredRed);
