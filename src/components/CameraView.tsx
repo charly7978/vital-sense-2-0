@@ -4,6 +4,7 @@ import Webcam from 'react-webcam';
 import { Camera as CapCamera } from '@capacitor/camera';
 import { Camera } from 'lucide-react';
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { loadOpenCV, isOpenCVLoaded } from '@/utils/opencvLoader';
 
 interface CameraViewProps {
   onFrame: (imageData: ImageData) => void;
@@ -17,6 +18,22 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   const [isAndroid, setIsAndroid] = useState(false);
   const [cameraInitialized, setCameraInitialized] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
+
+  useEffect(() => {
+    const initOpenCV = async () => {
+      try {
+        await loadOpenCV();
+        console.log('OpenCV initialized successfully');
+      } catch (err) {
+        console.error('Error initializing OpenCV:', err);
+        setError('Error al cargar OpenCV. Por favor, recarga la página.');
+      }
+    };
+
+    if (!isOpenCVLoaded()) {
+      initOpenCV();
+    }
+  }, []);
 
   useEffect(() => {
     const userAgent = window.navigator.userAgent.toLowerCase();
@@ -114,7 +131,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
     let animationFrameId: number;
 
     const processFrame = () => {
-      if (!isActive || !cameraInitialized) return;
+      if (!isActive || !cameraInitialized || !isOpenCVLoaded()) return;
 
       if (webcamRef.current && canvasRef.current) {
         const video = webcamRef.current.video;
@@ -128,7 +145,25 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
 
           try {
             const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-            onFrame(imageData);
+            // Aplicar procesamiento OpenCV si está disponible
+            if (window.cv) {
+              const src = window.cv.matFromImageData(imageData);
+              // Convertir a escala de grises
+              const gray = new window.cv.Mat();
+              window.cv.cvtColor(src, gray, window.cv.COLOR_RGBA2GRAY);
+              // Convertir de vuelta a ImageData
+              const processedImageData = new ImageData(
+                new Uint8ClampedArray(gray.data),
+                canvas.width,
+                canvas.height
+              );
+              onFrame(processedImageData);
+              // Liberar memoria
+              src.delete();
+              gray.delete();
+            } else {
+              onFrame(imageData);
+            }
           } catch (error) {
             console.error('Error processing frame:', error);
           }
