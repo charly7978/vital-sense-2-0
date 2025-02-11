@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React from 'react';
 import { useToast } from "@/hooks/use-toast";
 import CameraView from './CameraView';
 import VitalChart from './VitalChart';
@@ -9,21 +9,17 @@ import VitalSignsDisplay from './vitals/VitalSignsDisplay';
 import SignalQualityIndicator from './vitals/SignalQualityIndicator';
 import MeasurementControls from './vitals/MeasurementControls';
 import { PPGProcessor } from '../utils/ppgProcessor';
-import { BeepPlayer } from '../utils/audioUtils';
-import type { VitalReading, PPGData, SensitivitySettings, CalibrationSettings } from '../utils/types';
+import { useVitals } from '@/contexts/VitalsContext';
 
 const ppgProcessor = new PPGProcessor();
-const beepPlayer = new BeepPlayer();
 
-const MEASUREMENT_DURATION = 30; // segundos
-
-const defaultSensitivitySettings: SensitivitySettings = {
+const defaultSensitivitySettings = {
   signalAmplification: 1,
   noiseReduction: 1,
   peakDetection: 1
 };
 
-const defaultCalibrationSettings: CalibrationSettings = {
+const defaultCalibrationSettings = {
   measurementDuration: {
     value: 30,
     min: 10,
@@ -139,20 +135,22 @@ const defaultCalibrationSettings: CalibrationSettings = {
 };
 
 const HeartRateMonitor: React.FC = () => {
-  const [bpm, setBpm] = useState<number>(0);
-  const [spo2, setSpo2] = useState<number>(0);
-  const [systolic, setSystolic] = useState<number>(0);
-  const [diastolic, setDiastolic] = useState<number>(0);
-  const [hasArrhythmia, setHasArrhythmia] = useState<boolean>(false);
-  const [arrhythmiaType, setArrhythmiaType] = useState<string>('Normal');
-  const [readings, setReadings] = useState<VitalReading[]>([]);
-  const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [isStarted, setIsStarted] = useState<boolean>(false);
-  const [measurementProgress, setMeasurementProgress] = useState(0);
-  const [measurementQuality, setMeasurementQuality] = useState(0);
-  const [measurementStartTime, setMeasurementStartTime] = useState<number | null>(null);
+  const { 
+    bpm, 
+    spo2, 
+    systolic, 
+    diastolic, 
+    hasArrhythmia, 
+    arrhythmiaType,
+    readings,
+    isStarted,
+    measurementProgress,
+    measurementQuality,
+    toggleMeasurement,
+    processFrame
+  } = useVitals();
+
   const [sensitivitySettings, setSensitivitySettings] = useState<SensitivitySettings>(defaultSensitivitySettings);
-  const [calibrationSettings, setCalibrationSettings] = useState<CalibrationSettings>(defaultCalibrationSettings);
   const { toast } = useToast();
 
   const handleSensitivityChange = (newSettings: SensitivitySettings) => {
@@ -173,81 +171,6 @@ const HeartRateMonitor: React.FC = () => {
       title: "Calibración actualizada",
       description: `${key} ajustado a ${value}`,
     });
-  };
-
-  const handleFrame = useCallback((imageData: ImageData) => {
-    if (!isStarted) return;
-    
-    setIsProcessing(true);
-    try {
-      const vitals = ppgProcessor.processFrame(imageData);
-      if (vitals) {
-        if (vitals.isPeak === true) {
-          beepPlayer.playBeep('heartbeat');
-        }
-
-        setMeasurementQuality(vitals.signalQuality);
-        
-        if (vitals.signalQuality > 0) {
-          setBpm(vitals.bpm || 0);
-          setSpo2(vitals.spo2 || 0);
-          setSystolic(vitals.systolic || 0);
-          setDiastolic(vitals.diastolic || 0);
-          setHasArrhythmia(vitals.hasArrhythmia || false);
-          setArrhythmiaType(vitals.arrhythmiaType || 'Normal');
-          setReadings(ppgProcessor.getReadings());
-        }
-      }
-    } catch (error) {
-      console.error('Error processing frame:', error);
-      toast({
-        variant: "destructive",
-        title: "Error en el procesamiento",
-        description: "Error al procesar la imagen de la cámara."
-      });
-    }
-  }, [isStarted, toast]);
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-
-    if (isStarted && measurementStartTime) {
-      interval = setInterval(() => {
-        const elapsed = (Date.now() - measurementStartTime) / 1000;
-        const progress = Math.min((elapsed / MEASUREMENT_DURATION) * 100, 100);
-        setMeasurementProgress(progress);
-
-        if (elapsed >= MEASUREMENT_DURATION) {
-          setIsStarted(false);
-          beepPlayer.playBeep('success');
-          toast({
-            title: "Medición completada",
-            description: "La medición se ha completado exitosamente."
-          });
-        }
-      }, 100);
-    }
-
-    return () => {
-      if (interval) {
-        clearInterval(interval);
-      }
-    };
-  }, [isStarted, measurementStartTime, toast]);
-
-  const toggleMeasurement = () => {
-    setIsStarted(!isStarted);
-    if (!isStarted) {
-      setMeasurementStartTime(Date.now());
-      setMeasurementProgress(0);
-      toast({
-        title: "Iniciando medición",
-        description: `La medición durará ${MEASUREMENT_DURATION} segundos. Por favor, mantenga su dedo frente a la cámara.`
-      });
-    } else {
-      setMeasurementStartTime(null);
-      setIsProcessing(false);
-    }
   };
 
   return (
@@ -293,7 +216,7 @@ const HeartRateMonitor: React.FC = () => {
       </div>
 
       <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4 shadow-lg">
-        <CameraView onFrame={handleFrame} isActive={isStarted} />
+        <CameraView onFrame={processFrame} isActive={isStarted} />
         {isStarted && bpm === 0 && (
           <div className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
             <p className="text-yellow-300 text-sm text-center">
