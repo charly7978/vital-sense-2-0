@@ -1,4 +1,4 @@
-import { VitalReading, PPGData, SensitivitySettings } from './types';
+import { VitalReading, PPGData, SensitivitySettings, ProcessingSettings } from './types';
 import { BeepPlayer } from './audioUtils';
 import { SignalProcessor } from './signalProcessing';
 import { SignalExtractor } from './signalExtraction';
@@ -25,6 +25,21 @@ export class PPGProcessor {
     noiseReduction: 1,
     peakDetection: 1
   };
+  private processingSettings: ProcessingSettings = {
+    measurementDuration: 30,
+    minFramesForCalculation: 30,
+    minPeaksForValidHR: 3,
+    minPeakDistance: 500,
+    maxPeakDistance: 1500,
+    peakThresholdFactor: 0.5,
+    minRedValue: 20,
+    minRedDominance: 1.5,
+    minValidPixelsRatio: 0.3,
+    minBrightness: 30,
+    minValidReadings: 10,
+    fingerDetectionDelay: 1000,
+    minSpO2: 80
+  };
   
   constructor() {
     this.beepPlayer = new BeepPlayer();
@@ -35,12 +50,31 @@ export class PPGProcessor {
   }
 
   updateSensitivitySettings(settings: any) {
-    Object.assign(this.sensitivitySettings, settings);
+    if (settings.signalAmplification) {
+      this.sensitivitySettings.signalAmplification = settings.signalAmplification;
+    }
+    if (settings.noiseReduction) {
+      this.sensitivitySettings.noiseReduction = settings.noiseReduction;
+    }
+    if (settings.peakDetection) {
+      this.sensitivitySettings.peakDetection = settings.peakDetection;
+    }
+
+    Object.entries(settings).forEach(([key, value]: [string, any]) => {
+      if (key in this.processingSettings) {
+        (this.processingSettings as any)[key] = value;
+      }
+    });
+
     this.signalProcessor.updateKalmanParameters(
       settings.kalmanQ || 0.1,
       settings.kalmanR || 1
     );
-    console.log('Updated calibration settings:', settings);
+    
+    console.log('Updated settings:', {
+      sensitivity: this.sensitivitySettings,
+      processing: this.processingSettings
+    });
   }
 
   processFrame(imageData: ImageData): PPGData | null {

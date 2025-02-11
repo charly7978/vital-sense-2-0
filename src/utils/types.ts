@@ -25,10 +25,26 @@ export interface PPGData {
 }
 
 export interface SensitivitySettings {
-  [key: string]: number; // Add index signature
+  [key: string]: number;
   signalAmplification: number;
   noiseReduction: number;
   peakDetection: number;
+}
+
+export interface ProcessingSettings {
+  measurementDuration: number;
+  minFramesForCalculation: number;
+  minPeaksForValidHR: number;
+  minPeakDistance: number;
+  maxPeakDistance: number;
+  peakThresholdFactor: number;
+  minRedValue: number;
+  minRedDominance: number;
+  minValidPixelsRatio: number;
+  minBrightness: number;
+  minValidReadings: number;
+  fingerDetectionDelay: number;
+  minSpO2: number;
 }
 
 export interface CalibrationSettings {
