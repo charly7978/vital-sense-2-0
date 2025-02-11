@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Heart, Droplets, Activity, AlertTriangle, PlayCircle, StopCircle, Settings, Hand, SignalHigh, SignalMedium, SignalLow } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
@@ -8,7 +9,7 @@ import VitalChart from './VitalChart';
 import CalibrationDialog from './CalibrationDialog';
 import { PPGProcessor } from '../utils/ppgProcessor';
 import { BeepPlayer } from '../utils/audioUtils';
-import type { VitalReading, CalibrationData, UserCalibration } from '../utils/types';
+import type { VitalReading, CalibrationData, UserCalibration, PPGData } from '../utils/types';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from '@/integrations/supabase/client';
@@ -120,7 +121,7 @@ const HeartRateMonitor: React.FC = () => {
       const vitals = ppgProcessor.processFrame(imageData);
       if (vitals) {
         // Si hay un pico en la señal PPG, reproducir el beep
-        if (vitals.isPeak) {
+        if (vitals.isPeak === true) {
           beepPlayer.playBeep('heartbeat');
         }
 

@@ -14,6 +14,8 @@ export interface PPGData {
   arrhythmiaType: string;
   confidence: number;
   readings: VitalReading[];
+  isPeak?: boolean;  // Add this property as optional
+  signalQuality: number;
 }
 
 export interface CalibrationData {
@@ -42,3 +44,4 @@ export interface UserCalibration {
   calibration_date?: string;
   user_id?: string;
 }
+
