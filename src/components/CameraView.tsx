@@ -9,6 +9,15 @@ interface CameraViewProps {
   isActive: boolean;
 }
 
+// Extendemos las interfaces de TypeScript para incluir la propiedad torch
+interface ExtendedCapabilities extends MediaTrackCapabilities {
+  torch?: boolean;
+}
+
+interface ExtendedConstraints extends MediaTrackConstraintSet {
+  torch?: boolean;
+}
+
 const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   const webcamRef = useRef<Webcam>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -104,10 +113,10 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
         if (isAndroid) {
           try {
             const track = stream.getVideoTracks()[0];
-            const capabilities = track.getCapabilities();
+            const capabilities = track.getCapabilities() as ExtendedCapabilities;
             if (capabilities.torch) {
               await track.applyConstraints({
-                advanced: [{ torch: true }]
+                advanced: [{ torch: true } as ExtendedConstraints]
               });
             }
           } catch (flashError) {
