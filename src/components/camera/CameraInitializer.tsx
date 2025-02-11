@@ -1,6 +1,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { Camera as CapCamera } from '@capacitor/camera';
+import { useToast } from "@/hooks/use-toast";
 
 interface CameraInitializerProps {
   onInitialized: (stream: MediaStream) => void;
@@ -23,6 +24,7 @@ const CameraInitializer: React.FC<CameraInitializerProps> = ({
 }) => {
   const [isAndroid, setIsAndroid] = useState(false);
   const [currentStream, setCurrentStream] = useState<MediaStream | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     const userAgent = window.navigator.userAgent.toLowerCase();
@@ -36,12 +38,18 @@ const CameraInitializer: React.FC<CameraInitializerProps> = ({
         currentStream.removeTrack(track);
       });
       setCurrentStream(null);
+      console.log('Camera stream stopped');
     }
   }, [currentStream]);
 
   const initializeCamera = useCallback(async () => {
     try {
       stopCurrentStream();
+
+      if (!isActive) {
+        console.log('Camera not active, skipping initialization');
+        return;
+      }
 
       const permission = await CapCamera.checkPermissions();
       if (permission.camera !== 'granted') {
@@ -51,7 +59,7 @@ const CameraInitializer: React.FC<CameraInitializerProps> = ({
         }
       }
 
-      if (!isActive) return;
+      console.log('Camera permissions granted, initializing stream...');
 
       const constraints: MediaStreamConstraints = {
         video: {
@@ -62,9 +70,11 @@ const CameraInitializer: React.FC<CameraInitializerProps> = ({
       };
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      console.log('Camera stream obtained successfully');
       
       if (!isActive) {
         stream.getTracks().forEach(track => track.stop());
+        console.log('Camera deactivated during initialization');
         return;
       }
 
@@ -80,6 +90,7 @@ const CameraInitializer: React.FC<CameraInitializerProps> = ({
             await videoTrack.applyConstraints({
               advanced: [advancedConstraint]
             });
+            console.log('Torch enabled successfully');
           } catch (e) {
             console.error('Error activando la linterna:', e);
           }
@@ -87,12 +98,21 @@ const CameraInitializer: React.FC<CameraInitializerProps> = ({
       }
 
       onInitialized(stream);
+      toast({
+        title: "Cámara iniciada",
+        description: "La cámara se ha iniciado correctamente"
+      });
     } catch (error) {
       console.error('Error iniciando la cámara:', error);
       onError('Error al iniciar la cámara. Por favor, verifica los permisos y reintenta.');
       stopCurrentStream();
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Error al iniciar la cámara. Verifica los permisos."
+      });
     }
-  }, [isActive, isAndroid, onInitialized, onError, stopCurrentStream]);
+  }, [isActive, isAndroid, onInitialized, onError, stopCurrentStream, toast]);
 
   useEffect(() => {
     let initTimeout: NodeJS.Timeout;
