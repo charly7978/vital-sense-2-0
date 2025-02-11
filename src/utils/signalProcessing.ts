@@ -1,4 +1,3 @@
-
 import FFT from 'fft.js';
 import { PTTProcessor } from './pttProcessor';
 import { PPGFeatureExtractor } from './ppgFeatureExtractor';
@@ -482,4 +481,3 @@ export class SignalProcessor {
     return interpolated;
   }
 }
-
