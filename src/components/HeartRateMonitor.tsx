@@ -43,7 +43,23 @@ const HeartRateMonitor: React.FC = () => {
       setIsCalibrated(!!calibrationData && calibrationData.length > 0);
       
       if (calibrationData && calibrationData.length > 0) {
-        ppgProcessor.setCalibrationData(calibrationData[0]);
+        // Map database fields to UserCalibration type
+        const mappedCalibration: UserCalibration = {
+          id: calibrationData[0].id,
+          age: calibrationData[0].age,
+          height: calibrationData[0].height,
+          weight: calibrationData[0].weight,
+          systolic: calibrationData[0].reference_bp_systolic,
+          diastolic: calibrationData[0].reference_bp_diastolic,
+          deviceType: calibrationData[0].reference_device_type,
+          is_active: calibrationData[0].is_active,
+          calibration_constants: calibrationData[0].calibration_constants,
+          calibration_history: calibrationData[0].calibration_history,
+          last_calibration_quality: calibrationData[0].last_calibration_quality,
+          calibration_date: calibrationData[0].calibration_date,
+          user_id: calibrationData[0].user_id
+        };
+        ppgProcessor.setCalibrationData(mappedCalibration);
       }
     } catch (error) {
       console.error('Error checking calibration:', error);
@@ -158,7 +174,23 @@ const HeartRateMonitor: React.FC = () => {
         .limit(1);
 
       if (newCalibration && newCalibration.length > 0) {
-        ppgProcessor.setCalibrationData(newCalibration[0]);
+        // Map database fields to UserCalibration type
+        const mappedCalibration: UserCalibration = {
+          id: newCalibration[0].id,
+          age: newCalibration[0].age,
+          height: newCalibration[0].height,
+          weight: newCalibration[0].weight,
+          systolic: newCalibration[0].reference_bp_systolic,
+          diastolic: newCalibration[0].reference_bp_diastolic,
+          deviceType: newCalibration[0].reference_device_type,
+          is_active: newCalibration[0].is_active,
+          calibration_constants: newCalibration[0].calibration_constants,
+          calibration_history: newCalibration[0].calibration_history,
+          last_calibration_quality: newCalibration[0].last_calibration_quality,
+          calibration_date: newCalibration[0].calibration_date,
+          user_id: newCalibration[0].user_id
+        };
+        ppgProcessor.setCalibrationData(mappedCalibration);
       }
 
       toast({
