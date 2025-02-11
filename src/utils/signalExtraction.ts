@@ -1,3 +1,4 @@
+
 export class SignalExtractor {
   private readonly minIntensity = 45;
   private readonly maxIntensity = 250;
@@ -22,7 +23,12 @@ export class SignalExtractor {
     return this.kalman.x;
   }
 
-  extractChannels(imageData: ImageData) {
+  extractChannels(imageData: ImageData): { 
+    red: number; 
+    ir: number; 
+    quality: number;
+    perfusionIndex: number;
+  } {
     this.frameCount++;
     let redSum = 0, irSum = 0, pixelCount = 0;
 
@@ -46,7 +52,12 @@ export class SignalExtractor {
       }
     }
 
-    if (pixelCount === 0) return { red: 0, ir: 0, quality: 0 };
+    if (pixelCount === 0) return { 
+      red: 0, 
+      ir: 0, 
+      quality: 0,
+      perfusionIndex: 0 
+    };
 
     let avgRed = redSum / pixelCount;
     let avgIr = irSum / pixelCount;
@@ -64,6 +75,14 @@ export class SignalExtractor {
       this.lastIrValues.reduce((a, b) => a + b, 0) / this.lastIrValues.length
     );
 
-    return { red: avgRed, ir: avgIr, quality: 1 };
+    // Calcular el índice de perfusión
+    const perfusionIndex = avgIr > 0 ? (avgRed / avgIr) : 0;
+
+    return { 
+      red: avgRed, 
+      ir: avgIr, 
+      quality: pixelCount / (regionSize * regionSize * 4),
+      perfusionIndex 
+    };
   }
 }
