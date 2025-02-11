@@ -26,21 +26,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
     try {
       if (streamRef.current) {
         const tracks = streamRef.current.getTracks();
-        tracks.forEach(track => {
-          if (track.kind === 'video') {
-            // Intentar apagar la linterna antes de detener la cámara
-            const videoTrack = track as MediaStreamTrack & { getCapabilities?: () => any };
-            if (videoTrack.getCapabilities && videoTrack.getCapabilities().torch) {
-              try {
-                const constraints = { advanced: [{ torch: false }] };
-                videoTrack.applyConstraints(constraints);
-              } catch (e) {
-                console.error('Error al apagar la linterna:', e);
-              }
-            }
-            track.stop();
-          }
-        });
+        tracks.forEach(track => track.stop());
         streamRef.current = null;
       }
       if (webcamRef.current?.stream) {
@@ -66,29 +52,29 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
         video: {
           facingMode: isAndroid ? 'environment' : 'user',
           width: { ideal: 640 },
-          height: { ideal: 480 }
+          height: { ideal: 480 },
+          ...(isAndroid && {
+            advanced: [{
+              // En Android, intentamos habilitar la linterna
+              torch: true
+            } as any] // Usamos 'any' aquí porque el tipo MediaTrackConstraints no incluye 'torch'
+          })
         }
       };
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
-
-      // Activar la linterna en Android
+      
       if (isAndroid) {
         const videoTrack = stream.getVideoTracks()[0];
-        const capabilities = videoTrack.getCapabilities();
-        
-        if (capabilities.torch) {
-          try {
-            await videoTrack.applyConstraints({
-              advanced: [{ torch: true }]
-            });
-            console.log('Linterna activada exitosamente');
-          } catch (e) {
-            console.error('Error al activar la linterna:', e);
-          }
-        } else {
-          console.log('Este dispositivo no soporta linterna');
+        // Intentamos habilitar la linterna después de obtener el stream
+        try {
+          await videoTrack.applyConstraints({
+            advanced: [{ torch: true } as any]
+          });
+          console.log('Linterna activada exitosamente');
+        } catch (e) {
+          console.error('Error al activar la linterna:', e);
         }
       }
       
