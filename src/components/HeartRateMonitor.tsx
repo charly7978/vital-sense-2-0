@@ -1,9 +1,8 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useToast } from "@/hooks/use-toast";
 import CameraView from './CameraView';
 import VitalChart from './VitalChart';
-import SensitivityControls from './SensitivityControls';
 import BPCalibrationForm from './BPCalibrationForm';
 import VitalSignsDisplay from './vitals/VitalSignsDisplay';
 import SignalQualityIndicator from './vitals/SignalQualityIndicator';
@@ -11,15 +10,9 @@ import MeasurementControls from './vitals/MeasurementControls';
 import ProcessingSettingsPanel from './ProcessingSettingsPanel';
 import { PPGProcessor } from '../utils/ppgProcessor';
 import { useVitals } from '@/contexts/VitalsContext';
-import type { SensitivitySettings, ProcessingSettings } from '../utils/types';
+import type { ProcessingSettings } from '../utils/types';
 
 const ppgProcessor = new PPGProcessor();
-
-const defaultSensitivitySettings = {
-  signalAmplification: 1,
-  noiseReduction: 1,
-  peakDetection: 1
-};
 
 const HeartRateMonitor: React.FC = () => {
   const { 
@@ -37,13 +30,7 @@ const HeartRateMonitor: React.FC = () => {
     processFrame
   } = useVitals();
 
-  const [sensitivitySettings, setSensitivitySettings] = useState<SensitivitySettings>(defaultSensitivitySettings);
   const { toast } = useToast();
-
-  const handleSensitivityChange = (newSettings: SensitivitySettings) => {
-    setSensitivitySettings(newSettings);
-    ppgProcessor.updateSensitivitySettings(newSettings);
-  };
 
   const handleProcessingSettingsChange = (newSettings: ProcessingSettings) => {
     ppgProcessor.updateProcessingSettings(newSettings);
@@ -96,17 +83,10 @@ const HeartRateMonitor: React.FC = () => {
           <VitalChart data={readings} color="#ea384c" />
         </div>
 
-        <div className="flex flex-col gap-2">
-          <SensitivityControls 
-            settings={sensitivitySettings}
-            onSettingsChange={handleSensitivityChange}
-          />
-
-          <MeasurementControls
-            isStarted={isStarted}
-            onToggleMeasurement={toggleMeasurement}
-          />
-        </div>
+        <MeasurementControls
+          isStarted={isStarted}
+          onToggleMeasurement={toggleMeasurement}
+        />
       </div>
     </div>
   );
