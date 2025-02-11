@@ -7,7 +7,7 @@ import CameraView from './CameraView';
 import VitalChart from './VitalChart';
 import CalibrationDialog from './CalibrationDialog';
 import { PPGProcessor } from '../utils/ppgProcessor';
-import type { VitalReading, CalibrationData } from '../utils/types';
+import type { VitalReading, CalibrationData, UserCalibration } from '../utils/types';
 import { supabase } from '@/integrations/supabase/client';
 
 const ppgProcessor = new PPGProcessor();
