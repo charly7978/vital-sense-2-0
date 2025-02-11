@@ -7,6 +7,22 @@ import { SignalNormalizer } from './signalNormalization';
 import { SignalFilter } from './signalFilter';
 import { SignalFrequencyAnalyzer } from './signalFrequencyAnalyzer';
 
+export const DEFAULT_PROCESSING_SETTINGS: ProcessingSettings = {
+  MEASUREMENT_DURATION: 40,
+  MIN_FRAMES_FOR_CALCULATION: 30,
+  MIN_PEAKS_FOR_VALID_HR: 3,
+  MIN_PEAK_DISTANCE: 500,
+  MAX_PEAK_DISTANCE: 1500,
+  PEAK_THRESHOLD_FACTOR: 0.2,
+  MIN_RED_VALUE: 20,
+  MIN_RED_DOMINANCE: 1.5,
+  MIN_VALID_PIXELS_RATIO: 0.3,
+  MIN_BRIGHTNESS: 100,
+  MIN_VALID_READINGS: 50,
+  FINGER_DETECTION_DELAY: 1000,
+  MIN_SPO2: 80
+};
+
 export class PPGProcessor {
   private readings: VitalReading[] = [];
   private redBuffer: number[] = [];
@@ -29,21 +45,7 @@ export class PPGProcessor {
     noiseReduction: 1,
     peakDetection: 1
   };
-  public processingSettings: ProcessingSettings = {
-    MEASUREMENT_DURATION: 40,
-    MIN_FRAMES_FOR_CALCULATION: 30,
-    MIN_PEAKS_FOR_VALID_HR: 3,
-    MIN_PEAK_DISTANCE: 500,
-    MAX_PEAK_DISTANCE: 1500,
-    PEAK_THRESHOLD_FACTOR: 0.2,
-    MIN_RED_VALUE: 20,
-    MIN_RED_DOMINANCE: 1.5,
-    MIN_VALID_PIXELS_RATIO: 0.3,
-    MIN_BRIGHTNESS: 100,
-    MIN_VALID_READINGS: 50,
-    FINGER_DETECTION_DELAY: 1000,
-    MIN_SPO2: 80
-  };
+  public processingSettings: ProcessingSettings = DEFAULT_PROCESSING_SETTINGS;
   
   constructor() {
     this.beepPlayer = new BeepPlayer();
