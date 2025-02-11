@@ -10,6 +10,13 @@ interface CameraViewProps {
   isActive: boolean;
 }
 
+// Extendemos la interfaz MediaTrackConstraintSet para incluir torch
+declare global {
+  interface MediaTrackConstraintSet {
+    torch?: boolean;
+  }
+}
+
 const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   const webcamRef = useRef<Webcam>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
