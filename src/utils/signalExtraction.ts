@@ -1,14 +1,14 @@
 
 export class SignalExtractor {
-  private readonly minIntensity = 45;
+  private readonly minIntensity = 15; // Reducido de 45 para mejor detección
   private readonly maxIntensity = 250;
   private readonly smoothingWindow = 5;
   private lastRedValues: number[] = [];
   private lastIrValues: number[] = [];
   private frameCount = 0;
-  private readonly minValidPixels = 100; // Mínimo de píxeles válidos para considerar dedo presente
-  private readonly redDominanceThreshold = 1.2; // El canal rojo debe ser dominante
-  private readonly stabilityThreshold = 0.15; // Umbral para considerar señal estable
+  private readonly minValidPixels = 50; // Reducido de 100 para mejor detección
+  private readonly redDominanceThreshold = 1.1; // Reducido de 1.2 para mejor detección
+  private readonly stabilityThreshold = 0.1; // Reducido de 0.15 para mejor detección
   private lastStabilityValues: number[] = [];
 
   private kalman = {
@@ -50,7 +50,7 @@ export class SignalExtractor {
     const { width, height } = imageData;
     const centerX = Math.floor(width / 2);
     const centerY = Math.floor(height / 2);
-    const regionSize = 50;
+    const regionSize = Math.floor(Math.min(width, height) * 0.3); // Región más grande para mejor detección
 
     // Arrays para almacenar valores de píxeles válidos
     const validRedValues: number[] = [];
@@ -58,14 +58,16 @@ export class SignalExtractor {
 
     for (let y = centerY - regionSize; y < centerY + regionSize; y++) {
       for (let x = centerX - regionSize; x < centerX + regionSize; x++) {
+        if (y < 0 || y >= height || x < 0 || x >= width) continue;
+        
         const i = (y * width + x) * 4;
         const red = imageData.data[i];
         const green = imageData.data[i + 1];
         const blue = imageData.data[i + 2];
         const ir = (green + blue) / 2;
 
-        // Validación mejorada de píxeles
-        if (red > this.minIntensity && red < this.maxIntensity) {
+        // Validación más permisiva de píxeles
+        if (red > this.minIntensity) {
           validRedValues.push(red);
           validIrValues.push(ir);
           redSum += red;
@@ -79,7 +81,12 @@ export class SignalExtractor {
 
     // Verificaciones mejoradas para detección del dedo
     if (pixelCount < this.minValidPixels) {
-      console.log('Pocos píxeles válidos:', pixelCount);
+      console.log('Pocos píxeles válidos:', {
+        pixelCount,
+        minRequired: this.minValidPixels,
+        maxRed,
+        regionSize
+      });
       return { red: 0, ir: 0, quality: 0, perfusionIndex: 0 };
     }
 
@@ -87,8 +94,14 @@ export class SignalExtractor {
     let avgIr = irSum / pixelCount;
 
     // Verificar dominancia del canal rojo (característica del dedo)
-    if (avgRed / avgIr < this.redDominanceThreshold) {
-      console.log('Canal rojo no dominante:', avgRed / avgIr);
+    const redDominance = avgRed / avgIr;
+    if (redDominance < this.redDominanceThreshold) {
+      console.log('Canal rojo no dominante:', {
+        redDominance,
+        threshold: this.redDominanceThreshold,
+        avgRed,
+        avgIr
+      });
       return { red: 0, ir: 0, quality: 0, perfusionIndex: 0 };
     }
 
@@ -115,7 +128,8 @@ export class SignalExtractor {
     // Calidad basada en múltiples factores
     const pixelQuality = Math.min(1, pixelCount / (this.minValidPixels * 2));
     const stabilityQuality = stability > this.stabilityThreshold ? 1 : stability / this.stabilityThreshold;
-    const quality = Math.min(pixelQuality, stabilityQuality);
+    const redQuality = Math.min(1, redDominance / this.redDominanceThreshold);
+    const quality = Math.min(pixelQuality, stabilityQuality, redQuality);
 
     if (this.frameCount % 30 === 0) {
       console.log('Métricas de calidad:', {
@@ -123,7 +137,9 @@ export class SignalExtractor {
         stability,
         quality,
         perfusionIndex,
-        redDominance: avgRed / avgIr
+        redDominance,
+        regionSize,
+        maxRed
       });
     }
 
