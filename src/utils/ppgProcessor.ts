@@ -19,7 +19,7 @@ export class PPGProcessor {
   private beepPlayer: BeepPlayer;
   private readonly signalBuffer: number[] = [];
   private readonly bufferSize = 30;
-  private readonly qualityThreshold = 0.3;
+  private readonly qualityThreshold = 0.6;
   private sensitivitySettings: SensitivitySettings = {
     signalAmplification: 1,
     noiseReduction: 1,
@@ -36,7 +36,6 @@ export class PPGProcessor {
 
   updateSensitivitySettings(settings: SensitivitySettings) {
     this.sensitivitySettings = settings;
-    console.log('Updated sensitivity settings:', settings);
   }
 
   processFrame(imageData: ImageData): PPGData | null {
@@ -44,7 +43,7 @@ export class PPGProcessor {
     
     const { red, ir, quality, perfusionIndex } = this.signalExtractor.extractChannels(imageData);
     
-    if (quality < this.qualityThreshold || red < 20) {
+    if (quality < this.qualityThreshold || red < 50) {
       console.log('No se detecta dedo o señal de baja calidad', { red, quality });
       this.redBuffer = [];
       this.irBuffer = [];
@@ -64,8 +63,9 @@ export class PPGProcessor {
       };
     }
     
-    const amplifiedRed = Math.max(red * this.sensitivitySettings.signalAmplification, red * 1.2);
-    const amplifiedIr = Math.max(ir * this.sensitivitySettings.signalAmplification, ir * 1.2);
+    // Aplicar amplificación de señal
+    const amplifiedRed = red * this.sensitivitySettings.signalAmplification;
+    const amplifiedIr = ir * this.sensitivitySettings.signalAmplification;
     
     this.redBuffer.push(amplifiedRed);
     this.irBuffer.push(amplifiedIr);
@@ -95,13 +95,12 @@ export class PPGProcessor {
 
     if (isPeak) {
       this.peakTimes.push(now);
-      console.log('Peak detected:', { normalizedValue, time: now });
       
       if (this.peakTimes.length > 10) {
         this.peakTimes.shift();
       }
       
-      this.beepPlayer.playBeep('heartbeat').catch(err => {
+      this.beepPlayer.playBeep().catch(err => {
         console.error('Error al reproducir beep:', err);
       });
     }

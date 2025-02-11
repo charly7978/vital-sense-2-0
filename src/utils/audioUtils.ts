@@ -15,7 +15,6 @@ export class BeepPlayer {
       this.gainNode = this.audioContext.createGain();
       this.gainNode.connect(this.audioContext.destination);
       this.gainNode.gain.value = 0;
-      console.log('Audio context initialized successfully');
     } catch (error) {
       console.error('Error al inicializar contexto de audio:', error);
     }
@@ -23,18 +22,13 @@ export class BeepPlayer {
 
   async playBeep(type: 'heartbeat' | 'warning' | 'success' = 'heartbeat') {
     if (!this.audioContext || !this.gainNode) {
-      console.log('Initializing audio context before playing beep');
       await this.initAudioContext();
     }
 
     try {
-      if (!this.audioContext || !this.gainNode) {
-        console.error('Audio context still not available after initialization');
-        return;
-      }
+      if (!this.audioContext || !this.gainNode) return;
 
       if (this.audioContext.state !== 'running') {
-        console.log('Resuming audio context');
         await this.audioContext.resume();
       }
 
@@ -45,6 +39,7 @@ export class BeepPlayer {
 
       this.oscillator = this.audioContext.createOscillator();
       
+      // Sonido más suave y realista para el latido
       switch (type) {
         case 'heartbeat':
           this.oscillator.frequency.value = 60;
@@ -63,12 +58,12 @@ export class BeepPlayer {
       this.gainNode.gain.cancelScheduledValues(now);
       this.gainNode.gain.setValueAtTime(0, now);
       
+      // Para el latido, hacer un sonido más suave y corto
       if (type === 'heartbeat') {
-        this.gainNode.gain.linearRampToValueAtTime(0.3, now + 0.01); // Aumentado de 0.1
+        this.gainNode.gain.linearRampToValueAtTime(0.1, now + 0.01);
         this.gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
         this.oscillator.start(now);
         this.oscillator.stop(now + 0.1);
-        console.log('Playing heartbeat sound');
       } else if (type === 'warning') {
         this.gainNode.gain.linearRampToValueAtTime(0.3, now + 0.01);
         this.gainNode.gain.linearRampToValueAtTime(0, now + 0.3);
@@ -92,4 +87,3 @@ export class BeepPlayer {
     }
   }
 }
-

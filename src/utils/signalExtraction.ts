@@ -7,8 +7,8 @@ interface ExtractedSignals {
 }
 
 export class SignalExtractor {
-  private readonly qualityThreshold = 0.3; // Reducido de 0.6
-  private readonly minIntensity = 20; // Reducido de 30
+  private readonly qualityThreshold = 0.6;
+  private readonly minIntensity = 30;
   private readonly maxIntensity = 250;
   private lastRed = 0;
   private lastIr = 0;
@@ -27,7 +27,7 @@ export class SignalExtractor {
       const height = imageData.height;
       const centerX = Math.floor(width / 2);
       const centerY = Math.floor(height / 2);
-      const regionSize = Math.min(100, Math.floor(Math.min(width, height) / 2)); // Aumentado de 50
+      const regionSize = Math.min(50, Math.floor(Math.min(width, height) / 4));
       
       for (let y = centerY - regionSize; y < centerY + regionSize; y++) {
         for (let x = centerX - regionSize; x < centerX + regionSize; x++) {
@@ -51,7 +51,6 @@ export class SignalExtractor {
       }
       
       if (pixelCount === 0) {
-        console.log('No pixels found in region');
         return {
           red: this.lastRed,
           ir: this.lastIr,
@@ -67,17 +66,8 @@ export class SignalExtractor {
       const perfusionIndex = avgRed > 0 ? 
         ((maxRedIntensity - minRedIntensity) / avgRed) * 100 : 0;
 
-      console.log('Extracted signals:', { 
-        avgRed, 
-        quality, 
-        pixelCount,
-        darkPixels: darkPixelCount,
-        saturatedPixels: saturationCount,
-        perfusionIndex 
-      });
-
-      // Update last valid values con una calidad mínima más baja
-      if (quality > 0.2) {
+      // Update last valid values
+      if (quality > 0.3) {
         this.lastRed = avgRed;
         this.lastIr = avgIr;
       }
@@ -99,4 +89,3 @@ export class SignalExtractor {
     }
   }
 }
-
