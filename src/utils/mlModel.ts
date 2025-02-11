@@ -78,8 +78,17 @@ export class MLModel {
         this.memoryBuffer = this.memoryBuffer.slice(-this.maxMemoryEntries);
       }
 
-      // Preparar datos para el entrenamiento
-      const shuffledData = tf.util.shuffle(this.memoryBuffer);
+      // Preparar datos para el entrenamiento con shuffle manual
+      const shuffleArray = <T>(array: T[]): T[] => {
+        const shuffled = [...array];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        return shuffled;
+      };
+
+      const shuffledData = shuffleArray(this.memoryBuffer);
       const inputData = shuffledData.map(d => d.input);
       const outputData = shuffledData.map(d => d.output);
 
@@ -169,7 +178,6 @@ export class MLModel {
   }
 
   private calculateConfidence(original: number[], clamped: number[]): number {
-    // Calcula la confianza basada en qué tan lejos están los valores originales de los límites
     const confidenceScores = original.map((val, idx) => {
       const min = idx === 0 ? 10 : idx === 1 ? 0.3 : 0.1;
       const max = idx === 0 ? 30 : idx === 1 ? 0.7 : 0.5;
