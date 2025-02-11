@@ -8,6 +8,11 @@ interface CameraInitializerProps {
   onError: (error: string) => void;
 }
 
+// Define custom interface to include torch capability
+interface ExtendedCapabilities extends MediaTrackCapabilities {
+  torch?: boolean;
+}
+
 const CameraInitializer: React.FC<CameraInitializerProps> = ({
   onInitialized,
   isActive,
@@ -68,10 +73,12 @@ const CameraInitializer: React.FC<CameraInitializerProps> = ({
 
       if (isAndroid) {
         const videoTrack = stream.getVideoTracks()[0];
-        if (videoTrack.getCapabilities?.()?.torch) {
+        const capabilities = videoTrack.getCapabilities() as ExtendedCapabilities;
+        
+        if (capabilities?.torch) {
           try {
             await videoTrack.applyConstraints({
-              advanced: [{ torch: true } as any]
+              advanced: [{ torch: true }]
             });
             console.log('Torch activated successfully');
           } catch (e) {
