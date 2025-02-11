@@ -6,6 +6,7 @@ export interface VitalReading {
 
 export interface PPGData {
   bpm: number;
+  spo2: number;
   confidence: number;
   readings: VitalReading[];
 }
