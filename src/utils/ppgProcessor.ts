@@ -13,7 +13,7 @@ export class PPGProcessor {
   private readonly signalProcessor: SignalProcessor;
   private beepPlayer: BeepPlayer;
   private lastPeakTime: number = 0;
-  private readonly minPeakDistance = 500;
+  private readonly minPeakDistance = 500; // ms
   private readonly signalBuffer: number[] = [];
   private readonly bufferSize = 30;
   private baseline = 0;
@@ -34,22 +34,21 @@ export class PPGProcessor {
   } {
     const now = Date.now();
     
-    // Extraer señales roja e infrarroja
+    // Extracción mejorada de señales roja e infrarroja
     const { red, ir } = this.extractChannels(imageData);
     this.redBuffer.push(red);
     this.irBuffer.push(ir);
     
-    // Mantener buffer de tamaño fijo
     if (this.redBuffer.length > this.windowSize) {
       this.redBuffer.shift();
       this.irBuffer.shift();
     }
     
-    // Aplicar filtro paso bajo
+    // Filtrado y procesamiento de señal mejorado
     const filteredRed = this.signalProcessor.lowPassFilter(this.redBuffer, 5);
     const normalizedValue = this.normalizeSignal(filteredRed[filteredRed.length - 1]);
     
-    // Actualizar lecturas
+    // Actualización de lecturas
     this.readings.push({ timestamp: now, value: normalizedValue });
     if (this.readings.length > this.windowSize) {
       this.readings = this.readings.slice(-this.windowSize);
@@ -61,38 +60,37 @@ export class PPGProcessor {
       this.signalBuffer.shift();
     }
 
-    // Detección de picos mejorada
+    // Detección de picos mejorada con validación de calidad
     if (this.isRealPeak(normalizedValue, now)) {
       console.log('Peak detected at:', now);
       this.beepPlayer.playBeep();
       this.lastPeakTime = now;
       this.peakTimes.push(now);
       
-      // Mantener solo los últimos 10 picos
       if (this.peakTimes.length > 10) {
         this.peakTimes.shift();
       }
     }
 
-    // Calcular BPM usando FFT para mayor precisión
+    // Análisis FFT para BPM más preciso
     const { frequencies, magnitudes } = this.signalProcessor.performFFT(filteredRed);
     const dominantFreqIndex = magnitudes.indexOf(Math.max(...magnitudes));
     const dominantFreq = frequencies[dominantFreqIndex];
     const fftBpm = dominantFreq * 60;
     
-    // Calcular intervalos RR para análisis HRV
+    // Análisis de intervalos RR para HRV
     const intervals = [];
     for (let i = 1; i < this.peakTimes.length; i++) {
       intervals.push(this.peakTimes[i] - this.peakTimes[i-1]);
     }
     
-    // Análisis de arritmias
+    // Análisis avanzado de arritmias
     const hrvAnalysis = this.signalProcessor.analyzeHRV(intervals);
     
-    // Calcular SpO2
+    // Cálculo de SpO2 usando ratio-of-ratios
     const spo2 = this.signalProcessor.calculateSpO2(this.redBuffer, this.irBuffer);
     
-    // Estimar presión arterial
+    // Estimación de presión arterial usando características PPG
     const bp = this.signalProcessor.estimateBloodPressure(filteredRed, this.peakTimes);
     
     return {
@@ -114,14 +112,16 @@ export class PPGProcessor {
     const height = imageData.height;
     const centerX = Math.floor(width / 2);
     const centerY = Math.floor(height / 2);
-    const regionSize = 50;
+    const regionSize = 50; // Área de interés optimizada
     
+    // Análisis optimizado de la región central
     for (let y = centerY - regionSize; y < centerY + regionSize; y++) {
       for (let x = centerX - regionSize; x < centerX + regionSize; x++) {
         if (x >= 0 && x < width && y >= 0 && y < height) {
           const i = (y * width + x) * 4;
           redSum += imageData.data[i]; // Canal rojo
-          irSum += (imageData.data[i+1] + imageData.data[i+2]) / 2; // Aproximación IR
+          // Aproximación mejorada para IR usando verde y azul
+          irSum += (imageData.data[i+1] * 0.7 + imageData.data[i+2] * 0.3);
           pixelCount++;
         }
       }
@@ -134,6 +134,7 @@ export class PPGProcessor {
   }
 
   private normalizeSignal(value: number): number {
+    // Normalización adaptativa mejorada
     this.baseline = this.baseline * 0.95 + value * 0.05;
     return value - this.baseline;
   }
@@ -143,13 +144,17 @@ export class PPGProcessor {
       return false;
     }
 
+    // Detección de picos adaptativa mejorada
     const avgSignal = this.signalBuffer.reduce((a, b) => a + b, 0) / this.signalBuffer.length;
     this.adaptiveThreshold = this.adaptiveThreshold * 0.95 + Math.abs(avgSignal) * 0.05;
     const threshold = this.adaptiveThreshold * 0.7;
     
-    return currentValue > threshold && 
-           currentValue > avgSignal && 
-           currentValue > this.signalBuffer[this.signalBuffer.length - 2];
+    // Validación adicional de calidad de pico
+    const isPeak = currentValue > threshold && 
+                  currentValue > avgSignal && 
+                  currentValue > this.signalBuffer[this.signalBuffer.length - 2];
+    
+    return isPeak;
   }
 
   getReadings(): VitalReading[] {

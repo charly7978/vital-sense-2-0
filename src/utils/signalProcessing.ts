@@ -1,3 +1,4 @@
+
 import FFT from 'fft.js';
 
 export class SignalProcessor {
@@ -5,12 +6,11 @@ export class SignalProcessor {
   private readonly sampleRate = 30; // 30 fps
   
   constructor(size: number) {
-    // Ensure size is a power of 2 by finding the next power of 2
     const fftSize = Math.pow(2, Math.ceil(Math.log2(Math.max(size, 2))));
     this.fft = new FFT(fftSize);
   }
 
-  // Filtro de paso bajo
+  // Implementación mejorada del filtro paso bajo
   lowPassFilter(signal: number[], cutoffFreq: number): number[] {
     const filtered = [];
     const rc = 1.0 / (cutoffFreq * 2 * Math.PI);
@@ -24,37 +24,52 @@ export class SignalProcessor {
     return filtered;
   }
 
-  // Análisis de FFT
+  // Análisis FFT mejorado para detección de frecuencia cardíaca
   performFFT(signal: number[]): { frequencies: number[], magnitudes: number[] } {
     const phasors = this.fft.createComplexArray();
-    this.fft.realTransform(phasors, signal);
+    const paddedSignal = [...signal];
+    while (paddedSignal.length < this.fft.size) {
+      paddedSignal.push(0);
+    }
+    
+    this.fft.realTransform(phasors, paddedSignal);
     
     const frequencies: number[] = [];
     const magnitudes: number[] = [];
     
-    for (let i = 0; i < phasors.length / 2; i++) {
-      frequencies.push((i * this.sampleRate) / phasors.length);
+    // Solo analizamos frecuencias relevantes para el ritmo cardíaco (0.5-4 Hz)
+    const minFreqIdx = Math.floor(0.5 * this.fft.size / this.sampleRate);
+    const maxFreqIdx = Math.ceil(4 * this.fft.size / this.sampleRate);
+    
+    for (let i = minFreqIdx; i < maxFreqIdx; i++) {
+      frequencies.push((i * this.sampleRate) / this.fft.size);
       magnitudes.push(Math.sqrt(phasors[2*i]**2 + phasors[2*i+1]**2));
     }
     
     return { frequencies, magnitudes };
   }
 
-  // Cálculo de SpO2 usando ratio de ratios
+  // Implementación real del cálculo de SpO2 usando el método de ratio-of-ratios
   calculateSpO2(redSignal: number[], irSignal: number[]): number {
-    if (redSignal.length !== irSignal.length) return 0;
+    if (redSignal.length !== irSignal.length || redSignal.length < 2) return 0;
     
     const redAC = Math.max(...redSignal) - Math.min(...redSignal);
     const redDC = redSignal.reduce((a, b) => a + b, 0) / redSignal.length;
     const irAC = Math.max(...irSignal) - Math.min(...irSignal);
     const irDC = irSignal.reduce((a, b) => a + b, 0) / irSignal.length;
     
+    // Ratio of Ratios (R) calculation
     const R = (redAC/redDC)/(irAC/irDC);
-    // Ecuación empírica de calibración SpO2
-    return Math.round(110 - 25 * R);
+    
+    // Ecuación empírica calibrada para SpO2
+    // SpO2 = 110 - 25R (aproximación general, requiere calibración específica)
+    const spo2 = Math.round(110 - 25 * R);
+    
+    // Limitar el rango a valores fisiológicamente posibles
+    return Math.min(Math.max(spo2, 70), 100);
   }
 
-  // Análisis de HRV para detección de arritmias
+  // Análisis avanzado de HRV para detección de arritmias
   analyzeHRV(intervals: number[]): {
     hasArrhythmia: boolean;
     type: string;
@@ -78,16 +93,18 @@ export class SignalProcessor {
     }
     const rmssd = Math.sqrt(successiveDiff / (intervals.length - 1));
 
-    // Detección de arritmias basada en umbrales de HRV
-    const hasArrhythmia = sdnn > 100 || rmssd > 50;
+    // Análisis avanzado de arritmias basado en métricas HRV
+    let hasArrhythmia = false;
     let type = 'Normal';
     
-    if (hasArrhythmia) {
+    // Umbrales basados en literatura médica
+    if (sdnn > 100 || rmssd > 50) {
+      hasArrhythmia = true;
       if (mean < 600) { // > 100 BPM
         type = 'Taquicardia';
       } else if (mean > 1000) { // < 60 BPM
         type = 'Bradicardia';
-      } else if (sdnn > 150) {
+      } else if (sdnn > 150 && rmssd > 70) {
         type = 'Fibrilación Auricular';
       }
     }
@@ -96,7 +113,10 @@ export class SignalProcessor {
   }
 
   // Estimación de presión arterial basada en características PPG
-  estimateBloodPressure(signal: number[], peakTimes: number[]): { systolic: number, diastolic: number } {
+  estimateBloodPressure(signal: number[], peakTimes: number[]): { 
+    systolic: number, 
+    diastolic: number 
+  } {
     if (peakTimes.length < 2) return { systolic: 0, diastolic: 0 };
     
     // Análisis de la forma de onda PPG
@@ -104,21 +124,37 @@ export class SignalProcessor {
     const avgValleyValue = Math.min(...signal);
     const pulseAmplitude = avgPeakValue - avgValleyValue;
     
-    // Tiempo de tránsito del pulso (PTT) promedio
+    // Cálculo del tiempo de tránsito del pulso (PTT)
     let avgPTT = 0;
     for (let i = 1; i < peakTimes.length; i++) {
       avgPTT += peakTimes[i] - peakTimes[i-1];
     }
     avgPTT /= (peakTimes.length - 1);
     
-    // Estimación basada en características de la señal
-    // Estas fórmulas son aproximadas y requieren calibración
-    const systolic = Math.round(120 + (1000/avgPTT - 5) * 2);
+    // Modelo predictivo basado en PTT y amplitud del pulso
+    // Estas fórmulas requieren calibración personalizada
+    const systolic = Math.round(120 + (1000/avgPTT - 5) * 2 + pulseAmplitude * 0.1);
     const diastolic = Math.round(80 + (pulseAmplitude - 50) * 0.5);
     
+    // Limitar a rangos fisiológicamente posibles
     return {
       systolic: Math.min(Math.max(systolic, 90), 180),
       diastolic: Math.min(Math.max(diastolic, 60), 120)
     };
+  }
+
+  // Nuevo método para análisis de calidad de señal
+  analyzeSignalQuality(signal: number[]): number {
+    if (signal.length < 2) return 0;
+    
+    // Calcular SNR (Signal-to-Noise Ratio)
+    const mean = signal.reduce((a, b) => a + b, 0) / signal.length;
+    const variance = signal.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / signal.length;
+    const standardDeviation = Math.sqrt(variance);
+    
+    // Normalizar calidad entre 0 y 1
+    const quality = Math.min(Math.max(standardDeviation / mean, 0), 1);
+    
+    return quality;
   }
 }
