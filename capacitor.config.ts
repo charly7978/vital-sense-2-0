@@ -9,6 +9,12 @@ const config: CapacitorConfig = {
     url: 'https://4dadecf1-503f-48ab-8ca5-a4dfbf273434.lovableproject.com?forceHideBadge=true',
     cleartext: true
   },
+  android: {
+    allowMixedContent: true,
+    permissions: [
+      "android.permission.CAMERA"
+    ]
+  },
   plugins: {
     Camera: {
       ios: {

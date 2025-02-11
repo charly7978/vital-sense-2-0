@@ -19,16 +19,24 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame }) => {
     const checkPermissions = async () => {
       try {
         // Primero intentamos con Capacitor
-        try {
-          const permission = await CapCamera.checkPermissions();
-          if (permission.camera !== 'granted') {
-            const request = await CapCamera.requestPermissions();
-            if (request.camera !== 'granted') {
-              throw new Error('Permiso de cámara denegado');
-            }
+        const permission = await CapCamera.checkPermissions();
+        console.log('Camera permission status:', permission.camera);
+        
+        if (permission.camera !== 'granted') {
+          console.log('Requesting camera permission...');
+          const request = await CapCamera.requestPermissions();
+          console.log('Camera permission request result:', request.camera);
+          
+          if (request.camera !== 'granted') {
+            throw new Error('Permiso de cámara denegado');
           }
-        } catch (capError) {
-          // Si falla Capacitor, intentamos con la API web
+        }
+        
+        setError(null);
+      } catch (capError) {
+        console.log('Capacitor camera error, trying web API:', capError);
+        // Si falla Capacitor, intentamos con la API web
+        try {
           const stream = await navigator.mediaDevices.getUserMedia({ 
             video: { 
               facingMode: 'user',
@@ -37,11 +45,11 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame }) => {
             } 
           });
           stream.getTracks().forEach(track => track.stop());
+          setError(null);
+        } catch (webError) {
+          console.error('Web camera error:', webError);
+          setError('No se pudo acceder a la cámara. Por favor, permite el acceso a la cámara en la configuración de tu dispositivo.');
         }
-        setError(null);
-      } catch (err) {
-        console.error('Error accessing camera:', err);
-        setError('No se pudo acceder a la cámara. Por favor, permite el acceso a la cámara en la configuración de tu dispositivo.');
       }
     };
 
@@ -95,6 +103,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame }) => {
   }, [isInitialized, onFrame]);
 
   const handleUserMedia = () => {
+    console.log('Camera initialized successfully');
     setIsInitialized(true);
     setError(null);
   };
