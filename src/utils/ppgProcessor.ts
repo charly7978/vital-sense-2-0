@@ -8,19 +8,19 @@ import { SignalFilter } from './signalFilter';
 import { SignalFrequencyAnalyzer } from './signalFrequencyAnalyzer';
 
 export const DEFAULT_PROCESSING_SETTINGS: ProcessingSettings = {
-  MEASUREMENT_DURATION: 40,
-  MIN_FRAMES_FOR_CALCULATION: 30,
-  MIN_PEAKS_FOR_VALID_HR: 3,
-  MIN_PEAK_DISTANCE: 500,
-  MAX_PEAK_DISTANCE: 1500,
-  PEAK_THRESHOLD_FACTOR: 0.2,
-  MIN_RED_VALUE: 20,
-  MIN_RED_DOMINANCE: 1.5,
-  MIN_VALID_PIXELS_RATIO: 0.3,
-  MIN_BRIGHTNESS: 100,
-  MIN_VALID_READINGS: 50,
-  FINGER_DETECTION_DELAY: 1000,
-  MIN_SPO2: 80
+  MEASUREMENT_DURATION: 30,         // 30 segundos es suficiente para una medición precisa
+  MIN_FRAMES_FOR_CALCULATION: 15,   // Necesitamos menos frames para empezar a calcular
+  MIN_PEAKS_FOR_VALID_HR: 2,       // Con 2 picos ya podemos empezar a estimar
+  MIN_PEAK_DISTANCE: 400,          // ~150 BPM máximo
+  MAX_PEAK_DISTANCE: 1200,         // ~50 BPM mínimo
+  PEAK_THRESHOLD_FACTOR: 0.4,      // Factor más agresivo para detectar picos
+  MIN_RED_VALUE: 15,               // Umbral más bajo para detectar dedo
+  MIN_RED_DOMINANCE: 1.2,          // Menos restrictivo en dominancia roja
+  MIN_VALID_PIXELS_RATIO: 0.2,     // Menor área requerida
+  MIN_BRIGHTNESS: 80,              // Menor brillo requerido
+  MIN_VALID_READINGS: 30,          // Menos lecturas requeridas
+  FINGER_DETECTION_DELAY: 500,     // Menos delay para detección
+  MIN_SPO2: 75                     // Rango más amplio para SpO2
 };
 
 export class PPGProcessor {
@@ -39,11 +39,11 @@ export class PPGProcessor {
   private beepPlayer: BeepPlayer;
   private readonly signalBuffer: number[] = [];
   private readonly bufferSize = 30;
-  private readonly qualityThreshold = 0.3;
+  private readonly qualityThreshold = 0.2;  // Bajamos el umbral de calidad
   private sensitivitySettings: SensitivitySettings = {
-    signalAmplification: 1,
-    noiseReduction: 1,
-    peakDetection: 1
+    signalAmplification: 1.5,    // Aumentamos la amplificación
+    noiseReduction: 1.2,         // Aumentamos reducción de ruido
+    peakDetection: 1.3           // Aumentamos sensibilidad de picos
   };
   public processingSettings: ProcessingSettings = DEFAULT_PROCESSING_SETTINGS;
   
