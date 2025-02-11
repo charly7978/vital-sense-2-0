@@ -13,6 +13,7 @@ interface CameraViewProps {
 
 const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   const webcamRef = useRef<Webcam>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [isAndroid, setIsAndroid] = useState(false);
   const [cameraInitialized, setCameraInitialized] = useState(false);
@@ -36,6 +37,12 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
     const userAgent = window.navigator.userAgent.toLowerCase();
     setIsAndroid(userAgent.includes('android'));
   }, []);
+
+  useEffect(() => {
+    if (webcamRef.current?.video) {
+      videoRef.current = webcamRef.current.video;
+    }
+  }, [webcamRef.current]);
 
   const stopCamera = async () => {
     try {
@@ -84,7 +91,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
         onError={setError}
       />
       <CameraProcessor
-        videoRef={webcamRef.current?.video as React.RefObject<HTMLVideoElement>}
+        videoRef={videoRef}
         onFrame={onFrame}
         isActive={isActive}
         cameraInitialized={cameraInitialized}
@@ -101,3 +108,4 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
 };
 
 export default CameraView;
+
