@@ -191,7 +191,7 @@ export class PPGProcessor {
     const { frequencies, magnitudes } = this.frequencyAnalyzer.performFFT(filteredRed);
     const dominantFreqIndex = magnitudes.indexOf(Math.max(...magnitudes));
     const dominantFreq = frequencies[dominantFreqIndex];
-    const fftBpm = dominantFreq * 60;
+    const calculatedBpm = dominantFreq * 60;
     
     // Calculate intervals for HRV analysis
     const intervals = [];
@@ -213,13 +213,13 @@ export class PPGProcessor {
     
     // Cada 30 frames (aprox. 1 segundo) intentamos mejorar los parámetros
     if (this.frameCount % 30 === 0) {
-      this.saveTrainingData(bpm, spo2Result.spo2, signalQuality);
+      this.saveTrainingData(calculatedBpm, spo2Result.spo2, signalQuality);
       await this.trainMLModel();
-      await this.updateSettingsWithML(bpm, spo2Result.spo2, signalQuality);
+      await this.updateSettingsWithML(calculatedBpm, spo2Result.spo2, signalQuality);
     }
 
     return {
-      bpm: Math.round(fftBpm),
+      bpm: Math.round(calculatedBpm),
       spo2: spo2Result.spo2,
       systolic: bp.systolic,
       diastolic: bp.diastolic,
