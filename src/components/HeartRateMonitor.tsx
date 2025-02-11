@@ -1,23 +1,27 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
-import { Heart, Droplets, Activity, AlertTriangle, PlayCircle, StopCircle, Settings, Hand, SignalHigh, SignalMedium, SignalLow } from 'lucide-react';
+import { Heart, Droplets, Activity, AlertTriangle, PlayCircle, StopCircle, Hand, SignalHigh, SignalMedium, SignalLow } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import CameraView from './CameraView';
 import VitalChart from './VitalChart';
-import CalibrationDialog from './CalibrationDialog';
+import SensitivityControls from './SensitivityControls';
 import { PPGProcessor } from '../utils/ppgProcessor';
 import { BeepPlayer } from '../utils/audioUtils';
-import type { VitalReading, CalibrationData, UserCalibration, PPGData } from '../utils/types';
+import type { VitalReading, PPGData, SensitivitySettings } from '../utils/types';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
-import { supabase } from '@/integrations/supabase/client';
 
 const ppgProcessor = new PPGProcessor();
 const beepPlayer = new BeepPlayer();
 
 const MEASUREMENT_DURATION = 30; // segundos
+
+const defaultSensitivitySettings: SensitivitySettings = {
+  signalAmplification: 1,
+  noiseReduction: 1,
+  peakDetection: 1
+};
 
 const HeartRateMonitor: React.FC = () => {
   const [bpm, setBpm] = useState<number>(0);
@@ -29,88 +33,15 @@ const HeartRateMonitor: React.FC = () => {
   const [readings, setReadings] = useState<VitalReading[]>([]);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [isStarted, setIsStarted] = useState<boolean>(false);
-  const [showCalibration, setShowCalibration] = useState<boolean>(false);
-  const [isCalibrated, setIsCalibrated] = useState<boolean>(false);
   const [measurementProgress, setMeasurementProgress] = useState(0);
   const [measurementQuality, setMeasurementQuality] = useState(0);
   const [measurementStartTime, setMeasurementStartTime] = useState<number | null>(null);
+  const [sensitivitySettings, setSensitivitySettings] = useState<SensitivitySettings>(defaultSensitivitySettings);
   const { toast } = useToast();
 
-  useEffect(() => {
-    checkCalibration();
-  }, []);
-
-  const checkCalibration = async () => {
-    try {
-      const { data: calibrationData, error } = await supabase
-        .from('user_calibration')
-        .select('*')
-        .eq('is_active', true)
-        .limit(1);
-
-      if (error) throw error;
-
-      setIsCalibrated(!!calibrationData && calibrationData.length > 0);
-      
-      if (calibrationData && calibrationData.length > 0) {
-        // Map database fields to UserCalibration type
-        const mappedCalibration: UserCalibration = {
-          id: calibrationData[0].id,
-          age: calibrationData[0].age,
-          height: calibrationData[0].height,
-          weight: calibrationData[0].weight,
-          systolic: calibrationData[0].reference_bp_systolic,
-          diastolic: calibrationData[0].reference_bp_diastolic,
-          deviceType: calibrationData[0].reference_device_type,
-          is_active: calibrationData[0].is_active,
-          calibration_constants: calibrationData[0].calibration_constants || {},
-          calibration_history: Array.isArray(calibrationData[0].calibration_history) 
-            ? calibrationData[0].calibration_history 
-            : [],
-          last_calibration_quality: calibrationData[0].last_calibration_quality,
-          calibration_date: calibrationData[0].calibration_date,
-          user_id: calibrationData[0].user_id
-        };
-        ppgProcessor.setCalibrationData(mappedCalibration);
-      }
-    } catch (error) {
-      console.error('Error checking calibration:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "No se pudo verificar el estado de calibración"
-      });
-    }
-  };
-
-  const storeMeasurement = async (measurementData: any) => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        console.error('No authenticated user found');
-        return;
-      }
-
-      const { error } = await supabase
-        .from('vital_signs')
-        .insert([{
-          ...measurementData,
-          user_id: user.id
-        }]);
-
-      if (error) {
-        console.error('Error storing measurement:', error);
-        throw error;
-      }
-    } catch (error) {
-      console.error('Error storing measurement:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "No se pudieron guardar las mediciones"
-      });
-    }
+  const handleSensitivityChange = (newSettings: SensitivitySettings) => {
+    setSensitivitySettings(newSettings);
+    ppgProcessor.updateSensitivitySettings(newSettings);
   };
 
   const handleFrame = useCallback((imageData: ImageData) => {
@@ -120,7 +51,6 @@ const HeartRateMonitor: React.FC = () => {
     try {
       const vitals = ppgProcessor.processFrame(imageData);
       if (vitals) {
-        // Si hay un pico en la señal PPG, reproducir el beep
         if (vitals.isPeak === true) {
           beepPlayer.playBeep('heartbeat');
         }
@@ -135,20 +65,6 @@ const HeartRateMonitor: React.FC = () => {
           setHasArrhythmia(vitals.hasArrhythmia || false);
           setArrhythmiaType(vitals.arrhythmiaType || 'Normal');
           setReadings(ppgProcessor.getReadings());
-
-          if (vitals.bpm > 0 && vitals.spo2 > 0) {
-            storeMeasurement({
-              heart_rate: vitals.bpm,
-              spo2: vitals.spo2,
-              systolic_pressure: vitals.systolic,
-              diastolic_pressure: vitals.diastolic,
-              arrhythmia_detected: vitals.hasArrhythmia,
-              measurement_quality: vitals.signalQuality,
-              ppg_signal_data: {
-                readings: ppgProcessor.getReadings()
-              }
-            });
-          }
         }
       }
     } catch (error) {
@@ -189,15 +105,6 @@ const HeartRateMonitor: React.FC = () => {
   }, [isStarted, measurementStartTime, toast]);
 
   const toggleMeasurement = () => {
-    if (!isCalibrated && !isStarted) {
-      toast({
-        variant: "destructive",
-        title: "Calibración requerida",
-        description: "Por favor, realice la calibración antes de comenzar la medición."
-      });
-      return;
-    }
-
     setIsStarted(!isStarted);
     if (!isStarted) {
       setMeasurementStartTime(Date.now());
@@ -209,71 +116,6 @@ const HeartRateMonitor: React.FC = () => {
     } else {
       setMeasurementStartTime(null);
       setIsProcessing(false);
-    }
-  };
-
-  const handleCalibrationComplete = async (calibrationData: CalibrationData) => {
-    try {
-      const { error } = await supabase
-        .from('user_calibration')
-        .insert([{
-          age: calibrationData.age,
-          height: calibrationData.height,
-          weight: calibrationData.weight,
-          reference_bp_systolic: calibrationData.systolic,
-          reference_bp_diastolic: calibrationData.diastolic,
-          reference_device_type: calibrationData.deviceType,
-          is_active: true,
-          calibration_constants: {},
-          last_calibration_quality: 1.0,
-          calibration_history: []
-        }]);
-
-      if (error) throw error;
-
-      setIsCalibrated(true);
-      setShowCalibration(false);
-      
-      // Update processor with new calibration
-      const { data: newCalibration } = await supabase
-        .from('user_calibration')
-        .select('*')
-        .eq('is_active', true)
-        .limit(1);
-
-      if (newCalibration && newCalibration.length > 0) {
-        // Map database fields to UserCalibration type
-        const mappedCalibration: UserCalibration = {
-          id: newCalibration[0].id,
-          age: newCalibration[0].age,
-          height: newCalibration[0].height,
-          weight: newCalibration[0].weight,
-          systolic: newCalibration[0].reference_bp_systolic,
-          diastolic: newCalibration[0].reference_bp_diastolic,
-          deviceType: newCalibration[0].reference_device_type,
-          is_active: newCalibration[0].is_active,
-          calibration_constants: newCalibration[0].calibration_constants || {},
-          calibration_history: Array.isArray(newCalibration[0].calibration_history) 
-            ? newCalibration[0].calibration_history 
-            : [],
-          last_calibration_quality: newCalibration[0].last_calibration_quality,
-          calibration_date: newCalibration[0].calibration_date,
-          user_id: newCalibration[0].user_id
-        };
-        ppgProcessor.setCalibrationData(mappedCalibration);
-      }
-
-      toast({
-        title: "Calibración completada",
-        description: "Los datos de calibración se han guardado correctamente."
-      });
-    } catch (error) {
-      console.error('Error saving calibration:', error);
-      toast({
-        variant: "destructive",
-        title: "Error en la calibración",
-        description: "No se pudieron guardar los datos de calibración."
-      });
     }
   };
 
@@ -319,23 +161,7 @@ const HeartRateMonitor: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold text-gray-100">Monitor de Signos Vitales</h2>
-        <Button
-          variant="outline"
-          onClick={() => setShowCalibration(true)}
-          className="flex items-center gap-2"
-        >
-          <Settings className="w-4 h-4" />
-          Calibración
-        </Button>
       </div>
-
-      {!isCalibrated && (
-        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 mb-4">
-          <p className="text-yellow-300 text-sm">
-            Por favor, realice la calibración inicial para obtener mediciones más precisas.
-          </p>
-        </div>
-      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4 shadow-lg">
@@ -427,6 +253,11 @@ const HeartRateMonitor: React.FC = () => {
           </>
         )}
 
+        <SensitivityControls 
+          settings={sensitivitySettings}
+          onSettingsChange={handleSensitivityChange}
+        />
+
         <div className="flex justify-center">
           <Button
             onClick={toggleMeasurement}
@@ -462,12 +293,6 @@ const HeartRateMonitor: React.FC = () => {
         <h3 className="text-lg font-medium mb-4 text-gray-100">Señal PPG en Tiempo Real</h3>
         <VitalChart data={readings} color="#ea384c" />
       </div>
-
-      <CalibrationDialog 
-        open={showCalibration} 
-        onOpenChange={setShowCalibration}
-        onComplete={handleCalibrationComplete}
-      />
     </div>
   );
 };

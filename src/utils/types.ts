@@ -1,3 +1,4 @@
+
 export interface VitalReading {
   [key: string]: number;
   timestamp: number;
@@ -23,28 +24,9 @@ export interface PPGData {
   };
 }
 
-export interface CalibrationData {
-  age: number;
-  height: number;
-  weight: number;
-  systolic: number;
-  diastolic: number;
-  deviceType: string;
-  calibrationDate?: Date;
+export interface SensitivitySettings {
+  signalAmplification: number;
+  noiseReduction: number;
+  peakDetection: number;
 }
 
-export interface UserCalibration {
-  id: string;
-  age: number;
-  height: number;
-  weight: number;
-  systolic: number;
-  diastolic: number;
-  deviceType: string;
-  is_active: boolean;
-  calibration_constants: any;
-  calibration_history: any[];
-  last_calibration_quality: number;
-  calibration_date?: string;
-  user_id?: string;
-}

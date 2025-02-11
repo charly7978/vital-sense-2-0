@@ -1,5 +1,5 @@
 
-import { VitalReading, UserCalibration, PPGData } from './types';
+import { VitalReading, PPGData, SensitivitySettings } from './types';
 import { BeepPlayer } from './audioUtils';
 import { SignalProcessor } from './signalProcessing';
 import { SignalExtractor } from './signalExtraction';
@@ -21,7 +21,11 @@ export class PPGProcessor {
   private readonly signalBuffer: number[] = [];
   private readonly bufferSize = 30;
   private readonly qualityThreshold = 0.6;
-  private calibrationData: UserCalibration | null = null;
+  private sensitivitySettings: SensitivitySettings = {
+    signalAmplification: 1,
+    noiseReduction: 1,
+    peakDetection: 1
+  };
   
   constructor() {
     this.beepPlayer = new BeepPlayer();
@@ -31,9 +35,9 @@ export class PPGProcessor {
     this.signalNormalizer = new SignalNormalizer();
   }
 
-  setCalibrationData(data: UserCalibration) {
-    this.calibrationData = data;
-    this.signalProcessor.updateCalibrationConstants(data);
+  updateSensitivitySettings(settings: SensitivitySettings) {
+    this.sensitivitySettings = settings;
+    this.signalProcessor.updateSensitivityConstants(settings);
   }
 
   processFrame(imageData: ImageData): PPGData | null {
@@ -61,16 +65,23 @@ export class PPGProcessor {
       };
     }
     
-    this.redBuffer.push(red);
-    this.irBuffer.push(ir);
+    // Aplicar amplificación de señal
+    const amplifiedRed = red * this.sensitivitySettings.signalAmplification;
+    const amplifiedIr = ir * this.sensitivitySettings.signalAmplification;
+    
+    this.redBuffer.push(amplifiedRed);
+    this.irBuffer.push(amplifiedIr);
     
     if (this.redBuffer.length > this.windowSize) {
       this.redBuffer.shift();
       this.irBuffer.shift();
     }
     
-    const filteredRed = this.signalProcessor.lowPassFilter(this.redBuffer, 5);
-    const normalizedValue = this.signalNormalizer.normalizeSignal(filteredRed[filteredRed.length - 1]);
+    const filteredRed = this.signalProcessor.lowPassFilter(this.redBuffer, 
+      5 * this.sensitivitySettings.noiseReduction);
+    const normalizedValue = this.signalNormalizer.normalizeSignal(
+      filteredRed[filteredRed.length - 1]
+    );
     
     this.readings.push({ timestamp: now, value: normalizedValue });
     if (this.readings.length > this.windowSize) {
@@ -82,7 +93,12 @@ export class PPGProcessor {
       this.signalBuffer.shift();
     }
 
-    const isPeak = this.peakDetector.isRealPeak(normalizedValue, now, this.signalBuffer);
+    const isPeak = this.peakDetector.isRealPeak(
+      normalizedValue, 
+      now, 
+      this.signalBuffer,
+      this.sensitivitySettings.peakDetection
+    );
 
     if (isPeak) {
       this.peakTimes.push(now);
@@ -109,13 +125,7 @@ export class PPGProcessor {
     const hrvAnalysis = this.signalProcessor.analyzeHRV(intervals);
     const spo2Result = this.signalProcessor.calculateSpO2(this.redBuffer, this.irBuffer, perfusionIndex);
     
-    const bp = this.calibrationData ? 
-      this.signalProcessor.estimateBloodPressureWithCalibration(
-        filteredRed, 
-        this.peakTimes,
-        this.calibrationData
-      ) :
-      this.signalProcessor.estimateBloodPressure(filteredRed, this.peakTimes);
+    const bp = this.signalProcessor.estimateBloodPressure(filteredRed, this.peakTimes);
     
     const signalQuality = this.signalProcessor.analyzeSignalQuality(filteredRed);
     
@@ -143,3 +153,4 @@ export class PPGProcessor {
     return this.readings;
   }
 }
+
