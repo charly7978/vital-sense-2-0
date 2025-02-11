@@ -1,4 +1,3 @@
-
 import { VitalReading, PPGData, SensitivitySettings, ProcessingSettings } from './types';
 import { BeepPlayer } from './audioUtils';
 import { SignalProcessor } from './signalProcessing';
@@ -31,19 +30,19 @@ export class PPGProcessor {
     peakDetection: 1
   };
   private processingSettings: ProcessingSettings = {
-    measurementDuration: 30,
-    minFramesForCalculation: 30,
-    minPeaksForValidHR: 3,
-    minPeakDistance: 500,
-    maxPeakDistance: 1500,
-    peakThresholdFactor: 0.5,
-    minRedValue: 20,
-    minRedDominance: 1.5,
-    minValidPixelsRatio: 0.3,
-    minBrightness: 30,
-    minValidReadings: 10,
-    fingerDetectionDelay: 1000,
-    minSpO2: 80
+    MEASUREMENT_DURATION: 30,
+    MIN_FRAMES_FOR_CALCULATION: 30,
+    MIN_PEAKS_FOR_VALID_HR: 3,
+    MIN_PEAK_DISTANCE: 500,
+    MAX_PEAK_DISTANCE: 1500,
+    PEAK_THRESHOLD_FACTOR: 0.5,
+    MIN_RED_VALUE: 20,
+    MIN_RED_DOMINANCE: 1.5,
+    MIN_VALID_PIXELS_RATIO: 0.3,
+    MIN_BRIGHTNESS: 30,
+    MIN_VALID_READINGS: 10,
+    FINGER_DETECTION_DELAY: 1000,
+    MIN_SPO2: 80
   };
   
   constructor() {
@@ -68,8 +67,9 @@ export class PPGProcessor {
     }
 
     Object.entries(settings).forEach(([key, value]: [string, any]) => {
-      if (key in this.processingSettings) {
-        (this.processingSettings as any)[key] = value;
+      const uppercaseKey = key.toUpperCase();
+      if (uppercaseKey in this.processingSettings) {
+        (this.processingSettings as any)[uppercaseKey] = value;
       }
     });
 

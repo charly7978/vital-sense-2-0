@@ -32,19 +32,19 @@ export interface SensitivitySettings {
 }
 
 export interface ProcessingSettings {
-  measurementDuration: number;
-  minFramesForCalculation: number;
-  minPeaksForValidHR: number;
-  minPeakDistance: number;
-  maxPeakDistance: number;
-  peakThresholdFactor: number;
-  minRedValue: number;
-  minRedDominance: number;
-  minValidPixelsRatio: number;
-  minBrightness: number;
-  minValidReadings: number;
-  fingerDetectionDelay: number;
-  minSpO2: number;
+  MEASUREMENT_DURATION: number;
+  MIN_FRAMES_FOR_CALCULATION: number;
+  MIN_PEAKS_FOR_VALID_HR: number;
+  MIN_PEAK_DISTANCE: number;
+  MAX_PEAK_DISTANCE: number;
+  PEAK_THRESHOLD_FACTOR: number;
+  MIN_RED_VALUE: number;
+  MIN_RED_DOMINANCE: number;
+  MIN_VALID_PIXELS_RATIO: number;
+  MIN_BRIGHTNESS: number;
+  MIN_VALID_READINGS: number;
+  FINGER_DETECTION_DELAY: number;
+  MIN_SPO2: number;
 }
 
 export interface CalibrationSettings {
@@ -70,3 +70,4 @@ export interface BPCalibrationData {
   notes?: string;
   environmental_conditions?: Record<string, any>;
 }
+
