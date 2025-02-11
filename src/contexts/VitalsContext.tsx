@@ -44,14 +44,14 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   
   const { toast } = useToast();
 
-  const processFrame = useCallback((imageData: ImageData) => {
+  const processFrame = useCallback(async (imageData: ImageData) => {
     if (!isStarted) return;
     
     setIsProcessing(true);
     try {
-      const vitals = ppgProcessor.processFrame(imageData);
+      const vitals = await ppgProcessor.processFrame(imageData);
       if (vitals) {
-        if (vitals.isPeak === true) {
+        if (vitals.isPeak) {
           beepPlayer.playBeep('heartbeat');
         }
 
