@@ -25,7 +25,22 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   const stopCamera = async () => {
     try {
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
+        const tracks = streamRef.current.getTracks();
+        tracks.forEach(track => {
+          if (track.kind === 'video') {
+            // Intentar apagar la linterna antes de detener la cámara
+            const videoTrack = track as MediaStreamTrack & { getCapabilities?: () => any };
+            if (videoTrack.getCapabilities && videoTrack.getCapabilities().torch) {
+              try {
+                const constraints = { advanced: [{ torch: false }] };
+                videoTrack.applyConstraints(constraints);
+              } catch (e) {
+                console.error('Error al apagar la linterna:', e);
+              }
+            }
+            track.stop();
+          }
+        });
         streamRef.current = null;
       }
       if (webcamRef.current?.stream) {
@@ -55,13 +70,27 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
         }
       };
 
-      if (isAndroid) {
-        // @ts-ignore - La propiedad torch existe en Android
-        (constraints.video as any).advanced = [{ torch: true }];
-      }
-
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
+
+      // Activar la linterna en Android
+      if (isAndroid) {
+        const videoTrack = stream.getVideoTracks()[0];
+        const capabilities = videoTrack.getCapabilities();
+        
+        if (capabilities.torch) {
+          try {
+            await videoTrack.applyConstraints({
+              advanced: [{ torch: true }]
+            });
+            console.log('Linterna activada exitosamente');
+          } catch (e) {
+            console.error('Error al activar la linterna:', e);
+          }
+        } else {
+          console.log('Este dispositivo no soporta linterna');
+        }
+      }
       
       if (webcamRef.current && webcamRef.current.video) {
         webcamRef.current.video.srcObject = stream;
