@@ -14,6 +14,7 @@ export class SignalExtractor {
   private readonly maxIntensity = 250;
   private lastRed = 0;
   private lastIr = 0;
+  private frameCount = 0;
   private processingSettings: ProcessingSettings = {
     measurementDuration: 30,
     minFramesForCalculation: 30,
@@ -35,6 +36,7 @@ export class SignalExtractor {
   }
 
   extractChannels(imageData: ImageData): ExtractedSignals {
+    this.frameCount++;
     try {
       let redSum = 0;
       let irSum = 0;
@@ -43,6 +45,7 @@ export class SignalExtractor {
       let darkPixelCount = 0;
       let maxRedIntensity = 0;
       let minRedIntensity = 255;
+      let validRedPixels = 0;
       
       const width = imageData.width;
       const height = imageData.height;
@@ -50,6 +53,7 @@ export class SignalExtractor {
       const centerY = Math.floor(height / 2);
       const regionSize = Math.min(150, Math.floor(Math.min(width, height) / 2));
       
+      // Analizar región central
       for (let y = centerY - regionSize; y < centerY + regionSize; y++) {
         for (let x = centerX - regionSize; x < centerX + regionSize; x++) {
           if (x >= 0 && x < width && y >= 0 && y < height) {
@@ -57,6 +61,10 @@ export class SignalExtractor {
             const red = imageData.data[i];
             const green = imageData.data[i+1];
             const blue = imageData.data[i+2];
+            
+            if (red > this.processingSettings.minRedValue) {
+              validRedPixels++;
+            }
             
             maxRedIntensity = Math.max(maxRedIntensity, red);
             minRedIntensity = Math.min(minRedIntensity, red);
@@ -66,7 +74,8 @@ export class SignalExtractor {
             
             // Verificar dominancia del canal rojo
             const redDominance = red / ((green + blue) / 2);
-            if (redDominance >= this.processingSettings.minRedDominance) {
+            if (redDominance >= this.processingSettings.minRedDominance && 
+                red >= this.processingSettings.minRedValue) {
               redSum += red;
               irSum += (green * 0.8 + blue * 0.2);
               pixelCount++;
@@ -74,12 +83,36 @@ export class SignalExtractor {
           }
         }
       }
+
+      const totalPixels = 4 * regionSize * regionSize;
+      const validPixelsRatio = pixelCount / totalPixels;
+      const redDominanceRatio = validRedPixels / totalPixels;
+
+      // Log detallado cada 30 frames
+      if (this.frameCount % 30 === 0) {
+        console.log('Análisis de señal:', {
+          frameCount: this.frameCount,
+          validPixelsRatio,
+          redDominanceRatio,
+          maxRedIntensity,
+          minRedIntensity,
+          darkPixelCount,
+          saturationCount,
+          pixelCount,
+          avgRed: pixelCount > 0 ? redSum / pixelCount : 0
+        });
+      }
       
-      if (pixelCount === 0) {
-        console.log('No pixels found in region');
+      if (validPixelsRatio < this.processingSettings.minValidPixelsRatio || 
+          redDominanceRatio < 0.1) {
+        console.log('Dedo no detectado:', {
+          validPixelsRatio,
+          redDominanceRatio,
+          minRequired: this.processingSettings.minValidPixelsRatio
+        });
         return {
-          red: this.lastRed,
-          ir: this.lastIr,
+          red: 0,
+          ir: 0,
           quality: 0,
           perfusionIndex: 0
         };
@@ -87,10 +120,11 @@ export class SignalExtractor {
 
       const avgRed = redSum / pixelCount;
       const avgIr = irSum / pixelCount;
-      const validPixelsRatio = pixelCount / (4 * regionSize * regionSize);
+      
+      // Calcular calidad de la señal
       const quality = Math.max(0, Math.min(1, 
         validPixelsRatio >= this.processingSettings.minValidPixelsRatio ? 
-        1 - ((saturationCount + darkPixelCount) / pixelCount) : 0
+        1 - ((saturationCount + darkPixelCount) / totalPixels) : 0
       ));
       
       const perfusionIndex = avgRed > 0 ? 
@@ -100,6 +134,16 @@ export class SignalExtractor {
       if (quality > this.qualityThreshold && avgRed >= this.processingSettings.minBrightness) {
         this.lastRed = avgRed;
         this.lastIr = avgIr;
+        
+        // Log cuando encontramos una buena señal
+        if (this.frameCount % 10 === 0) {
+          console.log('Señal válida detectada:', {
+            quality,
+            perfusionIndex,
+            avgRed,
+            avgIr
+          });
+        }
       }
       
       return {
@@ -109,7 +153,7 @@ export class SignalExtractor {
         perfusionIndex
       };
     } catch (error) {
-      console.error('Error in signal extraction:', error);
+      console.error('Error en extracción de señal:', error);
       return {
         red: this.lastRed,
         ir: this.lastIr,

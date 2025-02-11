@@ -8,13 +8,28 @@ export class PeakDetector {
   private readonly adaptiveRate = 0.15;
   private peakBuffer: number[] = [];
   private timeBuffer: number[] = [];
+  private frameCount = 0;
 
   isRealPeak(currentValue: number, now: number, signalBuffer: number[]): boolean {
+    this.frameCount++;
+    
+    // Log del valor actual cada 10 frames
+    if (this.frameCount % 10 === 0) {
+      console.log('Análisis de pico:', {
+        currentValue,
+        threshold: this.adaptiveThreshold,
+        timeSinceLastPeak: now - this.lastPeakTime,
+        bufferLength: signalBuffer.length,
+        frameCount: this.frameCount
+      });
+    }
+
     if (now - this.lastPeakTime < this.minPeakDistance) {
       return false;
     }
 
     if (signalBuffer.length < 5) {
+      console.log('Buffer insuficiente para análisis');
       return false;
     }
 
@@ -33,6 +48,19 @@ export class PeakDetector {
                                   currentValue > this.minAmplitude;
     const isLocalMaximum = currentValue > Math.max(...signalBuffer.slice(-3));
 
+    // Log detallado de la validación
+    if (hasSignificantAmplitude) {
+      console.log('Validación de pico:', {
+        isValidShape,
+        hasSignificantAmplitude,
+        isLocalMaximum,
+        currentValue,
+        threshold: this.adaptiveThreshold,
+        avgValue,
+        stdDev
+      });
+    }
+
     if (isValidShape && hasSignificantAmplitude && isLocalMaximum) {
       // Verificar consistencia temporal
       const currentInterval = now - this.lastPeakTime;
@@ -41,12 +69,18 @@ export class PeakDetector {
       if (isValidInterval) {
         this.lastPeakTime = now;
         this.updatePeakHistory(currentValue, now);
-        console.log('Latido detectado:', {
+        console.log('¡LATIDO DETECTADO!', {
           valor: currentValue,
           umbral: this.adaptiveThreshold,
-          intervalo: currentInterval
+          intervalo: currentInterval,
+          bpmEstimado: 60000 / currentInterval
         });
         return true;
+      } else {
+        console.log('Intervalo inválido:', {
+          currentInterval,
+          minAllowed: this.minPeakDistance
+        });
       }
     }
 
