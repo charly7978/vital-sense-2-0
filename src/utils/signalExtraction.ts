@@ -1,10 +1,33 @@
+
 import { playBeep } from "@/assets/beep";
+import FFT from 'fft.js';
 
 export class SignalExtractor {
   private lastRedValues: number[] = [];
 
   private detectPeaks(signal: number[]) {
     return signal.filter((v, i, arr) => v > arr[i - 1] && v > arr[i + 1]).length;
+  }
+
+  private applyFFT(signal: number[]): number[] {
+    const fft = new FFT(Math.pow(2, Math.ceil(Math.log2(signal.length))));
+    const phasors = fft.createComplexArray();
+    
+    // Preparar la señal con padding de ceros si es necesario
+    const paddedSignal = [...signal];
+    while (paddedSignal.length < fft.size) {
+      paddedSignal.push(0);
+    }
+    
+    fft.realTransform(phasors, paddedSignal);
+    
+    // Calcular magnitudes
+    const magnitudes: number[] = [];
+    for (let i = 0; i < fft.size/2; i++) {
+      magnitudes.push(Math.sqrt(phasors[2*i]**2 + phasors[2*i+1]**2));
+    }
+    
+    return magnitudes;
   }
 
   extractChannels(imageData: ImageData) {
@@ -32,7 +55,8 @@ export class SignalExtractor {
     this.lastRedValues.push(avgRed);
     if (this.lastRedValues.length > 100) this.lastRedValues.shift();
 
-    const peaks = this.detectPeaks([...this.lastRedValues]);
+    const freqData = this.applyFFT(this.lastRedValues);
+    const peaks = this.detectPeaks(freqData);
     const bpm = peaks * 6; // Escala a 60s
 
     if (peaks > 0) playBeep(); // 🔊 Sonido cada latido detectado
