@@ -12,6 +12,11 @@ interface CameraDisplayProps {
   isAndroid: boolean;
 }
 
+// Extended interface for the track with torch capability
+interface TrackWithTorch extends MediaStreamTrack {
+  applyConstraints(constraints: MediaTrackConstraints & { advanced?: { torch?: boolean }[] }): Promise<void>;
+}
+
 const CameraDisplay: React.FC<CameraDisplayProps> = ({
   error,
   isActive,
@@ -24,10 +29,9 @@ const CameraDisplay: React.FC<CameraDisplayProps> = ({
       if (isAndroid && isActive && webcamRef.current?.video) {
         try {
           const stream = webcamRef.current.video.srcObject as MediaStream;
-          const track = stream.getVideoTracks()[0];
+          const track = stream.getVideoTracks()[0] as TrackWithTorch;
           
-          // Try to turn on the flashlight
-          if (track && 'imageCaptureSupported' in track) {
+          if (track) {
             await track.applyConstraints({
               advanced: [{ torch: true }]
             });
@@ -41,11 +45,10 @@ const CameraDisplay: React.FC<CameraDisplayProps> = ({
 
     enableFlashlight();
 
-    // Cleanup function to turn off the flashlight
     return () => {
       if (isAndroid && webcamRef.current?.video) {
         const stream = webcamRef.current.video.srcObject as MediaStream;
-        const track = stream?.getVideoTracks()[0];
+        const track = stream?.getVideoTracks()[0] as TrackWithTorch;
         if (track) {
           track.applyConstraints({
             advanced: [{ torch: false }]
@@ -76,8 +79,7 @@ const CameraDisplay: React.FC<CameraDisplayProps> = ({
             videoConstraints={{
               width: { ideal: 640 },
               height: { ideal: 480 },
-              facingMode: isAndroid ? 'environment' : 'user',
-              advanced: isAndroid ? [{ torch: true }] : []
+              facingMode: isAndroid ? 'environment' : 'user'
             }}
           />
         )}
