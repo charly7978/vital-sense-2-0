@@ -18,6 +18,7 @@ export class PPGProcessor {
   private readonly bufferSize = 30;
   private baseline = 0;
   private adaptiveThreshold = 0;
+  private readonly qualityThreshold = 0.6;
   
   constructor() {
     this.beepPlayer = new BeepPlayer();
@@ -31,11 +32,19 @@ export class PPGProcessor {
     diastolic: number;
     hasArrhythmia: boolean;
     arrhythmiaType: string;
-  } {
+    signalQuality: number;
+  } | null {
     const now = Date.now();
     
     // Extracción mejorada de señales roja e infrarroja
-    const { red, ir } = this.extractChannels(imageData);
+    const { red, ir, quality } = this.extractChannels(imageData);
+    
+    // Verificar calidad de señal antes de procesar
+    if (quality < this.qualityThreshold) {
+      console.log('Señal de baja calidad, esperando mejor colocación del dedo');
+      return null;
+    }
+    
     this.redBuffer.push(red);
     this.irBuffer.push(ir);
     
@@ -93,20 +102,29 @@ export class PPGProcessor {
     // Estimación de presión arterial usando características PPG
     const bp = this.signalProcessor.estimateBloodPressure(filteredRed, this.peakTimes);
     
+    // Calcular calidad general de la señal
+    const signalQuality = this.signalProcessor.analyzeSignalQuality(filteredRed);
+    
     return {
       bpm: Math.round(fftBpm),
       spo2,
       systolic: bp.systolic,
       diastolic: bp.diastolic,
       hasArrhythmia: hrvAnalysis.hasArrhythmia,
-      arrhythmiaType: hrvAnalysis.type
+      arrhythmiaType: hrvAnalysis.type,
+      signalQuality
     };
   }
 
-  private extractChannels(imageData: ImageData): { red: number, ir: number } {
+  private extractChannels(imageData: ImageData): { 
+    red: number, 
+    ir: number,
+    quality: number 
+  } {
     let redSum = 0;
     let irSum = 0;
     let pixelCount = 0;
+    let saturationCount = 0;
     
     const width = imageData.width;
     const height = imageData.height;
@@ -119,24 +137,39 @@ export class PPGProcessor {
       for (let x = centerX - regionSize; x < centerX + regionSize; x++) {
         if (x >= 0 && x < width && y >= 0 && y < height) {
           const i = (y * width + x) * 4;
-          redSum += imageData.data[i]; // Canal rojo
+          const red = imageData.data[i];
+          const green = imageData.data[i+1];
+          const blue = imageData.data[i+2];
+          
+          // Detectar saturación
+          if (red > 250 || red < 5) saturationCount++;
+          
+          redSum += red;
           // Aproximación mejorada para IR usando verde y azul
-          irSum += (imageData.data[i+1] * 0.7 + imageData.data[i+2] * 0.3);
+          irSum += (green * 0.7 + blue * 0.3);
           pixelCount++;
         }
       }
     }
     
+    // Calcular calidad basada en saturación
+    const quality = 1 - (saturationCount / pixelCount);
+    
     return {
       red: pixelCount > 0 ? redSum / pixelCount : 0,
-      ir: pixelCount > 0 ? irSum / pixelCount : 0
+      ir: pixelCount > 0 ? irSum / pixelCount : 0,
+      quality
     };
   }
 
   private normalizeSignal(value: number): number {
-    // Normalización adaptativa mejorada
+    // Normalización adaptativa mejorada con suavizado exponencial
     this.baseline = this.baseline * 0.95 + value * 0.05;
-    return value - this.baseline;
+    const normalized = value - this.baseline;
+    
+    // Escalar la señal para mantener amplitud consistente
+    const scale = 100; // Escala arbitraria para visualización
+    return normalized * scale / Math.max(Math.abs(this.baseline), 1);
   }
 
   private isRealPeak(currentValue: number, now: number): boolean {
@@ -147,14 +180,29 @@ export class PPGProcessor {
     // Detección de picos adaptativa mejorada
     const avgSignal = this.signalBuffer.reduce((a, b) => a + b, 0) / this.signalBuffer.length;
     this.adaptiveThreshold = this.adaptiveThreshold * 0.95 + Math.abs(avgSignal) * 0.05;
+    
+    // Umbral dinámico basado en la variabilidad de la señal
     const threshold = this.adaptiveThreshold * 0.7;
     
-    // Validación adicional de calidad de pico
+    // Validación adicional de calidad de pico usando derivadas
     const isPeak = currentValue > threshold && 
                   currentValue > avgSignal && 
-                  currentValue > this.signalBuffer[this.signalBuffer.length - 2];
+                  currentValue > this.signalBuffer[this.signalBuffer.length - 2] &&
+                  this.validatePeakShape(currentValue);
     
     return isPeak;
+  }
+
+  private validatePeakShape(currentValue: number): boolean {
+    if (this.signalBuffer.length < 3) return false;
+    
+    // Calcular derivadas
+    const derivative1 = currentValue - this.signalBuffer[this.signalBuffer.length - 2];
+    const derivative2 = this.signalBuffer[this.signalBuffer.length - 2] - 
+                       this.signalBuffer[this.signalBuffer.length - 3];
+    
+    // Verificar forma del pico (debe tener pendiente positiva seguida de negativa)
+    return derivative1 < 0 && derivative2 > 0;
   }
 
   getReadings(): VitalReading[] {
