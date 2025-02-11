@@ -15,19 +15,20 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <VitalsProvider>
-          <BrowserRouter>
+        <BrowserRouter>
+          <VitalsProvider>
             <Toaster />
             <Sonner />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </BrowserRouter>
-        </VitalsProvider>
+          </VitalsProvider>
+        </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
   );
 };
 
 export default App;
+
