@@ -24,12 +24,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
       width: { ideal: 1280 },
       height: { ideal: 720 },
       facingMode: isAndroid ? "environment" : "user",
-      // Configuración para mejor calidad de imagen
-      exposureMode: "manual",
-      exposureCompensation: 2.0, // Aumentar exposición
-      whiteBalanceMode: "manual",
-      brightness: 1.0,
-      contrast: 1.0
+      advanced: isAndroid ? [{ torch: true }] : undefined
     };
 
     return constraints;
@@ -91,28 +86,40 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
             webcamRef.current.video!.srcObject = mediaStream;
           }
 
-          // Aplicar configuraciones avanzadas si está disponible
-          const track = mediaStream.getVideoTracks()[0];
-          const capabilities = track.getCapabilities();
-          const settings: any = {};
-
-          // Intentar ajustar la exposición si está disponible
-          if (capabilities.exposureMode) {
-            settings.exposureMode = 'manual';
+          // Configurar la linterna para Android
+          if (isAndroid) {
+            const track = mediaStream.getVideoTracks()[0];
+            
+            // Intentar activar la linterna
+            try {
+              await track.applyConstraints({
+                advanced: [{ torch: true }]
+              });
+              console.log('Linterna activada exitosamente');
+            } catch (torchError) {
+              console.error('Error al activar la linterna:', torchError);
+              toast({
+                title: "Aviso",
+                description: "Por favor, asegúrate de tener buena iluminación para la medición."
+              });
+            }
           }
-          if (capabilities.exposureTime) {
-            settings.exposureTime = capabilities.exposureTime.max / 2;
-          }
-          if (capabilities.colorTemperature) {
-            settings.colorTemperature = 5000; // temperatura de color neutra
-          }
-
-          await track.applyConstraints(settings);
           
           setVideoInitialized(false);
           animationFrameRef.current = requestAnimationFrame(processFrame);
         } else {
+          // Desactivar la linterna y detener la transmisión
           if (mediaStream) {
+            const track = mediaStream.getVideoTracks()[0];
+            if (isAndroid) {
+              try {
+                await track.applyConstraints({
+                  advanced: [{ torch: false }]
+                });
+              } catch (error) {
+                console.error('Error al desactivar la linterna:', error);
+              }
+            }
             mediaStream.getTracks().forEach(track => track.stop());
           }
           if (animationFrameRef.current) {
@@ -134,6 +141,12 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
 
     return () => {
       if (mediaStream) {
+        const track = mediaStream.getVideoTracks()[0];
+        if (isAndroid) {
+          track.applyConstraints({
+            advanced: [{ torch: false }]
+          }).catch(console.error);
+        }
         mediaStream.getTracks().forEach(track => track.stop());
       }
       if (animationFrameRef.current) {
