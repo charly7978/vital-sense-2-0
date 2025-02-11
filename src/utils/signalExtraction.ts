@@ -1,3 +1,4 @@
+
 export class SignalExtractor {
   private readonly minIntensity = 45;
   private readonly maxIntensity = 250;

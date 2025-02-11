@@ -49,6 +49,11 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
       }
     } catch (error) {
       console.error('Error processing video frame:', error);
+      toast({
+        variant: "destructive",
+        title: "Error en el procesamiento",
+        description: "Error al procesar la imagen de la cámara."
+      });
     }
 
     animationFrameRef.current = requestAnimationFrame(processFrame);
