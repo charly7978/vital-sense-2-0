@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { Heart, Droplets, Activity, AlertTriangle, PlayCircle, StopCircle, Settings } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
@@ -7,10 +6,16 @@ import CameraView from './CameraView';
 import VitalChart from './VitalChart';
 import CalibrationDialog from './CalibrationDialog';
 import { PPGProcessor } from '../utils/ppgProcessor';
+import { BeepPlayer } from '../utils/audioUtils';
 import type { VitalReading, CalibrationData, UserCalibration } from '../utils/types';
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Progress } from "@/components/ui/progress";
 import { supabase } from '@/integrations/supabase/client';
 
 const ppgProcessor = new PPGProcessor();
+const beepPlayer = new BeepPlayer();
+
+const MEASUREMENT_DURATION = 30; // segundos
 
 const HeartRateMonitor: React.FC = () => {
   const [bpm, setBpm] = useState<number>(0);
@@ -24,6 +29,9 @@ const HeartRateMonitor: React.FC = () => {
   const [isStarted, setIsStarted] = useState<boolean>(false);
   const [showCalibration, setShowCalibration] = useState<boolean>(false);
   const [isCalibrated, setIsCalibrated] = useState<boolean>(false);
+  const [measurementProgress, setMeasurementProgress] = useState(0);
+  const [measurementQuality, setMeasurementQuality] = useState(0);
+  const [measurementStartTime, setMeasurementStartTime] = useState<number | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -110,6 +118,20 @@ const HeartRateMonitor: React.FC = () => {
     try {
       const vitals = ppgProcessor.processFrame(imageData);
       if (vitals) {
+        // Calcular calidad de señal y dar retroalimentación
+        if (vitals.signalQuality < 0.3) {
+          beepPlayer.playBeep('warning');
+          toast({
+            variant: "destructive",
+            title: "Señal débil",
+            description: "Por favor, ajuste la posición de su dedo"
+          });
+        } else if (vitals.signalQuality > 0.8) {
+          beepPlayer.playBeep('success');
+        }
+
+        setMeasurementQuality(vitals.signalQuality);
+        
         // Solo almacenar y mostrar mediciones cuando hay señal válida
         if (vitals.signalQuality > 0) {
           setBpm(vitals.bpm || 0);
@@ -120,7 +142,6 @@ const HeartRateMonitor: React.FC = () => {
           setArrhythmiaType(vitals.arrhythmiaType || 'Normal');
           setReadings(ppgProcessor.getReadings());
 
-          // Store measurement in database only if values are valid
           if (vitals.bpm > 0 && vitals.spo2 > 0) {
             storeMeasurement({
               heart_rate: vitals.bpm,
@@ -134,15 +155,6 @@ const HeartRateMonitor: React.FC = () => {
               }
             });
           }
-        } else {
-          // Resetear valores cuando no hay señal válida
-          setBpm(0);
-          setSpo2(0);
-          setSystolic(0);
-          setDiastolic(0);
-          setHasArrhythmia(false);
-          setArrhythmiaType('Normal');
-          setReadings([]);
         }
       }
     } catch (error) {
@@ -154,6 +166,33 @@ const HeartRateMonitor: React.FC = () => {
       });
     }
   }, [isStarted, toast]);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+
+    if (isStarted && measurementStartTime) {
+      interval = setInterval(() => {
+        const elapsed = (Date.now() - measurementStartTime) / 1000;
+        const progress = Math.min((elapsed / MEASUREMENT_DURATION) * 100, 100);
+        setMeasurementProgress(progress);
+
+        if (elapsed >= MEASUREMENT_DURATION) {
+          setIsStarted(false);
+          beepPlayer.playBeep('success');
+          toast({
+            title: "Medición completada",
+            description: "La medición se ha completado exitosamente."
+          });
+        }
+      }, 100);
+    }
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [isStarted, measurementStartTime, toast]);
 
   const toggleMeasurement = () => {
     if (!isCalibrated && !isStarted) {
@@ -167,11 +206,14 @@ const HeartRateMonitor: React.FC = () => {
 
     setIsStarted(!isStarted);
     if (!isStarted) {
+      setMeasurementStartTime(Date.now());
+      setMeasurementProgress(0);
       toast({
         title: "Iniciando medición",
-        description: "Por favor, mantenga su dedo frente a la cámara."
+        description: `La medición durará ${MEASUREMENT_DURATION} segundos. Por favor, mantenga su dedo frente a la cámara.`
       });
     } else {
+      setMeasurementStartTime(null);
       setIsProcessing(false);
     }
   };
@@ -318,23 +360,53 @@ const HeartRateMonitor: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex justify-center mb-4">
-        <Button
-          onClick={toggleMeasurement}
-          className={`px-6 py-3 text-lg ${isStarted ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}
-        >
-          {isStarted ? (
-            <>
-              <StopCircle className="mr-2" />
-              Detener Medición
-            </>
-          ) : (
-            <>
-              <PlayCircle className="mr-2" />
-              Iniciar Medición
-            </>
-          )}
-        </Button>
+      <div className="flex flex-col gap-4">
+        {isStarted && (
+          <>
+            <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4">
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm text-gray-400">
+                  <span>Progreso de la medición</span>
+                  <span>{Math.round(measurementProgress)}%</span>
+                </div>
+                <Progress value={measurementProgress} className="h-2" />
+              </div>
+            </div>
+
+            <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4">
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm text-gray-400">
+                  <span>Calidad de la señal</span>
+                  <span>{Math.round(measurementQuality * 100)}%</span>
+                </div>
+                <Progress 
+                  value={measurementQuality * 100} 
+                  className="h-2"
+                  variant={measurementQuality < 0.3 ? "destructive" : measurementQuality > 0.8 ? "default" : "warning"}
+                />
+              </div>
+            </div>
+          </>
+        )}
+
+        <div className="flex justify-center">
+          <Button
+            onClick={toggleMeasurement}
+            className={`px-6 py-3 text-lg ${isStarted ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}
+          >
+            {isStarted ? (
+              <>
+                <StopCircle className="mr-2" />
+                Detener Medición
+              </>
+            ) : (
+              <>
+                <PlayCircle className="mr-2" />
+                Iniciar Medición
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4 shadow-lg">

@@ -11,7 +11,7 @@ export class BeepPlayer {
   private async initAudioContext() {
     try {
       this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      await this.audioContext.resume(); // Intentar activar inmediatamente
+      await this.audioContext.resume();
       this.gainNode = this.audioContext.createGain();
       this.gainNode.connect(this.audioContext.destination);
       this.gainNode.gain.value = 0;
@@ -20,7 +20,7 @@ export class BeepPlayer {
     }
   }
 
-  async playBeep() {
+  async playBeep(type: 'heartbeat' | 'warning' | 'success' = 'heartbeat') {
     if (!this.audioContext || !this.gainNode) {
       await this.initAudioContext();
     }
@@ -28,43 +28,63 @@ export class BeepPlayer {
     try {
       if (!this.audioContext || !this.gainNode) return;
 
-      // Asegurar que el contexto esté activo
       if (this.audioContext.state !== 'running') {
         await this.audioContext.resume();
       }
 
-      // Limpiar oscilador anterior si existe
       if (this.oscillator) {
         this.oscillator.disconnect();
         this.oscillator = null;
       }
 
-      // Crear nuevo oscilador
       this.oscillator = this.audioContext.createOscillator();
-      this.oscillator.type = 'sine';
-      this.oscillator.frequency.value = 1000; // Frecuencia más alta para mejor audibilidad
+      
+      // Diferentes sonidos según el tipo
+      switch (type) {
+        case 'heartbeat':
+          this.oscillator.frequency.value = 1000;
+          break;
+        case 'warning':
+          this.oscillator.frequency.value = 440;
+          break;
+        case 'success':
+          this.oscillator.frequency.value = 1500;
+          break;
+      }
+      
       this.oscillator.connect(this.gainNode);
 
-      // Configurar el beep
       const now = this.audioContext.currentTime;
       this.gainNode.gain.cancelScheduledValues(now);
       this.gainNode.gain.setValueAtTime(0, now);
-      this.gainNode.gain.linearRampToValueAtTime(1.0, now + 0.005); // Ataque más rápido
-      this.gainNode.gain.linearRampToValueAtTime(0, now + 0.05); // Duración más corta
+      
+      // Diferentes duraciones según el tipo
+      if (type === 'warning') {
+        this.gainNode.gain.linearRampToValueAtTime(0.5, now + 0.01);
+        this.gainNode.gain.linearRampToValueAtTime(0, now + 0.3);
+        this.oscillator.start(now);
+        this.oscillator.stop(now + 0.3);
+      } else if (type === 'success') {
+        this.gainNode.gain.linearRampToValueAtTime(0.5, now + 0.01);
+        this.gainNode.gain.linearRampToValueAtTime(0, now + 0.15);
+        this.oscillator.start(now);
+        this.oscillator.stop(now + 0.15);
+      } else {
+        this.gainNode.gain.linearRampToValueAtTime(0.3, now + 0.005);
+        this.gainNode.gain.linearRampToValueAtTime(0, now + 0.05);
+        this.oscillator.start(now);
+        this.oscillator.stop(now + 0.05);
+      }
 
-      // Reproducir
-      this.oscillator.start(now);
-      this.oscillator.stop(now + 0.05);
-
-      // Limpiar
       setTimeout(() => {
         if (this.oscillator) {
           this.oscillator.disconnect();
           this.oscillator = null;
         }
-      }, 100);
+      }, 500);
     } catch (error) {
       console.error('Error al reproducir beep:', error);
     }
   }
 }
+
