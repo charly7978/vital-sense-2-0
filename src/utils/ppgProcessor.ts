@@ -1,4 +1,3 @@
-
 import { VitalReading, PPGData, SensitivitySettings, ProcessingSettings } from './types';
 import { BeepPlayer } from './audioUtils';
 import { SignalProcessor } from './signalProcessing';
@@ -68,22 +67,29 @@ export class PPGProcessor {
     try {
       const inputFeatures = [calculatedBpm, spo2, signalQuality];
       const optimizedSettings = await this.mlModel.predictOptimizedSettings(inputFeatures);
+      
+      if (!isNaN(optimizedSettings[0]) && !isNaN(optimizedSettings[1]) && !isNaN(optimizedSettings[2])) {
+        console.log("Valores ML recibidos:", optimizedSettings);
+        
+        if (optimizedSettings[0] >= 10 && optimizedSettings[0] <= 30) {
+          this.processingSettings.MIN_RED_VALUE = optimizedSettings[0];
+        }
+        if (optimizedSettings[1] >= 0.3 && optimizedSettings[1] <= 0.7) {
+          this.processingSettings.PEAK_THRESHOLD_FACTOR = optimizedSettings[1];
+        }
+        if (optimizedSettings[2] >= 0.1 && optimizedSettings[2] <= 0.5) {
+          this.processingSettings.MIN_VALID_PIXELS_RATIO = optimizedSettings[2];
+        }
 
-      if (optimizedSettings[0] >= 10 && optimizedSettings[0] <= 30) {
-        this.processingSettings.MIN_RED_VALUE = optimizedSettings[0];
+        console.log("✔ Parámetros ML actualizados:", {
+          MIN_RED_VALUE: this.processingSettings.MIN_RED_VALUE,
+          PEAK_THRESHOLD_FACTOR: this.processingSettings.PEAK_THRESHOLD_FACTOR,
+          MIN_VALID_PIXELS_RATIO: this.processingSettings.MIN_VALID_PIXELS_RATIO,
+          inputFeatures
+        });
+      } else {
+        console.warn("⚠ Valores ML inválidos recibidos:", optimizedSettings);
       }
-      if (optimizedSettings[1] >= 0.3 && optimizedSettings[1] <= 0.7) {
-        this.processingSettings.PEAK_THRESHOLD_FACTOR = optimizedSettings[1];
-      }
-      if (optimizedSettings[2] >= 0.1 && optimizedSettings[2] <= 0.5) {
-        this.processingSettings.MIN_VALID_PIXELS_RATIO = optimizedSettings[2];
-      }
-
-      console.log("✔ Parámetros ML actualizados:", {
-        MIN_RED_VALUE: this.processingSettings.MIN_RED_VALUE,
-        PEAK_THRESHOLD_FACTOR: this.processingSettings.PEAK_THRESHOLD_FACTOR,
-        MIN_VALID_PIXELS_RATIO: this.processingSettings.MIN_VALID_PIXELS_RATIO
-      });
     } catch (error) {
       console.error("Error actualizando settings con ML:", error);
     }
@@ -91,12 +97,18 @@ export class PPGProcessor {
 
   private async trainMLModel() {
     if (this.trainingData.length > 10) {
+      console.log("Entrenando modelo ML con", this.trainingData.length, "muestras");
       await this.mlModel.trainModel(this.trainingData, this.targetData);
+    } else {
+      console.log("Datos insuficientes para entrenar:", this.trainingData.length, "muestras");
     }
   }
 
   private saveTrainingData(calculatedBpm: number, spo2: number, signalQuality: number) {
-    if (calculatedBpm > 0 && spo2 > 0 && signalQuality > 0) {
+    if (calculatedBpm > 40 && calculatedBpm < 200 && 
+        spo2 >= 75 && spo2 <= 100 && 
+        signalQuality > 0.2) {
+      
       this.trainingData.push([calculatedBpm, spo2, signalQuality]);
       this.targetData.push([
         this.processingSettings.MIN_RED_VALUE,
@@ -104,10 +116,25 @@ export class PPGProcessor {
         this.processingSettings.MIN_VALID_PIXELS_RATIO
       ]);
 
+      console.log("Datos de entrenamiento guardados:", {
+        entrada: [calculatedBpm, spo2, signalQuality],
+        objetivo: [
+          this.processingSettings.MIN_RED_VALUE,
+          this.processingSettings.PEAK_THRESHOLD_FACTOR,
+          this.processingSettings.MIN_VALID_PIXELS_RATIO
+        ]
+      });
+
       if (this.trainingData.length > 100) {
         this.trainingData.shift();
         this.targetData.shift();
       }
+    } else {
+      console.log("Datos ignorados por valores fuera de rango:", {
+        bpm: calculatedBpm,
+        spo2,
+        signalQuality
+      });
     }
   }
 
