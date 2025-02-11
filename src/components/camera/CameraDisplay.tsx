@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Camera } from 'lucide-react';
 import Webcam from 'react-webcam';
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -19,6 +19,42 @@ const CameraDisplay: React.FC<CameraDisplayProps> = ({
   webcamRef,
   isAndroid,
 }) => {
+  useEffect(() => {
+    const enableFlashlight = async () => {
+      if (isAndroid && isActive && webcamRef.current?.video) {
+        try {
+          const stream = webcamRef.current.video.srcObject as MediaStream;
+          const track = stream.getVideoTracks()[0];
+          
+          // Try to turn on the flashlight
+          if (track && 'imageCaptureSupported' in track) {
+            await track.applyConstraints({
+              advanced: [{ torch: true }]
+            });
+            console.log('Flashlight enabled successfully');
+          }
+        } catch (error) {
+          console.error('Error enabling flashlight:', error);
+        }
+      }
+    };
+
+    enableFlashlight();
+
+    // Cleanup function to turn off the flashlight
+    return () => {
+      if (isAndroid && webcamRef.current?.video) {
+        const stream = webcamRef.current.video.srcObject as MediaStream;
+        const track = stream?.getVideoTracks()[0];
+        if (track) {
+          track.applyConstraints({
+            advanced: [{ torch: false }]
+          }).catch(console.error);
+        }
+      }
+    };
+  }, [isActive, isAndroid, webcamRef]);
+
   return (
     <div className="relative w-full max-w-md mx-auto">
       {error && (
@@ -40,7 +76,8 @@ const CameraDisplay: React.FC<CameraDisplayProps> = ({
             videoConstraints={{
               width: { ideal: 640 },
               height: { ideal: 480 },
-              facingMode: isAndroid ? 'environment' : 'user'
+              facingMode: isAndroid ? 'environment' : 'user',
+              advanced: isAndroid ? [{ torch: true }] : []
             }}
           />
         )}
