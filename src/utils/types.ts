@@ -15,3 +15,22 @@ export interface PPGData {
   confidence: number;
   readings: VitalReading[];
 }
+
+export interface CalibrationData {
+  age: number;
+  height: number;
+  weight: number;
+  systolic: number;
+  diastolic: number;
+  deviceType: string;
+  calibrationDate?: Date;
+}
+
+export interface UserCalibration extends CalibrationData {
+  id: string;
+  userId: string;
+  isActive: boolean;
+  calibrationConstants: any;
+  lastCalibrationQuality: number;
+  calibrationHistory: any[];
+}

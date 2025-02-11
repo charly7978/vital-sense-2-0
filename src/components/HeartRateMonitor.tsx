@@ -1,9 +1,11 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Heart, Droplets, Activity, AlertTriangle, PlayCircle, StopCircle } from 'lucide-react';
+import { Heart, Droplets, Activity, AlertTriangle, PlayCircle, StopCircle, Settings } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import CameraView from './CameraView';
 import VitalChart from './VitalChart';
+import CalibrationDialog from './CalibrationDialog';
 import { PPGProcessor } from '../utils/ppgProcessor';
 import type { VitalReading } from '../utils/types';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,56 +22,26 @@ const HeartRateMonitor: React.FC = () => {
   const [readings, setReadings] = useState<VitalReading[]>([]);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [isStarted, setIsStarted] = useState<boolean>(false);
+  const [showCalibration, setShowCalibration] = useState<boolean>(false);
+  const [isCalibrated, setIsCalibrated] = useState<boolean>(false);
   const { toast } = useToast();
 
-  // Guardar las mediciones en Supabase
   useEffect(() => {
-    const saveVitalSigns = async () => {
-      if (bpm > 0 && spo2 > 0) {
-        try {
-          const vitalSignsData = {
-            heart_rate: Math.round(bpm),
-            spo2: Math.round(spo2),
-            systolic: Math.round(systolic),
-            diastolic: Math.round(diastolic),
-            has_arrhythmia: hasArrhythmia,
-            arrhythmia_details: { type: arrhythmiaType },
-            ppg_data: JSON.stringify({ readings }),
-            measurement_quality: 1.0,
-          };
+    checkCalibration();
+  }, []);
 
-          const { error } = await supabase
-            .from('vital_signs')
-            .insert(vitalSignsData);
+  const checkCalibration = async () => {
+    try {
+      const { data: calibrationData } = await supabase
+        .from('user_calibration')
+        .select('*')
+        .limit(1);
 
-          if (error) {
-            console.error('Error saving vital signs:', error);
-            toast({
-              variant: "destructive",
-              title: "Error al guardar los signos vitales",
-              description: "Por favor, intenta nuevamente."
-            });
-          } else {
-            toast({
-              title: "Medición guardada",
-              description: "Los signos vitales se han registrado correctamente."
-            });
-          }
-        } catch (error) {
-          console.error('Error in saveVitalSigns:', error);
-          toast({
-            variant: "destructive",
-            title: "Error inesperado",
-            description: "Ocurrió un error al procesar la medición."
-          });
-        }
-      }
-    };
-
-    if (isProcessing && bpm > 0) {
-      saveVitalSigns();
+      setIsCalibrated(!!calibrationData && calibrationData.length > 0);
+    } catch (error) {
+      console.error('Error checking calibration:', error);
     }
-  }, [bpm, spo2, systolic, diastolic, hasArrhythmia, arrhythmiaType, readings, isProcessing, toast]);
+  };
 
   const handleFrame = useCallback((imageData: ImageData) => {
     if (!isStarted) return;
@@ -108,8 +80,60 @@ const HeartRateMonitor: React.FC = () => {
     }
   };
 
+  const handleCalibrationComplete = async (calibrationData: any) => {
+    try {
+      const { error } = await supabase
+        .from('user_calibration')
+        .insert({
+          age: calibrationData.age,
+          height: calibrationData.height,
+          weight: calibrationData.weight,
+          reference_bp_systolic: calibrationData.systolic,
+          reference_bp_diastolic: calibrationData.diastolic,
+          reference_device_type: calibrationData.deviceType,
+          is_active: true
+        });
+
+      if (error) throw error;
+
+      setIsCalibrated(true);
+      setShowCalibration(false);
+      toast({
+        title: "Calibración completada",
+        description: "Los datos de calibración se han guardado correctamente."
+      });
+    } catch (error) {
+      console.error('Error saving calibration:', error);
+      toast({
+        variant: "destructive",
+        title: "Error en la calibración",
+        description: "No se pudieron guardar los datos de calibración."
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-semibold text-gray-100">Monitor de Signos Vitales</h2>
+        <Button
+          variant="outline"
+          onClick={() => setShowCalibration(true)}
+          className="flex items-center gap-2"
+        >
+          <Settings className="w-4 h-4" />
+          Calibración
+        </Button>
+      </div>
+
+      {!isCalibrated && (
+        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 mb-4">
+          <p className="text-yellow-300 text-sm">
+            Por favor, realice la calibración inicial para obtener mediciones más precisas.
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4 shadow-lg">
           <div className="flex items-center justify-between">
@@ -192,6 +216,12 @@ const HeartRateMonitor: React.FC = () => {
         <h3 className="text-lg font-medium mb-4 text-gray-100">Señal PPG en Tiempo Real</h3>
         <VitalChart data={readings} color="#ea384c" />
       </div>
+
+      <CalibrationDialog 
+        open={showCalibration} 
+        onOpenChange={setShowCalibration}
+        onComplete={handleCalibrationComplete}
+      />
     </div>
   );
 };
