@@ -1,4 +1,5 @@
-import React from 'react';
+
+import React, { useState } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import CameraView from './CameraView';
 import VitalChart from './VitalChart';
@@ -10,6 +11,7 @@ import SignalQualityIndicator from './vitals/SignalQualityIndicator';
 import MeasurementControls from './vitals/MeasurementControls';
 import { PPGProcessor } from '../utils/ppgProcessor';
 import { useVitals } from '@/contexts/VitalsContext';
+import type { SensitivitySettings } from '../utils/types';
 
 const ppgProcessor = new PPGProcessor();
 
@@ -235,3 +237,4 @@ const HeartRateMonitor: React.FC = () => {
 };
 
 export default HeartRateMonitor;
+
