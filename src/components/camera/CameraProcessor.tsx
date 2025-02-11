@@ -22,15 +22,10 @@ const CameraProcessor: React.FC<CameraProcessorProps> = ({
 
   useEffect(() => {
     let animationFrameId: number;
-    let lastProcessTime = 0;
-    const PROCESS_INTERVAL = 33; // ~30 FPS
+    let mounted = true;
 
     const processFrame = () => {
-      const now = Date.now();
-      
-      if (!isActive || !cameraInitialized || processingRef.current || 
-          now - lastProcessTime < PROCESS_INTERVAL) {
-        animationFrameId = requestAnimationFrame(processFrame);
+      if (!mounted || !isActive || !cameraInitialized || processingRef.current) {
         return;
       }
 
@@ -44,14 +39,12 @@ const CameraProcessor: React.FC<CameraProcessorProps> = ({
       }
 
       processingRef.current = true;
-      lastProcessTime = now;
 
       try {
-        // Asegurar que las dimensiones coincidan
         if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
           canvas.width = video.videoWidth;
           canvas.height = video.videoHeight;
-          console.log('Dimensiones de canvas actualizadas:', canvas.width, canvas.height);
+          console.log('Canvas dimensions updated:', canvas.width, canvas.height);
         }
 
         context.drawImage(video, 0, 0);
@@ -59,14 +52,14 @@ const CameraProcessor: React.FC<CameraProcessorProps> = ({
         
         frameCountRef.current++;
         if (frameCountRef.current % 30 === 0) {
-          console.log('Procesando frame:', frameCountRef.current, 
-                      'Dimensiones:', canvas.width, 'x', canvas.height);
+          console.log('Processing frame:', frameCountRef.current, 
+                      'Dimensions:', canvas.width, 'x', canvas.height);
         }
         
         onFrame(imageData);
 
       } catch (error) {
-        console.error('Error procesando frame:', error);
+        console.error('Frame processing error:', error);
         toast({
           variant: "destructive",
           title: "Error",
@@ -74,17 +67,19 @@ const CameraProcessor: React.FC<CameraProcessorProps> = ({
         });
       } finally {
         processingRef.current = false;
+        if (mounted && isActive) {
+          animationFrameId = requestAnimationFrame(processFrame);
+        }
       }
-
-      animationFrameId = requestAnimationFrame(processFrame);
     };
 
     if (isActive && cameraInitialized) {
-      console.log('Iniciando procesamiento de frames');
+      console.log('Starting frame processing');
       animationFrameId = requestAnimationFrame(processFrame);
     }
 
     return () => {
+      mounted = false;
       if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
       }

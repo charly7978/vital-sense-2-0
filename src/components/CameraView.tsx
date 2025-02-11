@@ -25,45 +25,51 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
     setIsAndroid(userAgent.includes('android'));
   }, []);
 
+  const handleCameraInitialized = (stream: MediaStream) => {
+    console.log('Camera initialized, setting up video stream');
+    streamRef.current = stream;
+    
+    if (webcamRef.current?.video) {
+      webcamRef.current.video.srcObject = stream;
+      webcamRef.current.video.play().catch(error => {
+        console.error('Error playing video:', error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "No se pudo reproducir el video de la cámara"
+        });
+      });
+    }
+    
+    setCameraInitialized(true);
+    setError(null);
+  };
+
+  const cleanup = () => {
+    console.log('Cleaning up camera resources');
+    if (streamRef.current) {
+      const tracks = streamRef.current.getTracks();
+      tracks.forEach(track => {
+        track.stop();
+        console.log(`Stopped track: ${track.kind}`);
+      });
+      streamRef.current = null;
+    }
+    setCameraInitialized(false);
+  };
+
+  useEffect(() => {
+    if (!isActive) {
+      cleanup();
+    }
+    return cleanup;
+  }, [isActive]);
+
   useEffect(() => {
     if (webcamRef.current?.video) {
       videoRef.current = webcamRef.current.video;
     }
   }, [webcamRef.current]);
-
-  const handleCameraInitialized = (stream: MediaStream) => {
-    // Detener cualquier stream existente
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => {
-        track.stop();
-        streamRef.current?.removeTrack(track);
-      });
-    }
-
-    streamRef.current = stream;
-    if (webcamRef.current?.video) {
-      webcamRef.current.video.srcObject = stream;
-      webcamRef.current.video.play().catch(console.error);
-    }
-    setCameraInitialized(true);
-    setError(null);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!isActive && streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-      setCameraInitialized(false);
-    }
-  }, [isActive]);
 
   return (
     <>
@@ -72,12 +78,14 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
         isActive={isActive}
         onError={setError}
       />
-      <CameraProcessor
-        videoRef={videoRef}
-        onFrame={onFrame}
-        isActive={isActive}
-        cameraInitialized={cameraInitialized}
-      />
+      {cameraInitialized && (
+        <CameraProcessor
+          videoRef={videoRef}
+          onFrame={onFrame}
+          isActive={isActive && cameraInitialized}
+          cameraInitialized={cameraInitialized}
+        />
+      )}
       <CameraDisplay
         error={error}
         isActive={isActive}
