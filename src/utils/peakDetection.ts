@@ -1,10 +1,9 @@
-
 export class PeakDetector {
   private adaptiveThreshold = 0;
-  private readonly minPeakDistance = 500; // ms - mínimo tiempo entre latidos (120 BPM máximo)
+  private readonly minPeakDistance = 300; // Reducido para detectar frecuencias cardíacas más altas
   private lastPeakTime = 0;
   private readonly bufferSize = 10;
-  private readonly minAmplitude = 0.2; // Reducido de 0.3
+  private readonly minAmplitude = 0.1; // Reducido significativamente
   private readonly adaptiveRate = 0.15;
   private peakBuffer: number[] = [];
   private timeBuffer: number[] = [];
@@ -13,23 +12,11 @@ export class PeakDetector {
   isRealPeak(currentValue: number, now: number, signalBuffer: number[]): boolean {
     this.frameCount++;
     
-    // Log más frecuente
-    if (this.frameCount % 5 === 0) {
-      console.log('Análisis de pico:', {
-        currentValue,
-        threshold: this.adaptiveThreshold,
-        timeSinceLastPeak: now - this.lastPeakTime,
-        bufferLength: signalBuffer.length,
-        frameCount: this.frameCount
-      });
-    }
-
     if (now - this.lastPeakTime < this.minPeakDistance) {
       return false;
     }
 
-    if (signalBuffer.length < 5) {
-      console.log('Buffer insuficiente para análisis');
+    if (signalBuffer.length < 3) { // Reducido el requisito de buffer
       return false;
     }
 
@@ -40,30 +27,18 @@ export class PeakDetector {
     );
 
     // Umbral adaptativo más sensible
-    this.adaptiveThreshold = avgValue + stdDev;
+    this.adaptiveThreshold = avgValue + (stdDev * 0.5); // Reducido el multiplicador
 
     const isValidShape = this.validatePeakShape(currentValue, signalBuffer);
     const hasSignificantAmplitude = currentValue > this.adaptiveThreshold && 
                                   currentValue > this.minAmplitude;
-    const isLocalMaximum = currentValue > Math.max(...signalBuffer.slice(-3));
+    const isLocalMaximum = currentValue > Math.max(...signalBuffer.slice(-2)); // Reducido el número de muestras
 
-    if (hasSignificantAmplitude) {
-      console.log('Validación de pico:', {
-        isValidShape,
-        hasSignificantAmplitude,
-        isLocalMaximum,
-        currentValue,
-        threshold: this.adaptiveThreshold,
-        avgValue,
-        stdDev
-      });
-    }
-
-    if (isValidShape && hasSignificantAmplitude && isLocalMaximum) {
+    if (hasSignificantAmplitude && isLocalMaximum) {
       const currentInterval = now - this.lastPeakTime;
-      const isValidInterval = this.validatePeakInterval(currentInterval);
-
-      if (isValidInterval) {
+      
+      // Más permisivo con los intervalos
+      if (currentInterval >= this.minPeakDistance) {
         this.lastPeakTime = now;
         this.updatePeakHistory(currentValue, now);
         console.log('¡LATIDO DETECTADO!', {
@@ -73,11 +48,6 @@ export class PeakDetector {
           bpmEstimado: 60000 / currentInterval
         });
         return true;
-      } else {
-        console.log('Intervalo inválido:', {
-          currentInterval,
-          minAllowed: this.minPeakDistance
-        });
       }
     }
 
@@ -85,21 +55,15 @@ export class PeakDetector {
   }
 
   private validatePeakShape(currentValue: number, signalBuffer: number[]): boolean {
-    if (signalBuffer.length < 5) return false;
+    if (signalBuffer.length < 3) return true; // Más permisivo
 
-    const last5Values = [...signalBuffer.slice(-4), currentValue];
+    const last3Values = [...signalBuffer.slice(-2), currentValue];
     
-    // Criterios más relajados para la forma del pico
-    const isRising = last5Values[3] > last5Values[2] && 
-                    last5Values[2] > last5Values[1];
+    // Criterios más simples
+    const isRising = last3Values[2] > last3Values[1];
+    const isPeak = currentValue > last3Values[1];
     
-    const isPeak = currentValue > last5Values[3];
-    
-    const leftSlope = (currentValue - last5Values[3]) / 1;
-    const rightSlope = Math.abs((last5Values[3] - last5Values[2]) / 1);
-    const isSimilarSlope = Math.abs(leftSlope - rightSlope) < 0.8; // Más tolerante
-
-    return isRising && isPeak && isSimilarSlope;
+    return isRising && isPeak;
   }
 
   private validatePeakInterval(currentInterval: number): boolean {

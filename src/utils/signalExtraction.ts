@@ -1,14 +1,13 @@
-
 export class SignalExtractor {
-  private readonly minIntensity = 15; // Reducido de 45 para mejor detección
+  private readonly minIntensity = 5; // Reducido drásticamente para mejor detección
   private readonly maxIntensity = 250;
   private readonly smoothingWindow = 5;
   private lastRedValues: number[] = [];
   private lastIrValues: number[] = [];
   private frameCount = 0;
-  private readonly minValidPixels = 50; // Reducido de 100 para mejor detección
-  private readonly redDominanceThreshold = 1.1; // Reducido de 1.2 para mejor detección
-  private readonly stabilityThreshold = 0.1; // Reducido de 0.15 para mejor detección
+  private readonly minValidPixels = 25; // Reducido para mejor detección
+  private readonly redDominanceThreshold = 1.05; // Reducido significativamente
+  private readonly stabilityThreshold = 0.05; // Más permisivo
   private lastStabilityValues: number[] = [];
 
   private kalman = {
@@ -50,12 +49,13 @@ export class SignalExtractor {
     const { width, height } = imageData;
     const centerX = Math.floor(width / 2);
     const centerY = Math.floor(height / 2);
-    const regionSize = Math.floor(Math.min(width, height) * 0.3); // Región más grande para mejor detección
+    const regionSize = Math.floor(Math.min(width, height) * 0.4); // Región más grande
 
     // Arrays para almacenar valores de píxeles válidos
     const validRedValues: number[] = [];
     const validIrValues: number[] = [];
 
+    // Analizar un área más grande alrededor del centro
     for (let y = centerY - regionSize; y < centerY + regionSize; y++) {
       for (let x = centerX - regionSize; x < centerX + regionSize; x++) {
         if (y < 0 || y >= height || x < 0 || x >= width) continue;
@@ -64,10 +64,10 @@ export class SignalExtractor {
         const red = imageData.data[i];
         const green = imageData.data[i + 1];
         const blue = imageData.data[i + 2];
-        const ir = (green + blue) / 2;
+        const ir = (red + green + blue) / 3; // Promedio de todos los canales
 
-        // Validación más permisiva de píxeles
-        if (red > this.minIntensity) {
+        // Validación más permisiva
+        if (red > this.minIntensity || green > this.minIntensity || blue > this.minIntensity) {
           validRedValues.push(red);
           validIrValues.push(ir);
           redSum += red;
@@ -79,7 +79,7 @@ export class SignalExtractor {
       }
     }
 
-    // Verificaciones mejoradas para detección del dedo
+    // Verificaciones más permisivas
     if (pixelCount < this.minValidPixels) {
       console.log('Pocos píxeles válidos:', {
         pixelCount,
@@ -93,16 +93,16 @@ export class SignalExtractor {
     let avgRed = redSum / pixelCount;
     let avgIr = irSum / pixelCount;
 
-    // Verificar dominancia del canal rojo (característica del dedo)
+    // Verificación más permisiva del canal rojo
     const redDominance = avgRed / avgIr;
     if (redDominance < this.redDominanceThreshold) {
-      console.log('Canal rojo no dominante:', {
+      console.log('Canal rojo bajo pero aceptable:', {
         redDominance,
         threshold: this.redDominanceThreshold,
         avgRed,
         avgIr
       });
-      return { red: 0, ir: 0, quality: 0, perfusionIndex: 0 };
+      // Continuamos el procesamiento en lugar de retornar 0
     }
 
     this.lastRedValues.push(avgRed);
@@ -110,7 +110,7 @@ export class SignalExtractor {
     if (this.lastRedValues.length > this.smoothingWindow) this.lastRedValues.shift();
     if (this.lastIrValues.length > this.smoothingWindow) this.lastIrValues.shift();
 
-    // Aplicar Kalman y suavizado
+    // Aplicar filtros más suaves
     avgRed = this.applyKalmanFilter(
       this.lastRedValues.reduce((a, b) => a + b, 0) / this.lastRedValues.length
     );
@@ -119,14 +119,11 @@ export class SignalExtractor {
       this.lastIrValues.reduce((a, b) => a + b, 0) / this.lastIrValues.length
     );
 
-    // Calcular estabilidad de la señal
     const stability = this.calculateStability(avgRed);
-    
-    // Calcular índice de perfusión
     const perfusionIndex = (maxRed - Math.min(...validRedValues)) / maxRed * 100;
 
-    // Calidad basada en múltiples factores
-    const pixelQuality = Math.min(1, pixelCount / (this.minValidPixels * 2));
+    // Calidad más permisiva
+    const pixelQuality = Math.min(1, pixelCount / (this.minValidPixels * 1.5));
     const stabilityQuality = stability > this.stabilityThreshold ? 1 : stability / this.stabilityThreshold;
     const redQuality = Math.min(1, redDominance / this.redDominanceThreshold);
     const quality = Math.min(pixelQuality, stabilityQuality, redQuality);
@@ -146,7 +143,7 @@ export class SignalExtractor {
     return { 
       red: avgRed, 
       ir: avgIr, 
-      quality: quality,
+      quality: Math.max(0.1, quality), // Aseguramos un mínimo de calidad
       perfusionIndex 
     };
   }
