@@ -68,6 +68,7 @@ export class PPGProcessor {
     
     try {
       if (now - this.lastProcessingTime < this.minProcessingInterval) {
+        const { red, ir, quality, fingerPresent } = this.signalExtractor.extractChannels(imageData);
         return {
           bpm: 0,
           spo2: 0,
@@ -75,12 +76,12 @@ export class PPGProcessor {
           diastolic: 0,
           hasArrhythmia: false,
           arrhythmiaType: 'Normal',
-          signalQuality: 0,
+          signalQuality: quality,
           confidence: 0,
           readings: [],
           isPeak: false,
-          redValue: 0,
-          fingerPresent: false,
+          redValue: red,
+          fingerPresent: fingerPresent,
           hrvMetrics: {
             sdnn: 0,
             rmssd: 0,
@@ -106,12 +107,12 @@ export class PPGProcessor {
           diastolic: 0,
           hasArrhythmia: false,
           arrhythmiaType: 'Normal',
-          signalQuality: 0,
+          signalQuality: quality,
           confidence: 0,
           readings: this.readings,
           isPeak: false,
           redValue: red,
-          fingerPresent: false,
+          fingerPresent: fingerPresent,
           hrvMetrics: {
             sdnn: 0,
             rmssd: 0,
@@ -197,6 +198,7 @@ export class PPGProcessor {
         bpm: this.lastValidBpm,
         spo2: this.lastValidSpO2,
         quality,
+        fingerPresent,
         bufferSize: this.redBuffer.length,
         peakCount: this.peakTimes.length
       });
@@ -213,7 +215,7 @@ export class PPGProcessor {
         readings: this.readings,
         isPeak,
         redValue: red,
-        fingerPresent: true,
+        fingerPresent: fingerPresent,
         hrvMetrics: {
           sdnn: hrvAnalysis.sdnn,
           rmssd: hrvAnalysis.rmssd,
