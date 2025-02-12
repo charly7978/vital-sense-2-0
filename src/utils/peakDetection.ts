@@ -1,18 +1,17 @@
-
 export class PeakDetector {
   private adaptiveThreshold = 0;
   private readonly minPeakDistance = 250;
   private lastPeakTime = 0;
-  private readonly bufferSize = 30; // Aumentado para mejor análisis estadístico
-  private readonly minAmplitude = 0.03; // Reducido significativamente basado en investigación
-  private readonly adaptiveRate = 0.15;
+  private readonly bufferSize = 30; 
+  private readonly minAmplitude = 0.01; // Reducido drásticamente para mayor sensibilidad
+  private readonly adaptiveRate = 0.2; // Aumentado para adaptación más rápida
   private peakBuffer: number[] = [];
   private timeBuffer: number[] = [];
   private frameCount = 0;
   private readonly maxBPM = 180;
   private readonly minBPM = 40;
-  private lastPeakValues: number[] = []; // Nuevo: histórico de valores de picos
-  private readonly peakMemory = 5; // Nuevo: cantidad de picos a recordar
+  private lastPeakValues: number[] = [];
+  private readonly peakMemory = 5;
 
   isRealPeak(currentValue: number, now: number, signalBuffer: number[]): boolean {
     this.frameCount++;
@@ -28,28 +27,25 @@ export class PeakDetector {
       return false;
     }
 
-    // Análisis estadístico mejorado
     const recentValues = signalBuffer.slice(-this.bufferSize);
     const avgValue = recentValues.reduce((a, b) => a + b, 0) / recentValues.length;
     const stdDev = Math.sqrt(
       recentValues.reduce((a, b) => a + Math.pow(b - avgValue, 2), 0) / recentValues.length
     );
 
-    // Nuevo: Análisis de tendencia
     const trend = this.calculateTrend(recentValues);
     const detrended = currentValue - trend;
 
-    // Umbral adaptativo basado en ventana móvil y tendencia
     const dynamicThreshold = this.calculateDynamicThreshold(recentValues, avgValue, stdDev);
     this.adaptiveThreshold = (this.adaptiveThreshold * (1 - this.adaptiveRate)) + 
                             (dynamicThreshold * this.adaptiveRate);
 
-    // Validaciones más precisas
+    // Validaciones más permisivas
     const hasSignificantAmplitude = detrended > this.minAmplitude * stdDev;
-    const isAboveThreshold = currentValue > this.adaptiveThreshold;
+    const isAboveThreshold = currentValue > (this.adaptiveThreshold * 0.8); // Reducido el umbral un 20%
     const isPotentialPeak = this.validatePeakCharacteristics(currentValue, signalBuffer, avgValue, stdDev);
 
-    if (hasSignificantAmplitude && isAboveThreshold && isPotentialPeak) {
+    if ((hasSignificantAmplitude || isAboveThreshold) && isPotentialPeak) { // Cambiado AND por OR para más sensibilidad
       const currentInterval = now - this.lastPeakTime;
       
       if (this.validatePeakTiming(currentInterval, now)) {
@@ -98,7 +94,6 @@ export class PeakDetector {
     const skewness = this.calculateSkewness(values, mean, stdDev);
     const kurtosis = this.calculateKurtosis(values, mean, stdDev);
     
-    // Ajuste del umbral basado en la forma de la distribución
     const thresholdFactor = 0.4 + 
                            Math.abs(skewness) * 0.1 + 
                            Math.max(0, kurtosis - 3) * 0.05;
@@ -122,23 +117,20 @@ export class PeakDetector {
     const window = 4;
     const samples = signalBuffer.slice(-window);
     
-    // Análisis de primera y segunda derivada
     const firstDerivative = samples.map((v, i, arr) => i > 0 ? v - arr[i-1] : 0);
     const secondDerivative = firstDerivative.map((v, i, arr) => i > 0 ? v - arr[i-1] : 0);
     
-    // Verificación de forma de onda PPG típica
-    const isRising = firstDerivative[firstDerivative.length - 2] > 0;
-    const isPeaking = firstDerivative[firstDerivative.length - 1] < 0;
-    const isConcaveDown = secondDerivative[secondDerivative.length - 1] < 0;
+    const isRising = firstDerivative[firstDerivative.length - 2] > -0.1; // Permite pendientes casi planas
+    const isPeaking = firstDerivative[firstDerivative.length - 1] < 0.1;
+    const isConcaveDown = secondDerivative[secondDerivative.length - 1] < 0.1;
     
-    // Análisis de amplitud relativa
     const relativeAmplitude = (currentValue - mean) / stdDev;
     const isSignificant = relativeAmplitude > this.minAmplitude;
     
-    return isRising && isPeaking && isConcaveDown && isSignificant;
+    return (isRising && isPeaking) || (isConcaveDown && isSignificant); // Más permisivo con OR
   }
 
-  private validatePeakTiming(currentInterval: number, now: number): boolean {
+  private validatePeakTiming(currentInterval: number): boolean {
     const maxInterval = (60000 / this.minBPM);
     const minInterval = (60000 / this.maxBPM);
     
@@ -146,7 +138,6 @@ export class PeakDetector {
       return false;
     }
 
-    // Análisis de regularidad del ritmo
     if (this.timeBuffer.length >= 3) {
       const recentIntervals = this.timeBuffer.slice(-3)
         .map((t, i, arr) => i > 0 ? t - arr[i-1] : 0)
@@ -156,8 +147,7 @@ export class PeakDetector {
       const variability = recentIntervals.reduce((acc, interval) => 
         acc + Math.pow(interval - avgInterval, 2), 0) / recentIntervals.length;
       
-      // Permitir más variabilidad si el ritmo es consistente
-      const allowedVariation = Math.min(0.4, 0.3 + variability / avgInterval);
+      const allowedVariation = Math.min(0.5, 0.4 + variability / avgInterval); // Aumentado a 0.5
       
       return Math.abs(currentInterval - avgInterval) <= avgInterval * allowedVariation;
     }
@@ -204,7 +194,6 @@ export class PeakDetector {
     this.peakBuffer.push(peakValue);
     this.timeBuffer.push(timestamp);
     
-    // Actualizar histórico de valores de picos
     this.lastPeakValues.push(peakValue);
     if (this.lastPeakValues.length > this.peakMemory) {
       this.lastPeakValues.shift();
