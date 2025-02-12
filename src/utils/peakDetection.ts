@@ -1,3 +1,4 @@
+
 export class PeakDetector {
   private adaptiveThreshold = 0;
   private readonly minPeakDistance = 180; // Reducido para mejor detección
@@ -13,7 +14,7 @@ export class PeakDetector {
   private lastPeakValues: number[] = [];
   private readonly peakMemory = 5;
 
-  isRealPeak(currentValue: number, now: number, signalBuffer: number[], sensitivityFactor: number = 1): boolean {
+  isRealPeak(currentValue: number, now: number, signalBuffer: number[]): boolean {
     this.frameCount++;
     
     const minInterval = (60000 / this.maxBPM);
@@ -37,7 +38,7 @@ export class PeakDetector {
     const detrended = currentValue - trend;
 
     // Mejorado el cálculo del umbral dinámico para mayor sensibilidad
-    const dynamicThreshold = this.calculateDynamicThreshold(recentValues, avgValue, stdDev) * sensitivityFactor;
+    const dynamicThreshold = this.calculateDynamicThreshold(recentValues, avgValue, stdDev);
     this.adaptiveThreshold = (this.adaptiveThreshold * (1 - this.adaptiveRate)) + 
                             (dynamicThreshold * this.adaptiveRate);
 

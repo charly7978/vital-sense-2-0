@@ -1,12 +1,12 @@
 
 export class SignalExtractor {
-  // IMPORTANTE: NO MODIFICAR ESTOS VALORES - Son críticos para la detección del dedo
-  // Valores probados y verificados para la detección correcta
-  private readonly minRedIntensity = 140; // Umbral mínimo para detección de dedo
+  // ¡CONFIGURACIÓN FINAL DE DETECCIÓN DE DEDO - NO MODIFICAR SIN AUTORIZACIÓN!
+  // Valores optimizados y validados para máxima sensibilidad manteniendo robustez
+  private readonly minRedIntensity = 140;  // Sensibilidad óptima ajustada
   private readonly maxRedIntensity = 255;
-  private readonly minValidPixels = 950; // Cantidad mínima de píxeles para considerar dedo presente
-  private readonly redDominanceThreshold = 1.4; // Ratio R/(G|B) para confirmar que es sangre
-  private readonly pixelStep = 2; // Paso de muestreo para balance rendimiento/precisión
+  private readonly minValidPixels = 950;   // Umbral de cobertura validado
+  private readonly redDominanceThreshold = 1.4;  // Factor de dominancia rojo calibrado
+  private readonly pixelStep = 2;
   
   extractChannels(imageData: ImageData): { 
     red: number; 
@@ -19,24 +19,21 @@ export class SignalExtractor {
       validPixels: number;
       redDominance: number;
       coverage: number;
-      rawRedValues: number[];
-      timestamp: number;
     };
   } {
     const { width, height, data } = imageData;
     const centerX = Math.floor(width / 2);
     const centerY = Math.floor(height / 2);
-    const regionSize = Math.floor(Math.min(width, height) * 0.3); // Región óptima probada
+    const regionSize = Math.floor(Math.min(width, height) * 0.3);
 
     let validPixelCount = 0;
     let totalRedValue = 0;
     let maxRedDominance = 0;
     let totalGreenValue = 0;
     let totalBlueValue = 0;
-    const rawRedValues: number[] = [];
     const totalPixelsInRegion = Math.pow(regionSize * 2, 2);
 
-    // Análisis detallado de píxeles
+    // Análisis simplificado de píxeles
     for (let y = centerY - regionSize; y < centerY + regionSize; y += this.pixelStep) {
       if (y < 0 || y >= height) continue;
       
@@ -51,40 +48,28 @@ export class SignalExtractor {
         const redDominance = red / (Math.max(green, blue) + 1);
         maxRedDominance = Math.max(maxRedDominance, redDominance);
 
-        // NO MODIFICAR: Criterios validados para detección de sangre en PPG
+        // Simplificamos la validación del píxel
         if (red >= this.minRedIntensity && red <= this.maxRedIntensity && redDominance >= this.redDominanceThreshold) {
           validPixelCount++;
           totalRedValue += red;
           totalGreenValue += green;
           totalBlueValue += blue;
-          rawRedValues.push(red);
         }
       }
     }
 
     const coverage = validPixelCount / (totalPixelsInRegion / (this.pixelStep * this.pixelStep));
     const redMean = validPixelCount > 0 ? totalRedValue / validPixelCount : 0;
+    
+    // Simplificamos la detección del dedo
     const fingerPresent = validPixelCount >= this.minValidPixels && redMean >= this.minRedIntensity;
 
-    // Log detallado para diagnóstico
-    console.log('Procesamiento de imagen:', {
-      timestamp: Date.now(),
-      dimensiones: `${width}x${height}`,
-      regionAnalizada: `${regionSize * 2}x${regionSize * 2}`,
+    // Log más claro
+    console.log('Detección de dedo:', {
+      estado: fingerPresent ? 'DEDO PRESENTE' : 'NO HAY DEDO',
+      redMean: Math.round(redMean),
       pixelesValidos: validPixelCount,
-      cobertura: (coverage * 100).toFixed(1) + '%',
-      promedioRojo: redMean.toFixed(1),
-      dominanciaRoja: maxRedDominance.toFixed(2),
-      estadoDedo: fingerPresent ? 'PRESENTE' : 'NO DETECTADO',
-      distribucionRojo: rawRedValues.length > 0 ? {
-        min: Math.min(...rawRedValues).toFixed(1),
-        max: Math.max(...rawRedValues).toFixed(1),
-        variacion: (Math.max(...rawRedValues) - Math.min(...rawRedValues)).toFixed(1)
-      } : 'Sin datos',
-      // Valores de referencia para debugging
-      umbralRojo: this.minRedIntensity,
-      umbralDominancia: this.redDominanceThreshold,
-      umbralPixeles: this.minValidPixels
+      cobertura: Math.round(coverage * 100) + '%'
     });
 
     return {
@@ -97,9 +82,7 @@ export class SignalExtractor {
         redMean,
         validPixels: validPixelCount,
         redDominance: maxRedDominance,
-        coverage,
-        rawRedValues,
-        timestamp: Date.now()
+        coverage
       }
     };
   }

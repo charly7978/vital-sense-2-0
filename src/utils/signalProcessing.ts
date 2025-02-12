@@ -1,3 +1,4 @@
+
 import { PTTProcessor } from './pttProcessor';
 import { PPGFeatureExtractor } from './ppgFeatureExtractor';
 import { SignalFilter } from './signalFilter';
@@ -11,8 +12,8 @@ export class SignalProcessor {
   private readonly spO2CalibrationCoefficients = {
     a: 110,
     b: 25,
-    c: 1.1,
-    perfusionIndexThreshold: 0.3
+    c: 1,
+    perfusionIndexThreshold: 0.2
   };
 
   private readonly pttProcessor: PTTProcessor;
@@ -37,7 +38,7 @@ export class SignalProcessor {
       const spo2Cal = calibrationData.spo2_calibration_data;
       this.spO2CalibrationCoefficients.a = spo2Cal.a || 110;
       this.spO2CalibrationCoefficients.b = spo2Cal.b || 25;
-      this.spO2CalibrationCoefficients.c = spo2Cal.c || 1.1;
+      this.spO2CalibrationCoefficients.c = spo2Cal.c || 1;
     }
   }
 
@@ -71,9 +72,8 @@ export class SignalProcessor {
     irAC /= (windowSize - 1);
     
     const R = ((redAC * irDC) / (irAC * redDC)) * this.spO2CalibrationCoefficients.c;
-    const correctionFactor = Math.max(0.9, Math.min(1.1, 1.0 - (redAC - irAC) / 5000));
-    let spo2 = Math.round((this.spO2CalibrationCoefficients.a - 
-                        this.spO2CalibrationCoefficients.b * R) * correctionFactor);
+    let spo2 = Math.round(this.spO2CalibrationCoefficients.a - 
+                         this.spO2CalibrationCoefficients.b * R);
     
     let confidence = 1.0;
     
@@ -84,7 +84,7 @@ export class SignalProcessor {
     const signalQuality = this.qualityAnalyzer.analyzeSignalQuality(filteredRed);
     confidence *= signalQuality;
     
-    spo2 = Math.min(Math.max(spo2, 80), 100);
+    spo2 = Math.min(Math.max(spo2, 70), 100);
     confidence = Math.min(Math.max(confidence * 100, 0), 100);
     
     return { spo2, confidence };
@@ -164,9 +164,9 @@ export class SignalProcessor {
     const { augmentationIndex, stiffnessIndex } = ppgFeatures;
 
     const coefficients = {
-      ptt: -0.8,
-      aix: 25,
-      si: 2.5,
+      ptt: -0.9,
+      aix: 30,
+      si: 3,
       baselineSys: 120,
       baselineDia: 80
     };
@@ -186,10 +186,10 @@ export class SignalProcessor {
     );
 
     systolic = Math.min(Math.max(systolic, 90), 180);
-    diastolic = Math.min(Math.max(diastolic, 60), 110);
+    diastolic = Math.min(Math.max(diastolic, 60), 120);
 
-    if (systolic <= diastolic + 30) {
-      systolic = diastolic + 30;
+    if (systolic <= diastolic) {
+      systolic = diastolic + 40;
     }
 
     return { systolic, diastolic };
