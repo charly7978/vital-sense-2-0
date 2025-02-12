@@ -363,6 +363,60 @@ export type Database = {
           },
         ]
       }
+      ppg_calibration: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean | null
+          max_red_intensity: number
+          min_red_intensity: number
+          min_valid_pixels: number
+          name: string
+          pixel_step: number
+          red_dominance_threshold: number
+          roi_scale: number
+          updated_at: string
+          validated_by: string | null
+          validation_date: string | null
+          validation_score: number | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_red_intensity: number
+          min_red_intensity: number
+          min_valid_pixels: number
+          name: string
+          pixel_step: number
+          red_dominance_threshold: number
+          roi_scale: number
+          updated_at?: string
+          validated_by?: string | null
+          validation_date?: string | null
+          validation_score?: number | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_red_intensity?: number
+          min_red_intensity?: number
+          min_valid_pixels?: number
+          name?: string
+          pixel_step?: number
+          red_dominance_threshold?: number
+          roi_scale?: number
+          updated_at?: string
+          validated_by?: string | null
+          validation_date?: string | null
+          validation_score?: number | null
+        }
+        Relationships: []
+      }
       ppg_signals: {
         Row: {
           created_at: string | null
