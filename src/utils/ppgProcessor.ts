@@ -101,7 +101,7 @@ export class PPGProcessor {
    */
   async processFrame(imageData: ImageData): Promise<PPGData | null> {
     const now = Date.now();
-    
+
     try {
       // Control de frecuencia de procesamiento
       if (now - this.lastProcessingTime < this.minProcessingInterval) {
@@ -109,33 +109,45 @@ export class PPGProcessor {
       }
       this.lastProcessingTime = now;
 
-      // Extracción de señales de los canales de color
+      // 🔴 Paso 1: Extraer y validar la señal
       const extractionResult = this.signalExtractor.extractChannels(imageData);
-      const { red, ir, quality, diagnostics } = extractionResult;
-      
-      // Log detallado del frame procesado
-      console.log('Frame procesado:', {
+      const { red, ir, quality, perfusionIndex, diagnostics } = extractionResult;
+
+      console.log("🔍 Datos extraídos:", {
         timestamp: now,
-        frameInterval: now - this.lastProcessingTime,
-        rawRedValue: red.toFixed(3),
-        signalQuality: (quality * 100).toFixed(1) + '%',
+        red: red.toFixed(2),
+        ir: ir.toFixed(2),
+        quality: (quality * 100).toFixed(1) + "%",
+        perfusion: (perfusionIndex * 100).toFixed(1) + "%",
         pixelesValidos: diagnostics.validPixels,
-        variacionRojo: diagnostics.rawRedValues.length > 0 ? 
-          (Math.max(...diagnostics.rawRedValues) - Math.min(...diagnostics.rawRedValues)).toFixed(3) : 'N/A'
+        variacionRojo: diagnostics.rawRedValues.length > 0 
+          ? (Math.max(...diagnostics.rawRedValues) - Math.min(...diagnostics.rawRedValues)).toFixed(3) 
+          : "N/A"
       });
-      
-      // Validación de calidad de señal
-      if (quality < this.qualityThreshold || red < this.processingSettings.MIN_RED_VALUE) {
-        console.log('Señal insuficiente:', {
-          calidad: (quality * 100).toFixed(1) + '%',
+
+      // 🔴 Paso 2: Validaciones iniciales rigurosas
+      if (red < this.processingSettings.MIN_RED_VALUE) {
+        console.log("⚠ No se detecta el dedo correctamente:", {
           valorRojo: red.toFixed(1),
-          umbralCalidad: (this.qualityThreshold * 100).toFixed(1) + '%',
-          umbralRojo: this.processingSettings.MIN_RED_VALUE
+          umbralMinimo: this.processingSettings.MIN_RED_VALUE
         });
         return null;
       }
-      
-      // Amplificación y procesamiento de señal
+
+      if (quality < this.qualityThreshold) {
+        console.log("⚠ Calidad de señal insuficiente:", {
+          calidad: (quality * 100).toFixed(1) + "%",
+          umbralRequerido: (this.qualityThreshold * 100).toFixed(1) + "%"
+        });
+        return null;
+      }
+
+      if (diagnostics.validPixels / (imageData.width * imageData.height) < this.processingSettings.MIN_VALID_PIXELS_RATIO) {
+        console.log("⚠ Área de detección insuficiente");
+        return null;
+      }
+
+      // 🔴 Paso 3: Procesamiento de señal
       const amplifiedRed = red * this.sensitivitySettings.signalAmplification;
       const amplifiedIr = ir * this.sensitivitySettings.signalAmplification;
       
@@ -144,7 +156,7 @@ export class PPGProcessor {
       
       // Filtrado y normalización
       const filteredRed = this.signalFilter.lowPassFilter(this.redBuffer, 
-        5 * this.sensitivitySettings.noiseReduction);
+        4 * this.sensitivitySettings.noiseReduction);
       const normalizedValue = this.signalNormalizer.normalizeSignal(
         filteredRed[filteredRed.length - 1]
       );
@@ -153,7 +165,35 @@ export class PPGProcessor {
       this.readings.push({ timestamp: now, value: normalizedValue });
       this.signalBuffer.push(normalizedValue);
 
-      // Limpieza de datos antiguos
+      // 🔴 Paso 4: Detección de picos y análisis
+      const isPeak = this.peakDetector.isRealPeak(
+        normalizedValue, 
+        now, 
+        this.signalBuffer,
+        this.sensitivitySettings.peakDetection
+      );
+
+      if (isPeak) {
+        this.peakTimes.push(now);
+        await this.beepPlayer.playBeep('heartbeat').catch(console.error);
+      }
+
+      // 🔴 Paso 5: Cálculo de métricas vitales
+      const spo2Result = this.signalProcessor.calculateSpO2(
+        this.redBuffer, 
+        this.irBuffer,
+        perfusionIndex
+      );
+
+      const hrvIntervals = [];
+      for (let i = 1; i < this.peakTimes.length; i++) {
+        hrvIntervals.push(this.peakTimes[i] - this.peakTimes[i-1]);
+      }
+
+      const hrvAnalysis = this.signalProcessor.analyzeHRV(hrvIntervals);
+      const bpEstimation = this.signalProcessor.estimateBloodPressure(filteredRed, this.peakTimes);
+
+      // Limpieza de buffers antiguos
       this.dataManager.cleanupData(
         this.readings,
         this.redBuffer,
@@ -164,51 +204,12 @@ export class PPGProcessor {
         this.bufferSize
       );
 
-      // Detección de picos (latidos)
-      const isPeak = this.peakDetector.isRealPeak(normalizedValue, now, this.signalBuffer);
-
-      if (isPeak) {
-        this.peakTimes.push(now);
-        try {
-          await this.beepPlayer.playBeep('heartbeat');
-        } catch (error) {
-          console.error('Error reproduciendo beep:', error);
-        }
-      }
-
-      // Análisis de frecuencia para BPM
-      const { frequencies, magnitudes } = this.frequencyAnalyzer.performFFT(filteredRed);
-      const dominantFreqIndex = magnitudes.indexOf(Math.max(...magnitudes));
-      const dominantFreq = frequencies[dominantFreqIndex];
-      const calculatedBpm = dominantFreq * 60;
-      
-      // Cálculo de intervalos RR para HRV
-      const intervals = [];
-      for (let i = 1; i < this.peakTimes.length; i++) {
-        intervals.push(this.peakTimes[i] - this.peakTimes[i-1]);
-      }
-      
-      // Análisis de signos vitales
-      const hrvAnalysis = this.signalProcessor.analyzeHRV(intervals);
-      const spo2Result = this.signalProcessor.calculateSpO2(this.redBuffer, this.irBuffer);
-      const bp = this.signalProcessor.estimateBloodPressure(filteredRed, this.peakTimes);
-      const validatedVitals = this.vitalsValidator.validateVitalSigns(calculatedBpm, bp.systolic, bp.diastolic);
-
-      // Log de mediciones calculadas
-      console.log('Mediciones calculadas:', {
-        bpm: validatedVitals.bpm,
+      // 🔴 Paso 6: Preparar respuesta con todas las métricas
+      const result: PPGData = {
+        bpm: this.calculateInstantaneousBPM(this.peakTimes),
         spo2: spo2Result.spo2,
-        presion: `${validatedVitals.systolic}/${validatedVitals.diastolic}`,
-        intervalosRR: intervals.length,
-        confianza: spo2Result.confidence
-      });
-
-      // Retorno de resultados procesados
-      return {
-        bpm: validatedVitals.bpm,
-        spo2: Math.min(100, Math.max(75, spo2Result.spo2)),
-        systolic: validatedVitals.systolic,
-        diastolic: validatedVitals.diastolic,
+        systolic: bpEstimation.systolic,
+        diastolic: bpEstimation.diastolic,
         hasArrhythmia: hrvAnalysis.hasArrhythmia,
         arrhythmiaType: hrvAnalysis.type,
         signalQuality: quality,
@@ -224,10 +225,50 @@ export class PPGProcessor {
           lfhf: hrvAnalysis.lfhf
         }
       };
+
+      console.log("✅ Medición completa:", {
+        bpm: result.bpm,
+        spo2: result.spo2 + "%",
+        presion: `${result.systolic}/${result.diastolic}`,
+        calidad: (result.signalQuality * 100).toFixed(1) + "%",
+        confianza: (result.confidence).toFixed(1) + "%",
+        arritmia: result.hasArrhythmia ? result.arrhythmiaType : "No",
+        hrv: {
+          sdnn: result.hrvMetrics.sdnn.toFixed(1),
+          rmssd: result.hrvMetrics.rmssd.toFixed(1)
+        }
+      });
+
+      return result;
+
     } catch (error) {
-      console.error('Error procesando frame:', error);
+      console.error("❌ Error crítico procesando frame:", error);
       return null;
     }
+  }
+
+  private calculateInstantaneousBPM(peakTimes: number[]): number {
+    if (peakTimes.length < 2) return 0;
+    
+    // Usar los últimos 4 intervalos para un cálculo más estable
+    const recentPeaks = peakTimes.slice(-5);
+    const intervals = [];
+    
+    for (let i = 1; i < recentPeaks.length; i++) {
+      const interval = recentPeaks[i] - recentPeaks[i-1];
+      if (interval >= this.processingSettings.MIN_PEAK_DISTANCE && 
+          interval <= this.processingSettings.MAX_PEAK_DISTANCE) {
+        intervals.push(interval);
+      }
+    }
+    
+    if (intervals.length === 0) return 0;
+    
+    // Calcular la media de los intervalos válidos
+    const averageInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+    const bpm = Math.round(60000 / averageInterval); // Convertir a BPM
+    
+    return Math.min(Math.max(bpm, 40), 200); // Límites fisiológicos
   }
 
   /**
