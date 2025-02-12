@@ -3,9 +3,9 @@ export class SignalExtractor {
   private readonly ROI_SIZE = 32;
   private readonly MIN_RED_THRESHOLD = 140;
   private readonly MAX_RED_THRESHOLD = 240;
-  private readonly MIN_VALID_PIXELS = 30;
+  private readonly MIN_VALID_PIXELS = 35; // Aumentado de 30 a 35
   private lastFingerPresent: boolean = false;
-  private readonly STABILITY_THRESHOLD = 4; // Aumentado de 3 a 4
+  private readonly STABILITY_THRESHOLD = 4;
   private stabilityCounter: number = 0;
 
   extractChannels(imageData: ImageData): { 
