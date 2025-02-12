@@ -1,4 +1,3 @@
-
 import { PTTProcessor } from './pttProcessor';
 import { PPGFeatureExtractor } from './ppgFeatureExtractor';
 import { SignalFilter } from './signalFilter';
@@ -81,13 +80,7 @@ export class SignalProcessor {
       confidence *= (perfusionIndex / this.spO2CalibrationCoefficients.perfusionIndexThreshold);
     }
     
-    // Usamos los valores promedio de verde y azul como 0 ya que no los necesitamos para SpO2
-    const signalStability = this.qualityAnalyzer.calculateSignalStability(
-      filteredRed,
-      redDC / 2, // valor verde estimado
-      redDC / 3, // valor azul estimado
-      windowSize * 1000 // píxeles válidos estimados
-    );
+    const signalStability = this.qualityAnalyzer.calculateSignalStability(filteredRed);
     confidence *= signalStability;
     
     spo2 = Math.min(Math.max(spo2, 70), 100);
