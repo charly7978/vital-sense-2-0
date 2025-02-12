@@ -163,13 +163,18 @@ export class SignalProcessor {
 
     try {
       // Obtener datos de calibración
-      const { data: calibrationData } = await supabase
+      const { data: calibrationData, error } = await supabase
         .from('blood_pressure_calibration')
         .select('*')
         .eq('is_active', true)
         .order('calibration_date', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle(); // Cambiado de .single() a .maybeSingle()
+
+      if (error) {
+        console.error('Error obteniendo calibración:', error);
+        return this.lastValidPressure;
+      }
 
       if (!calibrationData) {
         console.log('No hay datos de calibración');
