@@ -49,6 +49,8 @@ export class SignalExtractor {
         this.stabilityCounter++;
         if (this.stabilityCounter >= this.STABILITY_THRESHOLD) {
           this.lastFingerPresent = true;
+          // Reset del contador cuando cambiamos a estado detectado
+          this.stabilityCounter = 0;
         }
       }
     } else {
@@ -56,12 +58,11 @@ export class SignalExtractor {
         this.stabilityCounter--;
         if (this.stabilityCounter <= 0) {
           this.lastFingerPresent = false;
+          // Reset del contador cuando cambiamos a estado no detectado
+          this.stabilityCounter = 0;
         }
       }
     }
-
-    // Mantener el contador dentro de los límites
-    this.stabilityCounter = Math.max(0, Math.min(this.stabilityCounter, this.STABILITY_THRESHOLD));
 
     // Log detallado para debugging
     console.log('Detección de dedo:', {
