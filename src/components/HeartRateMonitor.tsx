@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import CameraView from './CameraView';
 import VitalChart from './VitalChart';
@@ -14,6 +14,7 @@ import { useVitals } from '@/contexts/VitalsContext';
 const ppgProcessor = new PPGProcessor();
 
 const HeartRateMonitor: React.FC = () => {
+  const [showFingerMessage, setShowFingerMessage] = useState(false);
   const { 
     bpm, 
     spo2, 
@@ -33,6 +34,15 @@ const HeartRateMonitor: React.FC = () => {
 
   const { toast } = useToast();
 
+  // Efecto para actualizar el mensaje en tiempo real
+  useEffect(() => {
+    if (isStarted) {
+      setShowFingerMessage(measurementQuality < 0.01);
+    } else {
+      setShowFingerMessage(false);
+    }
+  }, [isStarted, measurementQuality]);
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-7xl mx-auto p-4">
       <div className="space-y-4">
@@ -51,9 +61,9 @@ const HeartRateMonitor: React.FC = () => {
 
         <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4">
           <CameraView onFrame={processFrame} isActive={isStarted} />
-          {isStarted && measurementQuality < 0.01 && (
+          {showFingerMessage && (
             <div className="mt-2 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-              <p className="text-yellow-300 text-sm">
+              <p className="text-yellow-300 text-sm animate-pulse">
                 Coloque su dedo sobre la cámara y manténgalo estable
               </p>
             </div>

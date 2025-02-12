@@ -20,7 +20,7 @@ const SignalQualityIndicator: React.FC<SignalQualityIndicatorProps> = ({
   const getSignalQualityIndicator = () => {
     if (measurementQuality === 0 || measurementQuality < 0.01) {
       return (
-        <div className="flex items-center space-x-2 text-gray-400">
+        <div className="flex items-center space-x-2 text-gray-400 animate-pulse">
           <Hand className="w-6 h-6" />
           <span>Coloque su dedo sobre la cámara</span>
         </div>
