@@ -12,59 +12,44 @@ interface PTTResult {
 
 export class PTTProcessor {
   private lastValidPTT: number = 0;
-  private readonly minValidPTT = 150; // ms
-  private readonly maxValidPTT = 400; // ms
+  private readonly minValidPTT = 100; // Reducido de 150 para capturar más PTTs
+  private readonly maxValidPTT = 500; // Reducido de 400 para capturar más PTTs
+  private readonly MIN_PEAK_HEIGHT = 10;
+  private readonly MIN_PEAK_DISTANCE = 15;
 
   calculatePTT(ppgSignal: number[]): PTTResult | null {
-    if (!ppgSignal || ppgSignal.length < 3) return null;
+    if (!ppgSignal || ppgSignal.length < 10) return null;
 
     try {
-      // Find systolic peak (maximum point in the signal)
-      const systolicPeak = Math.max(...ppgSignal);
-      const systolicIndex = ppgSignal.indexOf(systolicPeak);
-
-      if (systolicIndex === -1) return null;
-
-      // Find dicrotic notch (local minimum after systolic peak)
-      let notchIndex = -1;
-      let notchValue = systolicPeak;
+      // Detectar picos con umbral dinámico
+      const peaks: number[] = [];
+      const threshold = this.calculateDynamicThreshold(ppgSignal);
       
-      for (let i = systolicIndex + 1; i < ppgSignal.length - 1; i++) {
-        if (ppgSignal[i] < ppgSignal[i+1] && ppgSignal[i] < ppgSignal[i-1]) {
-          notchIndex = i;
-          notchValue = ppgSignal[i];
-          break;
+      for (let i = 1; i < ppgSignal.length - 1; i++) {
+        if (this.isPeak(ppgSignal, i, threshold)) {
+          if (peaks.length === 0 || i - peaks[peaks.length - 1] >= this.MIN_PEAK_DISTANCE) {
+            peaks.push(i);
+          }
         }
       }
 
-      if (notchIndex === -1) return null;
+      if (peaks.length < 2) return null;
 
-      // Find diastolic peak (local maximum after dicrotic notch)
-      let diastolicIndex = -1;
-      let diastolicPeak = notchValue;
-
-      for (let i = notchIndex + 1; i < ppgSignal.length - 1; i++) {
-        if (ppgSignal[i] > diastolicPeak) {
-          diastolicIndex = i;
-          diastolicPeak = ppgSignal[i];
+      // Calcular PTT promedio entre picos consecutivos
+      const ptts: number[] = [];
+      for (let i = 1; i < peaks.length; i++) {
+        const ptt = (peaks[i] - peaks[i-1]) * (1000 / 30); // Asumiendo 30Hz
+        if (ptt >= this.minValidPTT && ptt <= this.maxValidPTT) {
+          ptts.push(ptt);
         }
       }
 
-      // Calculate PTT as time between systolic peak and dicrotic notch
-      const ptt = (notchIndex - systolicIndex) * (1000 / 30); // Assuming 30Hz sampling rate
+      if (ptts.length === 0) return null;
 
-      // Validate PTT
-      if (ptt < this.minValidPTT || ptt > this.maxValidPTT) {
-        return null;
-      }
-
-      // Calculate pulse width and other features
-      const pulseWidth = (diastolicIndex - systolicIndex) * (1000 / 30);
-
-      // Calculate confidence based on signal quality and feature reliability
-      const amplitudeRatio = diastolicPeak / systolicPeak;
-      const notchPromience = (systolicPeak - notchValue) / systolicPeak;
-      const confidence = this.calculateConfidence(amplitudeRatio, notchPromience);
+      // Calcular PTT promedio y características
+      const ptt = ptts.reduce((a, b) => a + b, 0) / ptts.length;
+      const systolicPeak = Math.max(...peaks.map(i => ppgSignal[i]));
+      const confidence = this.calculateConfidence(ppgSignal, peaks);
 
       this.lastValidPTT = ptt;
 
@@ -73,43 +58,92 @@ export class PTTProcessor {
         confidence,
         features: {
           systolicPeak,
-          diastolicPeak,
-          notchTime: notchIndex * (1000 / 30),
-          pulseWidth
+          diastolicPeak: this.findDiastolicPeak(ppgSignal, peaks),
+          notchTime: this.findDicroticNotch(ppgSignal, peaks),
+          pulseWidth: this.calculatePulseWidth(peaks)
         }
       };
     } catch (error) {
-      console.error('Error calculating PTT:', error);
+      console.error('Error calculando PTT:', error);
       return null;
     }
   }
 
-  private calculateConfidence(amplitudeRatio: number, notchPromience: number): number {
-    // Ideal ranges based on physiological norms
-    const idealAmplitudeRatio = { min: 0.3, max: 0.7 };
-    const idealNotchPromience = { min: 0.1, max: 0.3 };
-
-    // Calculate individual confidence scores
-    const amplitudeScore = this.calculateRangeScore(
-      amplitudeRatio,
-      idealAmplitudeRatio.min,
-      idealAmplitudeRatio.max
+  private calculateDynamicThreshold(signal: number[]): number {
+    const mean = signal.reduce((a, b) => a + b, 0) / signal.length;
+    const stdDev = Math.sqrt(
+      signal.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / signal.length
     );
-
-    const notchScore = this.calculateRangeScore(
-      notchPromience,
-      idealNotchPromience.min,
-      idealNotchPromience.max
-    );
-
-    // Combine scores with weights
-    return (amplitudeScore * 0.6 + notchScore * 0.4);
+    return mean + stdDev * 0.5; // Umbral más sensible
   }
 
-  private calculateRangeScore(value: number, min: number, max: number): number {
-    if (value < min) return Math.max(0, 1 - (min - value) / min);
-    if (value > max) return Math.max(0, 1 - (value - max) / max);
-    return 1;
+  private isPeak(signal: number[], index: number, threshold: number): boolean {
+    return signal[index] > threshold &&
+           signal[index] > signal[index - 1] &&
+           signal[index] > signal[index + 1] &&
+           signal[index] - signal[index - 1] >= this.MIN_PEAK_HEIGHT;
+  }
+
+  private findDiastolicPeak(signal: number[], peaks: number[]): number {
+    let maxDiastolic = 0;
+    for (let i = 0; i < peaks.length - 1; i++) {
+      const segment = signal.slice(peaks[i], peaks[i + 1]);
+      maxDiastolic = Math.max(maxDiastolic, Math.max(...segment));
+    }
+    return maxDiastolic;
+  }
+
+  private findDicroticNotch(signal: number[], peaks: number[]): number {
+    if (peaks.length < 2) return 0;
+    
+    const segment = signal.slice(peaks[0], peaks[1]);
+    let minIdx = 0;
+    let minVal = Infinity;
+    
+    for (let i = Math.floor(segment.length * 0.3); i < Math.floor(segment.length * 0.7); i++) {
+      if (segment[i] < minVal) {
+        minVal = segment[i];
+        minIdx = i;
+      }
+    }
+    
+    return minIdx * (1000 / 30);
+  }
+
+  private calculatePulseWidth(peaks: number[]): number {
+    if (peaks.length < 2) return 0;
+    return (peaks[1] - peaks[0]) * (1000 / 30);
+  }
+
+  private calculateConfidence(signal: number[], peaks: number[]): number {
+    if (peaks.length < 2) return 0;
+
+    const peakHeights = peaks.map(i => signal[i]);
+    const meanHeight = peakHeights.reduce((a, b) => a + b, 0) / peakHeights.length;
+    const heightVariability = Math.sqrt(
+      peakHeights.reduce((a, b) => a + Math.pow(b - meanHeight, 2), 0) / peakHeights.length
+    ) / meanHeight;
+
+    const intervalVariability = this.calculateIntervalVariability(peaks);
+    
+    return Math.max(0, Math.min(1, 
+      (1 - heightVariability * 0.5) * 
+      (1 - intervalVariability * 0.5)
+    ));
+  }
+
+  private calculateIntervalVariability(peaks: number[]): number {
+    if (peaks.length < 3) return 1;
+    
+    const intervals = [];
+    for (let i = 1; i < peaks.length; i++) {
+      intervals.push(peaks[i] - peaks[i-1]);
+    }
+    
+    const meanInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+    return Math.sqrt(
+      intervals.reduce((a, b) => a + Math.pow(b - meanInterval, 2), 0) / intervals.length
+    ) / meanInterval;
   }
 
   getLastValidPTT(): number {
