@@ -80,10 +80,14 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const result = await ppgProcessor.processFrame(imageData);
       
-      // Actualización directa del estado del dedo basado en la detección técnica
-      const isFingerDetected = result?.red > 0 && result?.quality > 0;
+      // Actualización más segura del estado del dedo
+      const isFingerDetected = (result?.red !== undefined && result?.red > 0) && 
+                              (result?.quality !== undefined && result?.quality > 0);
       setFingerPresent(isFingerDetected);
-      console.log('Estado de detección del dedo:', isFingerDetected);
+      console.log('Estado de detección del dedo:', isFingerDetected, {
+        red: result?.red,
+        quality: result?.quality
+      });
 
       // Solo procesar las mediciones si hay dedo presente
       if (isFingerDetected) {
