@@ -1,4 +1,3 @@
-
 import { VitalReading, PPGData, SensitivitySettings, ProcessingSettings } from './types';
 import { BeepPlayer } from './audioUtils';
 import { SignalProcessor } from './signalProcessing';
@@ -15,7 +14,7 @@ export class PPGProcessor {
   private irBuffer: number[] = [];
   private peakTimes: number[] = [];
   private readonly samplingRate = 30;
-  private readonly windowSize = 150; // Reducido de 300 a 150
+  private readonly windowSize = 150;
   private readonly signalProcessor: SignalProcessor;
   private readonly signalExtractor: SignalExtractor;
   private readonly peakDetector: PeakDetector;
@@ -23,12 +22,12 @@ export class PPGProcessor {
   private readonly signalFilter: SignalFilter;
   private readonly frequencyAnalyzer: SignalFrequencyAnalyzer;
   private beepPlayer: BeepPlayer;
-  private readonly signalBuffer: number[] = [];
+  private signalBuffer: number[] = [];
   private readonly bufferSize = 30;
   private readonly qualityThreshold = 0.2;
   private mlModel: MLModel;
   private lastProcessingTime: number = 0;
-  private readonly minProcessingInterval = 33; // ~30fps
+  private readonly minProcessingInterval = 33;
   private lastValidBpm: number = 0;
   private lastValidSystolic: number = 120;
   private lastValidDiastolic: number = 80;
@@ -97,12 +96,10 @@ export class PPGProcessor {
 
   private cleanupOldData() {
     const now = Date.now();
-    const maxAge = 30000; // 30 segundos
+    const maxAge = 30000;
 
-    // Limpiar lecturas antiguas
     this.readings = this.readings.filter(reading => now - reading.timestamp < maxAge);
 
-    // Mantener buffers en tamaño máximo
     if (this.redBuffer.length > this.windowSize) {
       this.redBuffer = this.redBuffer.slice(-this.windowSize);
     }
@@ -120,7 +117,6 @@ export class PPGProcessor {
   async processFrame(imageData: ImageData): Promise<PPGData | null> {
     const now = Date.now();
     
-    // Control de frecuencia de procesamiento
     if (now - this.lastProcessingTime < this.minProcessingInterval) {
       return null;
     }
@@ -166,7 +162,6 @@ export class PPGProcessor {
     this.readings.push({ timestamp: now, value: normalizedValue });
     this.signalBuffer.push(normalizedValue);
 
-    // Limpiar datos antiguos periódicamente
     this.cleanupOldData();
 
     const isPeak = this.peakDetector.isRealPeak(normalizedValue, now, this.signalBuffer);
