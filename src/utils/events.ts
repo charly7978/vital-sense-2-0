@@ -1,30 +1,43 @@
 
+/**
+ * Custom EventEmitter implementation for browser environments
+ */
 type EventCallback = (...args: any[]) => void;
 
 export class EventEmitter {
-  private events: { [key: string]: EventCallback[] } = {};
+  private eventMap: { [key: string]: EventCallback[] };
 
-  on(event: string, callback: EventCallback) {
-    if (!this.events[event]) {
-      this.events[event] = [];
+  constructor() {
+    this.eventMap = {};
+  }
+
+  on(eventName: string, callback: EventCallback): this {
+    if (!this.eventMap[eventName]) {
+      this.eventMap[eventName] = [];
     }
-    this.events[event].push(callback);
+    this.eventMap[eventName].push(callback);
     return this;
   }
 
-  emit(event: string, ...args: any[]) {
-    const callbacks = this.events[event];
-    if (callbacks) {
-      callbacks.forEach(callback => callback(...args));
+  emit(eventName: string, ...args: any[]): this {
+    const handlers = this.eventMap[eventName];
+    if (handlers) {
+      handlers.forEach((handler) => {
+        try {
+          handler(...args);
+        } catch (error) {
+          console.error(`Error in event handler for ${eventName}:`, error);
+        }
+      });
     }
     return this;
   }
 
-  removeAllListeners(event?: string) {
-    if (event) {
-      delete this.events[event];
+  removeAllListeners(eventName?: string): this {
+    if (eventName) {
+      delete this.eventMap[eventName];
     } else {
-      this.events = {};
+      this.eventMap = {};
     }
     return this;
   }
