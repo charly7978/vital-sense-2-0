@@ -1,14 +1,15 @@
 
 export class SignalExtractor {
-  private readonly ROI_SIZE = 32;
-  private readonly MIN_RED_THRESHOLD = 135;
-  private readonly MAX_RED_THRESHOLD = 240;
-  private readonly MIN_VALID_PIXELS = 25;
+  private readonly ROI_SIZE = 48; // Aumentado para capturar más área
+  private readonly MIN_RED_THRESHOLD = 100; // Reducido para ser más sensible
+  private readonly MAX_RED_THRESHOLD = 255; // Aumentado para captar más variación
+  private readonly MIN_VALID_PIXELS = 15; // Reducido para ser más sensible
   private lastFingerPresent: boolean = false;
-  private readonly STABILITY_THRESHOLD = 4;
+  private readonly STABILITY_THRESHOLD = 3; // Reducido para respuesta más rápida
   private stabilityCounter: number = 0;
   private lastProcessingTime: number = 0;
   private readonly MIN_PROCESSING_INTERVAL = 33; // ~30fps
+  private readonly QUALITY_THRESHOLD = 0.1; // Reducido para ser más permisivo
 
   extractChannels(imageData: ImageData): { 
     red: number;
@@ -37,9 +38,11 @@ export class SignalExtractor {
     const greenValues: number[] = [];
     let validPixelCount = 0;
     let totalPixels = 0;
+    let maxRed = 0;
+    let minRed = 255;
 
     try {
-      // Análisis directo de píxeles
+      // Análisis directo de píxeles con detección de rango dinámico
       for (let y = centerY - halfROI; y < centerY + halfROI; y++) {
         for (let x = centerX - halfROI; x < centerX + halfROI; x++) {
           if (y >= 0 && y < height && x >= 0 && x < width) {
@@ -49,6 +52,11 @@ export class SignalExtractor {
               const red = data[i];
               redValues.push(red);
               greenValues.push(data[i + 1]);
+              
+              // Actualizar valores máximo y mínimo
+              maxRed = Math.max(maxRed, red);
+              minRed = Math.min(minRed, red);
+
               if (red >= this.MIN_RED_THRESHOLD && red <= this.MAX_RED_THRESHOLD) {
                 validPixelCount++;
               }
@@ -58,8 +66,14 @@ export class SignalExtractor {
       }
 
       const redMedian = this.calculateMedian(redValues);
-      const currentFingerPresent = redMedian >= this.MIN_RED_THRESHOLD && 
-                                 validPixelCount >= this.MIN_VALID_PIXELS;
+      const redRange = maxRed - minRed;
+      
+      // Mejorada la lógica de detección de dedo
+      const currentFingerPresent = (
+        redMedian >= this.MIN_RED_THRESHOLD && 
+        validPixelCount >= this.MIN_VALID_PIXELS &&
+        redRange > 10 // Asegurarse de que hay variación en la señal
+      );
 
       // Lógica de estabilidad mejorada
       if (currentFingerPresent === this.lastFingerPresent) {
@@ -74,17 +88,20 @@ export class SignalExtractor {
         this.lastFingerPresent = currentFingerPresent;
       }
 
-      const quality = totalPixels > 0 ? validPixelCount / totalPixels : 0;
+      const quality = this.calculateSignalQuality(redValues, validPixelCount, totalPixels, redRange);
 
       // Log detallado para debugging
       console.log('Detección de dedo:', {
         redMedian,
+        redRange,
         validPixelCount,
         totalPixels,
         quality: quality.toFixed(2),
         currentDetection: currentFingerPresent,
         stabilityCounter: this.stabilityCounter,
-        finalState: finalFingerPresent
+        finalState: finalFingerPresent,
+        maxRed,
+        minRed
       });
 
       return {
@@ -102,6 +119,19 @@ export class SignalExtractor {
         fingerPresent: false
       };
     }
+  }
+
+  private calculateSignalQuality(
+    redValues: number[],
+    validPixels: number,
+    totalPixels: number,
+    redRange: number
+  ): number {
+    const baseQuality = totalPixels > 0 ? validPixels / totalPixels : 0;
+    const rangeQuality = Math.min(redRange / 50, 1); // Normalizar el rango
+    
+    // Combinar métricas de calidad
+    return (baseQuality * 0.7 + rangeQuality * 0.3);
   }
 
   private calculateMedian(values: number[]): number {

@@ -8,10 +8,10 @@
  */
 export class PeakDetector {
   private adaptiveThreshold = 0;
-  private readonly minPeakDistance = 250; // Aumentado de 180 a 250ms para evitar falsos positivos
+  private readonly minPeakDistance = 200; // Reducido para ser más sensible
   private lastPeakTime = 0;
   private readonly bufferSize = 15;
-  private readonly minAmplitude = 0.005; // Aumentado para exigir picos más claros
+  private readonly minAmplitude = 0.003; // Reducido para detectar picos más pequeños
   private readonly adaptiveRate = 0.35;
   private peakBuffer: number[] = [];
   private timeBuffer: number[] = [];
@@ -20,60 +20,54 @@ export class PeakDetector {
   private readonly minBPM = 40;
   private lastPeakValues: number[] = [];
   private readonly peakMemory = 5;
-  private readonly minPeakProminence = 0.1; // Nuevo: mínima diferencia con valores circundantes
+  private readonly minPeakProminence = 0.05; // Reducido para mayor sensibilidad
 
   detectPeak(signal: number[], peakThreshold: number = 1.0): boolean {
-    if (signal.length < 5) return false; // Aumentado de 3 a 5 para mejor contexto
+    if (signal.length < 5) return false;
 
-    // Obtener más contexto alrededor del punto analizado
     const current = signal[signal.length - 1];
     const prev1 = signal[signal.length - 2];
     const prev2 = signal[signal.length - 3];
-    const prev3 = signal[signal.length - 4]; // Nuevo: más contexto
-    const prev4 = signal[signal.length - 5]; // Nuevo: más contexto
+    const prev3 = signal[signal.length - 4];
+    const prev4 = signal[signal.length - 5];
 
     // Calcular diferencias usando más puntos
     const diff1 = prev1 - current;
     const diff2 = prev1 - prev2;
-    const diff3 = prev2 - prev3; // Nueva diferencia
-    const diff4 = prev3 - prev4; // Nueva diferencia
+    const diff3 = prev2 - prev3;
+    const diff4 = prev3 - prev4;
 
-    // Un pico debe tener una forma específica
-    const isPotentialPeak = diff1 > 0 && diff2 > 0 && 
-                           diff3 < 0 && diff4 < 0 && // Nueva condición: forma más clara
-                           Math.abs(diff1) > this.minPeakProminence; // Nueva condición: prominencia
+    // Un pico debe tener una forma específica pero con criterios más flexibles
+    const isPotentialPeak = 
+      diff1 > 0 && 
+      (diff2 > 0 || Math.abs(diff2) < 0.001) && // Más tolerante con la pendiente
+      (diff3 < 0 || Math.abs(diff3) < 0.001) && // Más tolerante con la pendiente
+      Math.abs(diff1) > this.minPeakProminence; // Menor exigencia de prominencia
 
     if (isPotentialPeak) {
       const now = Date.now();
       
-      // Validar intervalo mínimo entre picos
       if (now - this.lastPeakTime < this.minPeakDistance) {
         return false;
       }
 
-      // Calcular umbral adaptativo basado en picos previos
+      // Calcular umbral adaptativo con más tolerancia
       if (this.peakBuffer.length > 0) {
         const avgPeak = this.peakBuffer.reduce((a, b) => a + b, 0) / this.peakBuffer.length;
-        this.adaptiveThreshold = avgPeak * 0.6; // Aumentado de 0.4 a 0.6 para ser más exigente
+        this.adaptiveThreshold = avgPeak * 0.5; // Reducido para ser más sensible
       } else {
-        this.adaptiveThreshold = Math.max(current * 0.4, this.minAmplitude);
+        this.adaptiveThreshold = Math.max(current * 0.3, this.minAmplitude);
       }
 
-      // Validar que el pico supere el umbral y tenga suficiente amplitud
-      if (prev1 > this.adaptiveThreshold && 
-          Math.abs(prev1 - Math.min(current, prev2)) > this.minAmplitude) {
-        
-        // Actualizar buffers
+      if (prev1 > this.adaptiveThreshold) {
         this.peakBuffer.push(prev1);
         this.timeBuffer.push(now);
         
-        // Mantener tamaño del buffer
         if (this.peakBuffer.length > this.bufferSize) {
           this.peakBuffer.shift();
           this.timeBuffer.shift();
         }
 
-        // Validar BPM resultante si tenemos suficientes datos
         if (this.timeBuffer.length >= 2) {
           const interval = this.timeBuffer[this.timeBuffer.length - 1] - 
                           this.timeBuffer[this.timeBuffer.length - 2];
