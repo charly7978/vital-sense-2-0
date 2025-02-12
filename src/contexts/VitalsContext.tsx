@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { BeepPlayer } from '../utils/audioUtils';
 import { PPGProcessor } from '../utils/ppgProcessor';
@@ -16,6 +17,7 @@ interface VitalsContextType {
   isStarted: boolean;
   measurementProgress: number;
   measurementQuality: number;
+  fingerPresent: boolean;  // Añadido fingerPresent a la interfaz
   sensitivitySettings: SensitivitySettings;
   toggleMeasurement: () => void;
   processFrame: (imageData: ImageData) => void;
@@ -28,10 +30,10 @@ const beepPlayer = new BeepPlayer();
 const ppgProcessor = new PPGProcessor();
 
 const MEASUREMENT_DURATION = 30; // seconds
-const MIN_QUALITY_THRESHOLD = 0.25; // Aumentado significativamente para mayor precisión
+const MIN_QUALITY_THRESHOLD = 0.25;
 const MIN_READINGS_FOR_BP = 10;
-const NO_FINGER_THRESHOLD = 0.3; // Mucho más estricto
-const CONSECUTIVE_LOW_QUALITY_LIMIT = 2; // Más rápido para detectar ausencia
+const NO_FINGER_THRESHOLD = 0.3;
+const CONSECUTIVE_LOW_QUALITY_LIMIT = 2;
 
 export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [bpm, setBpm] = useState<number>(0);
@@ -45,13 +47,14 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isStarted, setIsStarted] = useState<boolean>(false);
   const [measurementProgress, setMeasurementProgress] = useState(0);
   const [measurementQuality, setMeasurementQuality] = useState(0);
+  const [fingerPresent, setFingerPresent] = useState(false);  // Añadido estado para fingerPresent
   const [measurementStartTime, setMeasurementStartTime] = useState<number | null>(null);
   const [validReadingsCount, setValidReadingsCount] = useState(0);
   const [consecutiveLowQualityCount, setConsecutiveLowQualityCount] = useState(0);
   const [sensitivitySettings, setSensitivitySettings] = useState<SensitivitySettings>({
-    signalAmplification: 2.0, // Aumentado para mejor detección
-    noiseReduction: 1.0, // Reducido para ser más sensible
-    peakDetection: 1.1 // Reducido para detectar más picos
+    signalAmplification: 2.0,
+    noiseReduction: 1.0,
+    peakDetection: 1.1
   });
 
   const { toast } = useToast();
@@ -66,6 +69,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setReadings([]);
     setValidReadingsCount(0);
     setConsecutiveLowQualityCount(0);
+    setFingerPresent(false);  // Reseteamos fingerPresent
   }, []);
 
   const updateSensitivitySettings = useCallback((newSettings: SensitivitySettings) => {
@@ -83,6 +87,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       // Verificar si no hay dedo presente
       if (!vitals || vitals.signalQuality < NO_FINGER_THRESHOLD) {
         setConsecutiveLowQualityCount(prev => prev + 1);
+        setFingerPresent(false);  // Actualizamos fingerPresent cuando no hay dedo
         
         if (consecutiveLowQualityCount >= CONSECUTIVE_LOW_QUALITY_LIMIT) {
           console.log('No se detecta dedo o señal muy baja:', vitals?.signalQuality || 0);
@@ -91,6 +96,8 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
         return;
       }
+
+      setFingerPresent(true);  // Actualizamos fingerPresent cuando hay dedo
 
       // Resetear contador si la calidad es buena
       if (vitals.signalQuality > MIN_QUALITY_THRESHOLD) {
@@ -208,6 +215,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     isStarted,
     measurementProgress,
     measurementQuality,
+    fingerPresent,  // Añadido fingerPresent al value object
     sensitivitySettings,
     toggleMeasurement,
     processFrame,
