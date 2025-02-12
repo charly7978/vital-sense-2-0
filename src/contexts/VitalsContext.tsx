@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { BeepPlayer } from '../utils/audioUtils';
 import { PPGProcessor } from '../utils/ppgProcessor';
@@ -28,10 +29,10 @@ const beepPlayer = new BeepPlayer();
 const ppgProcessor = new PPGProcessor();
 
 const MEASUREMENT_DURATION = 30; // seconds
-const MIN_QUALITY_THRESHOLD = 0.15; // Reducido de 0.3 a 0.15
+const MIN_QUALITY_THRESHOLD = 0.05; // Reducido drásticamente para ser más sensible
 const MIN_READINGS_FOR_BP = 10;
-const NO_FINGER_THRESHOLD = 0.1; // Reducido de 0.2 a 0.1
-const CONSECUTIVE_LOW_QUALITY_LIMIT = 10; // Aumentado de 5 a 10 frames
+const NO_FINGER_THRESHOLD = 0.02; // Reducido drásticamente
+const CONSECUTIVE_LOW_QUALITY_LIMIT = 3; // Reducido a solo 3 frames para respuesta más rápida
 
 export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [bpm, setBpm] = useState<number>(0);
@@ -49,9 +50,9 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [validReadingsCount, setValidReadingsCount] = useState(0);
   const [consecutiveLowQualityCount, setConsecutiveLowQualityCount] = useState(0);
   const [sensitivitySettings, setSensitivitySettings] = useState<SensitivitySettings>({
-    signalAmplification: 1.5,
-    noiseReduction: 1.2,
-    peakDetection: 1.3
+    signalAmplification: 2.0, // Aumentado para mejor detección
+    noiseReduction: 1.0, // Reducido para ser más sensible
+    peakDetection: 1.1 // Reducido para detectar más picos
   });
 
   const { toast } = useToast();
