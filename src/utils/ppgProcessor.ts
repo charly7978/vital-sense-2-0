@@ -24,7 +24,7 @@ export class PPGProcessor {
   private readonly frequencyAnalyzer: SignalFrequencyAnalyzer;
   private beepPlayer: BeepPlayer;
   private signalBuffer: number[] = [];
-  private readonly bufferSize = 90;
+  private readonly bufferSize = 90; // Reducido de 150 a 90 para evitar acumulación
   private readonly qualityThreshold = 0.2;
   private mlModel: MLModel;
   private lastProcessingTime: number = 0;
@@ -67,8 +67,40 @@ export class PPGProcessor {
     const now = Date.now();
     
     try {
+      const { red, ir, quality, fingerPresent } = this.signalExtractor.extractChannels(imageData);
+
+      // Control de frecuencia de procesamiento
       if (now - this.lastProcessingTime < this.minProcessingInterval) {
-        const { red, ir, quality, fingerPresent } = this.signalExtractor.extractChannels(imageData);
+        return {
+          bpm: this.lastValidBpm,
+          spo2: this.lastValidSpO2,
+          systolic: 0,
+          diastolic: 0,
+          hasArrhythmia: false,
+          arrhythmiaType: 'Normal',
+          signalQuality: quality,
+          confidence: 0,
+          readings: this.readings,
+          isPeak: false,
+          redValue: red,
+          fingerPresent: fingerPresent,
+          hrvMetrics: {
+            sdnn: 0,
+            rmssd: 0,
+            pnn50: 0,
+            lfhf: 0
+          }
+        };
+      }
+      
+      this.lastProcessingTime = now;
+
+      if (!fingerPresent) {
+        if (this.noFingerTimer === null) {
+          this.noFingerTimer = now;
+        } else if (now - this.noFingerTimer >= this.RESET_DELAY) {
+          this.resetValues();
+        }
         return {
           bpm: 0,
           spo2: 0,
@@ -90,39 +122,14 @@ export class PPGProcessor {
           }
         };
       }
-      this.lastProcessingTime = now;
-
-      const { red, ir, quality, fingerPresent } = this.signalExtractor.extractChannels(imageData);
-      
-      if (!fingerPresent) {
-        if (this.noFingerTimer === null) {
-          this.noFingerTimer = now;
-        } else if (now - this.noFingerTimer >= this.RESET_DELAY) {
-          this.resetValues();
-        }
-        return {
-          bpm: 0,
-          spo2: 0,
-          systolic: 0,
-          diastolic: 0,
-          hasArrhythmia: false,
-          arrhythmiaType: 'Normal',
-          signalQuality: quality,
-          confidence: 0,
-          readings: this.readings,
-          isPeak: false,
-          redValue: red,
-          fingerPresent: fingerPresent,
-          hrvMetrics: {
-            sdnn: 0,
-            rmssd: 0,
-            pnn50: 0,
-            lfhf: 0
-          }
-        };
-      }
 
       this.noFingerTimer = null;
+
+      // Limitar tamaño del buffer antes de agregar nuevos valores
+      if (this.redBuffer.length >= this.bufferSize) {
+        this.redBuffer = this.redBuffer.slice(-Math.floor(this.bufferSize * 0.8)); // Mantener solo el 80% más reciente
+        this.irBuffer = this.irBuffer.slice(-Math.floor(this.bufferSize * 0.8));
+      }
 
       // Amplificar y almacenar señales
       const amplifiedRed = red * this.sensitivitySettings.signalAmplification;
@@ -130,12 +137,6 @@ export class PPGProcessor {
       
       this.redBuffer.push(amplifiedRed);
       this.irBuffer.push(amplifiedIr);
-      
-      // Mantener tamaño de buffer
-      if (this.redBuffer.length > this.bufferSize) {
-        this.redBuffer = this.redBuffer.slice(-this.bufferSize);
-        this.irBuffer = this.irBuffer.slice(-this.bufferSize);
-      }
 
       // Filtrar señal
       const filteredRed = this.signalFilter.lowPassFilter(this.redBuffer);
@@ -145,10 +146,10 @@ export class PPGProcessor {
         filteredRed[filteredRed.length - 1]
       );
       
-      // Agregar a lecturas
+      // Mantener tamaño de lecturas
       this.readings.push({ timestamp: now, value: normalizedValue });
       if (this.readings.length > this.bufferSize) {
-        this.readings = this.readings.slice(-this.bufferSize);
+        this.readings = this.readings.slice(-Math.floor(this.bufferSize * 0.8));
       }
       
       // Detectar picos con señal filtrada
@@ -162,46 +163,31 @@ export class PPGProcessor {
         await this.beepPlayer.playBeep('heartbeat');
       }
 
-      // Mantener solo los últimos picos relevantes
-      const recentPeaks = this.peakTimes.filter(t => now - t < 5000);
-      this.peakTimes = recentPeaks;
+      // Mantener solo picos recientes
+      this.peakTimes = this.peakTimes.filter(t => now - t < 5000);
 
-      if (this.redBuffer.length < this.bufferSize) {
+      if (this.redBuffer.length < Math.floor(this.bufferSize * 0.5)) {
         console.log('Buffer insuficiente:', this.redBuffer.length);
         return null;
       }
 
-      // Análisis de frecuencia y cálculo de BPM
+      // Análisis y cálculos
       const { frequencies, magnitudes } = this.frequencyAnalyzer.performFFT(filteredRed);
       const dominantFreqIndex = magnitudes.indexOf(Math.max(...magnitudes));
       const dominantFreq = frequencies[dominantFreqIndex];
       let calculatedBpm = Math.round(dominantFreq * 60);
       
-      // Validar BPM
       if (calculatedBpm >= 40 && calculatedBpm <= 200) {
         this.lastValidBpm = Math.round(this.lastValidBpm * 0.7 + calculatedBpm * 0.3);
       }
 
-      // Calcular SpO2
       const spo2Result = this.signalProcessor.calculateSpO2(this.redBuffer, this.irBuffer);
       if (spo2Result.spo2 >= 80 && spo2Result.spo2 <= 100) {
         this.lastValidSpO2 = Math.round(this.lastValidSpO2 * 0.7 + spo2Result.spo2 * 0.3);
       }
 
-      // Análisis de ritmo cardíaco
       const hrvAnalysis = this.signalProcessor.analyzeHRV(this.peakTimes);
-      
-      // Calcular presión arterial
       const bp = await this.signalProcessor.estimateBloodPressure(filteredRed, this.peakTimes);
-
-      console.log('Procesamiento:', {
-        bpm: this.lastValidBpm,
-        spo2: this.lastValidSpO2,
-        quality,
-        fingerPresent,
-        bufferSize: this.redBuffer.length,
-        peakCount: this.peakTimes.length
-      });
 
       return {
         bpm: this.lastValidBpm,
