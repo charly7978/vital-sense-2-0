@@ -7,8 +7,11 @@ export class BeepPlayer {
   private isInitialized: boolean = false;
 
   constructor() {
-    // No inicializamos aquí, esperamos a la primera interacción del usuario
-    console.log('BeepPlayer constructor called');
+    // Intentamos inicializar inmediatamente
+    console.log('BeepPlayer constructor called - attempting immediate initialization');
+    this.initAudioContext().catch(err => {
+      console.warn('Could not initialize audio context in constructor:', err);
+    });
   }
 
   private async initAudioContext() {
@@ -44,14 +47,17 @@ export class BeepPlayer {
   }
 
   async playBeep(type: 'heartbeat' | 'warning' | 'success' = 'heartbeat') {
+    console.log('playBeep called with type:', type);
+    
     try {
+      // Intentar inicializar si no está inicializado
       if (!this.isInitialized) {
-        console.log('First beep attempt, initializing audio...');
+        console.log('Audio not initialized, attempting initialization...');
         await this.initAudioContext();
       }
 
       if (!this.audioContext || !this.gainNode) {
-        console.error('Audio context or gain node not available');
+        console.error('Audio context or gain node not available after initialization');
         return;
       }
 
@@ -62,9 +68,9 @@ export class BeepPlayer {
 
       // Asegurarse que el contexto esté activo
       if (this.audioContext.state !== 'running') {
-        console.log('Resuming audio context...');
+        console.log('Audio context not running, current state:', this.audioContext.state);
         await this.audioContext.resume();
-        console.log('Audio context resumed, state:', this.audioContext.state);
+        console.log('Audio context resumed, new state:', this.audioContext.state);
       }
 
       this.isPlaying = true;
@@ -78,9 +84,10 @@ export class BeepPlayer {
 
       this.oscillator = this.audioContext.createOscillator();
       
+      // Aumentar la frecuencia para hacerlo más audible
       switch (type) {
         case 'heartbeat':
-          this.oscillator.frequency.value = 40;
+          this.oscillator.frequency.value = 150; // Aumentado de 40 a 150 Hz
           break;
         case 'warning':
           this.oscillator.frequency.value = 440;
@@ -97,23 +104,23 @@ export class BeepPlayer {
       this.gainNode.gain.setValueAtTime(0, now);
       
       if (type === 'heartbeat') {
-        // Primer beat (lub)
-        this.gainNode.gain.linearRampToValueAtTime(0.5, now + 0.01);
-        this.gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+        // Primer beat (lub) - más fuerte y corto
+        this.gainNode.gain.linearRampToValueAtTime(0.8, now + 0.01); // Aumentado de 0.5 a 0.8
+        this.gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
         
-        // Pausa breve
-        this.gainNode.gain.linearRampToValueAtTime(0.001, now + 0.15);
+        // Pausa más corta
+        this.gainNode.gain.linearRampToValueAtTime(0.001, now + 0.1);
         
-        // Segundo beat (dub)
-        this.gainNode.gain.linearRampToValueAtTime(0.3, now + 0.16);
-        this.gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+        // Segundo beat (dub) - más fuerte
+        this.gainNode.gain.linearRampToValueAtTime(0.6, now + 0.11); // Aumentado de 0.3 a 0.6
+        this.gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
         
         this.oscillator.start(now);
-        this.oscillator.stop(now + 0.3);
+        this.oscillator.stop(now + 0.25);
         
-        console.log('Playing heartbeat sound');
+        console.log('Playing heartbeat sound with enhanced volume');
       } else {
-        this.gainNode.gain.linearRampToValueAtTime(0.3, now + 0.01);
+        this.gainNode.gain.linearRampToValueAtTime(0.5, now + 0.01);
         this.gainNode.gain.linearRampToValueAtTime(0, type === 'warning' ? now + 0.3 : now + 0.15);
         this.oscillator.start(now);
         this.oscillator.stop(now + (type === 'warning' ? 0.3 : 0.15));
@@ -126,14 +133,13 @@ export class BeepPlayer {
           this.oscillator = null;
         }
         this.isPlaying = false;
-        console.log('Beep playback completed');
-      }, 500);
+        console.log('Beep playback completed successfully');
+      }, 300); // Reducido de 500 a 300ms
 
     } catch (error) {
       console.error('Error playing beep:', error);
       this.isPlaying = false;
-      // Reintentar inicialización en el próximo intento
-      this.isInitialized = false;
+      this.isInitialized = false; // Reset para reintentar inicialización
     }
   }
 }
