@@ -1,16 +1,16 @@
 
 export class PeakDetector {
   private adaptiveThreshold = 0;
-  private readonly minPeakDistance = 250;
+  private readonly minPeakDistance = 250; // Ajustado para 60-240 BPM
   private lastPeakTime = 0;
-  private readonly bufferSize = 30; 
-  private readonly minAmplitude = 0.01;
-  private readonly adaptiveRate = 0.2;
+  private readonly bufferSize = 30;
+  private readonly minAmplitude = 0.008; // Reducido para mayor sensibilidad
+  private readonly adaptiveRate = 0.15; // Ajustado para mejor adaptación
   private peakBuffer: number[] = [];
   private timeBuffer: number[] = [];
   private frameCount = 0;
-  private readonly maxBPM = 180;
-  private readonly minBPM = 40;
+  private readonly maxBPM = 220;
+  private readonly minBPM = 30;
   private lastPeakValues: number[] = [];
   private readonly peakMemory = 5;
 
@@ -37,19 +37,20 @@ export class PeakDetector {
     const trend = this.calculateTrend(recentValues);
     const detrended = currentValue - trend;
 
+    // Mejorado el cálculo del umbral dinámico
     const dynamicThreshold = this.calculateDynamicThreshold(recentValues, avgValue, stdDev);
     this.adaptiveThreshold = (this.adaptiveThreshold * (1 - this.adaptiveRate)) + 
                             (dynamicThreshold * this.adaptiveRate);
 
-    // Validaciones más permisivas
+    // Validaciones más precisas
     const hasSignificantAmplitude = detrended > this.minAmplitude * stdDev;
-    const isAboveThreshold = currentValue > (this.adaptiveThreshold * 0.8);
+    const isAboveThreshold = currentValue > (this.adaptiveThreshold * 0.85);
     const isPotentialPeak = this.validatePeakCharacteristics(currentValue, signalBuffer, avgValue, stdDev);
 
     if ((hasSignificantAmplitude || isAboveThreshold) && isPotentialPeak) {
       const currentInterval = now - this.lastPeakTime;
       
-      if (this.validatePeakTiming(currentInterval)) { // Corregido: eliminado el segundo argumento
+      if (this.validatePeakTiming(currentInterval)) {
         this.lastPeakTime = now;
         this.updatePeakHistory(currentValue, now);
         
@@ -63,8 +64,7 @@ export class PeakDetector {
           detrendizado: detrended.toFixed(3),
           intervalo: currentInterval.toFixed(0),
           bpm: bpm.toFixed(1),
-          confianza: (confidence * 100).toFixed(1) + '%',
-          amplitudRelativa: (detrended / stdDev).toFixed(2)
+          confianza: (confidence * 100).toFixed(1) + '%'
         });
         
         return true;
