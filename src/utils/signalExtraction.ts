@@ -1,13 +1,15 @@
 export class SignalExtractor {
   private readonly ROI_SIZE = 36;
-  private readonly MIN_RED_THRESHOLD = 180; // 🔽 Bajado para aceptar más rango
-  private readonly MAX_RED_THRESHOLD = 230; // 🔼 Reducido para evitar saturación
-  private readonly MIN_VALID_PIXELS = 400; // 🔼 Aumentado para reducir falsos positivos
+  private readonly MIN_RED_THRESHOLD = 180;
+  private readonly MAX_RED_THRESHOLD = 230;
+  private readonly MIN_VALID_PIXELS = 400;
   private lastFingerPresent: boolean = false;
   private readonly STABILITY_THRESHOLD = 6;
   private stabilityCounter: number = 0;
   private frameCounter: number = 0;
   private failedDetections: number = 0;
+  private lastRedMedian: number = 0;
+  private lastDetectionTime: number = Date.now(); // ⏳ Guardamos cuándo se detectó el dedo por última vez
 
   extractChannels(imageData: ImageData): { 
     red: number;
@@ -37,10 +39,16 @@ export class SignalExtractor {
       }
     }
 
-    const redMedian = this.calculateMedian(redValues);
+    let redMedian = this.calculateMedian(redValues);
     const pixelRatio = validPixelCount / (this.ROI_SIZE * this.ROI_SIZE);
 
-    // 🚀 **Nueva condición: Evitar falsas detecciones cuando la señal está saturada**
+    // 🚀 **Suavizado del valor de `redMedian`**
+    if (this.lastRedMedian !== 0) {
+      redMedian = (this.lastRedMedian * 0.8) + (redMedian * 0.2);
+    }
+    this.lastRedMedian = redMedian;
+
+    // 🚀 **Detección de dedo mejorada con transición suave**
     const hasValidSignal = 
       redMedian >= this.MIN_RED_THRESHOLD && 
       redMedian <= this.MAX_RED_THRESHOLD && 
@@ -49,19 +57,26 @@ export class SignalExtractor {
     if (hasValidSignal) {
       this.stabilityCounter = Math.min(this.stabilityCounter + 1, this.STABILITY_THRESHOLD);
       this.failedDetections = 0;
+      this.lastDetectionTime = Date.now(); // ⏳ Guardamos el último tiempo en que se detectó el dedo
     } else {
-      this.stabilityCounter = Math.max(this.stabilityCounter - 1, 0);
       this.failedDetections++;
+      
+      // 🚀 **Si el dedo desaparece, bajamos `stabilityCounter` gradualmente en lugar de resetear**
+      const timeSinceLastDetection = (Date.now() - this.lastDetectionTime) / 1000; // ⏳ Segundos sin detección
 
-      if (this.failedDetections >= 10) {
-        console.log("⚠ Muchas detecciones fallidas seguidas. Reseteando detección...");
+      if (timeSinceLastDetection < 2) {
+        // Si el dedo se fue por menos de 2 segundos, bajamos lentamente
+        this.stabilityCounter = Math.max(this.stabilityCounter - 1, 0);
+      } else {
+        // Si el dedo se fue por más de 2 segundos, reseteamos todo
+        console.log("⚠ Dedo ausente por mucho tiempo. Reiniciando detección...");
         this.stabilityCounter = 0;
         this.failedDetections = 0;
         this.lastFingerPresent = false;
       }
     }
 
-    // 🚀 **Reiniciar buffers cada 60 frames**
+    // 🚀 **Reiniciar buffers cada 60 frames para evitar acumulación de ruido**
     this.frameCounter++;
     if (this.frameCounter >= 60) {
       console.log("🔄 Reseteando buffers de detección para mantener estabilidad.");
@@ -70,7 +85,7 @@ export class SignalExtractor {
       this.failedDetections = 0;
     }
 
-    // 🔴 **Nuevo: Se activa o desactiva el dedo SOLO si la estabilidad alcanza el umbral**
+    // 🔴 **Activar/desactivar el estado del dedo con transiciones suaves**
     if (this.stabilityCounter >= this.STABILITY_THRESHOLD) {
       this.lastFingerPresent = true;
     } else if (this.stabilityCounter === 0) {
@@ -84,6 +99,7 @@ export class SignalExtractor {
       hasValidSignal,
       stabilityCounter: this.stabilityCounter,
       failedDetections: this.failedDetections,
+      timeSinceLastDetection,
       finalState: this.lastFingerPresent,
       pixelRatio
     });
