@@ -82,39 +82,32 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (vitals) {
         setMeasurementQuality(vitals.signalQuality);
         setReadings(vitals.readings);
-      }
+        setFingerPresent(vitals.redValue > 150); // Umbral ajustado según los logs
 
-      const isFingerDetected = vitals?.redValue > 15;
-      setFingerPresent(isFingerDetected);
+        if (vitals.redValue > 150) {  // Solo procesar si hay dedo presente
+          if (vitals.isPeak) {
+            await beepPlayer.playBeep('heartbeat');
+            setValidReadingsCount(prev => prev + 1);
+          }
 
-      if (vitals && isFingerDetected) {
-        setValidReadingsCount(prev => prev + 1);
+          if (vitals.bpm > 0) {
+            setBpm(vitals.bpm);
+          }
 
-        if (vitals.isPeak) {
-          await beepPlayer.playBeep('heartbeat');
-        }
+          if (vitals.spo2 >= 80 && vitals.spo2 <= 100) {
+            setSpo2(vitals.spo2);
+          }
 
-        if (vitals.bpm > 40 && vitals.bpm < 200) {
-          setBpm(vitals.bpm);
-        }
-
-        if (vitals.spo2 >= 80 && vitals.spo2 <= 100) {
-          setSpo2(vitals.spo2);
-        }
-
-        if (validReadingsCount >= MIN_READINGS_FOR_BP) {
-          if (vitals.systolic > 0 && vitals.diastolic > 0 && 
-              vitals.systolic > vitals.diastolic &&
-              vitals.systolic >= 90 && vitals.systolic <= 180 &&
-              vitals.diastolic >= 60 && vitals.diastolic <= 120) {
+          if (vitals.systolic > 0 && vitals.diastolic > 0) {
             setSystolic(vitals.systolic);
             setDiastolic(vitals.diastolic);
           }
-        }
 
-        setHasArrhythmia(vitals.hasArrhythmia);
-        setArrhythmiaType(vitals.arrhythmiaType);
+          setHasArrhythmia(vitals.hasArrhythmia);
+          setArrhythmiaType(vitals.arrhythmiaType);
+        }
       }
+
     } catch (error) {
       console.error('Error processing frame:', error);
       toast({
@@ -123,7 +116,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         description: "Error al procesar la imagen de la cámara."
       });
     }
-  }, [isStarted, validReadingsCount, toast]);
+  }, [isStarted, beepPlayer, toast]);
 
   const toggleMeasurement = useCallback(() => {
     setIsStarted(prev => !prev);

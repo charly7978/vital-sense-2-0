@@ -26,7 +26,7 @@ const SignalQualityIndicator: React.FC<SignalQualityIndicatorProps> = ({
     if (qualityPercentage >= 75) return { color: 'text-blue-500', text: 'SEÑAL FUERTE' };
     if (qualityPercentage >= 50) return { color: 'text-yellow-500', text: 'SEÑAL MODERADA' };
     if (qualityPercentage >= 25) return { color: 'text-orange-500', text: 'SEÑAL DÉBIL' };
-    return { color: 'text-red-500', text: 'SIN SEÑAL' };
+    return { color: 'text-red-500', text: 'COLOQUE SU DEDO EN LA CÁMARA' };
   };
 
   const qualityStatus = getQualityStatus();
@@ -51,7 +51,7 @@ const SignalQualityIndicator: React.FC<SignalQualityIndicatorProps> = ({
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Activity className={cn("w-5 h-5 animate-pulse", qualityStatus.color)} />
-              <span className="text-sm font-medium text-gray-200">Intensidad de Señal PPG</span>
+              <span className="text-sm font-medium text-gray-200">Calidad de Señal</span>
             </div>
             <span className={cn("font-bold", qualityStatus.color)}>
               {qualityPercentage}%
