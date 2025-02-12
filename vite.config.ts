@@ -9,11 +9,7 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "0.0.0.0",
     port: 8080,
-    hmr: {
-      clientPort: 443,
-      host: '4dadecf1-503f-48ab-8ca5-a4dfbf273434.lovableproject.com',
-      protocol: 'wss'
-    },
+    hmr: false, // Deshabilitamos HMR para evitar problemas de conexión
     watch: {
       usePolling: true
     },
