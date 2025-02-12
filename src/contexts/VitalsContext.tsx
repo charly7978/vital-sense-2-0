@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { BeepPlayer } from '../utils/audioUtils';
 import { PPGProcessor } from '../utils/ppgProcessor';
@@ -29,6 +30,7 @@ const beepPlayer = new BeepPlayer();
 const ppgProcessor = new PPGProcessor();
 
 export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { toast } = useToast();
   const [bpm, setBpm] = useState<number>(0);
   const [spo2, setSpo2] = useState<number>(0);
   const [systolic, setSystolic] = useState<number>(0);
@@ -47,6 +49,10 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     peakDetection: 1.1
   });
 
+  const updateSensitivitySettings = useCallback((settings: SensitivitySettings) => {
+    setSensitivitySettings(settings);
+  }, []);
+
   const processFrame = useCallback(async (imageData: ImageData) => {
     if (!isStarted) return;
 
@@ -54,7 +60,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const vitals = await ppgProcessor.processFrame(imageData);
       
       if (vitals) {
-        // Actualización inmediata del estado del dedo
         setFingerPresent(vitals.fingerPresent);
         
         if (vitals.fingerPresent) {
@@ -71,7 +76,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           setHasArrhythmia(vitals.hasArrhythmia);
           setArrhythmiaType(vitals.arrhythmiaType);
         } else {
-          // Reset inmediato cuando no hay dedo
           setReadings([]);
           setBpm(0);
           setSpo2(0);
@@ -92,12 +96,12 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       resetMeasurements();
       toast({
         title: "Iniciando medición",
-        description: `La medición durará 30 segundos. Por favor, mantenga su dedo frente a la cámara.`
+        description: "La medición durará 30 segundos. Por favor, mantenga su dedo frente a la cámara."
       });
     } else {
       resetMeasurements();
     }
-  }, [isStarted, toast]);
+  }, [isStarted]);
 
   const resetMeasurements = useCallback(() => {
     setBpm(0);
@@ -109,26 +113,28 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setReadings([]);
   }, []);
 
-  const value = {
-    bpm,
-    spo2,
-    systolic,
-    diastolic,
-    hasArrhythmia,
-    arrhythmiaType,
-    readings,
-    isProcessing,
-    isStarted,
-    measurementProgress,
-    measurementQuality,
-    fingerPresent,
-    sensitivitySettings,
-    toggleMeasurement,
-    processFrame,
-    updateSensitivitySettings
-  };
-
-  return <VitalsContext.Provider value={value}>{children}</VitalsContext.Provider>;
+  return (
+    <VitalsContext.Provider value={{
+      bpm,
+      spo2,
+      systolic,
+      diastolic,
+      hasArrhythmia,
+      arrhythmiaType,
+      readings,
+      isProcessing,
+      isStarted,
+      measurementProgress,
+      measurementQuality,
+      fingerPresent,
+      sensitivitySettings,
+      toggleMeasurement,
+      processFrame,
+      updateSensitivitySettings
+    }}>
+      {children}
+    </VitalsContext.Provider>
+  );
 };
 
 export const useVitals = () => {

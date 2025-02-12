@@ -17,6 +17,7 @@ export interface PPGData {
   isPeak?: boolean;
   signalQuality: number;
   redValue: number;
+  fingerPresent: boolean;
   hrvMetrics?: {
     sdnn: number;
     rmssd: number;
