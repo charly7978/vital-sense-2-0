@@ -134,6 +134,45 @@ export type Database = {
         }
         Relationships: []
       }
+      calibration_profiles: {
+        Row: {
+          created_at: string
+          description: string | null
+          device_info: Json | null
+          environment_conditions: Json | null
+          id: string
+          is_active: boolean | null
+          name: string
+          notes: string | null
+          settings: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          device_info?: Json | null
+          environment_conditions?: Json | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          notes?: string | null
+          settings: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          device_info?: Json | null
+          environment_conditions?: Json | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          notes?: string | null
+          settings?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       calibration_reference_data: {
         Row: {
           calibration_accuracy: number | null
