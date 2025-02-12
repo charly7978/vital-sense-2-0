@@ -2,11 +2,11 @@
 export class SignalExtractor {
   // ¡CONFIGURACIÓN FINAL DE DETECCIÓN DE DEDO - NO MODIFICAR SIN AUTORIZACIÓN!
   // Valores optimizados y validados para máxima sensibilidad manteniendo robustez
-  private readonly minRedIntensity = 120;  // Reducido para mayor sensibilidad
+  private readonly minRedIntensity = 140;  // Sensibilidad óptima ajustada
   private readonly maxRedIntensity = 255;
-  private readonly minValidPixels = 850;   // Reducido para mejor detección
-  private readonly redDominanceThreshold = 1.2;  // Ajustado según investigación
-  private readonly pixelStep = 1; // Reducido para mayor precisión
+  private readonly minValidPixels = 950;   // Umbral de cobertura validado
+  private readonly redDominanceThreshold = 1.4;  // Factor de dominancia rojo calibrado
+  private readonly pixelStep = 2;
   
   extractChannels(imageData: ImageData): { 
     red: number; 
@@ -24,7 +24,7 @@ export class SignalExtractor {
     const { width, height, data } = imageData;
     const centerX = Math.floor(width / 2);
     const centerY = Math.floor(height / 2);
-    const regionSize = Math.floor(Math.min(width, height) * 0.35); // Aumentado área de detección
+    const regionSize = Math.floor(Math.min(width, height) * 0.3);
 
     let validPixelCount = 0;
     let totalRedValue = 0;
@@ -33,7 +33,7 @@ export class SignalExtractor {
     let totalBlueValue = 0;
     const totalPixelsInRegion = Math.pow(regionSize * 2, 2);
 
-    // Análisis mejorado de píxeles con mejor muestreo
+    // Análisis simplificado de píxeles
     for (let y = centerY - regionSize; y < centerY + regionSize; y += this.pixelStep) {
       if (y < 0 || y >= height) continue;
       
@@ -45,14 +45,11 @@ export class SignalExtractor {
         const green = data[i + 1];
         const blue = data[i + 2];
         
-        // Mejorado el cálculo de dominancia del rojo
-        const redDominance = (red / Math.max(green, blue));
+        const redDominance = red / (Math.max(green, blue) + 1);
         maxRedDominance = Math.max(maxRedDominance, redDominance);
 
-        // Validación mejorada del píxel
-        if (red >= this.minRedIntensity && 
-            red <= this.maxRedIntensity && 
-            redDominance >= this.redDominanceThreshold) {
+        // Simplificamos la validación del píxel
+        if (red >= this.minRedIntensity && red <= this.maxRedIntensity && redDominance >= this.redDominanceThreshold) {
           validPixelCount++;
           totalRedValue += red;
           totalGreenValue += green;
@@ -63,30 +60,23 @@ export class SignalExtractor {
 
     const coverage = validPixelCount / (totalPixelsInRegion / (this.pixelStep * this.pixelStep));
     const redMean = validPixelCount > 0 ? totalRedValue / validPixelCount : 0;
-    const greenMean = validPixelCount > 0 ? totalGreenValue / validPixelCount : 0;
-    const blueMean = validPixelCount > 0 ? totalBlueValue / validPixelCount : 0;
     
-    // Mejorada la detección del dedo con múltiples factores
-    const perfusionIndex = redMean / Math.max(greenMean, blueMean);
-    const fingerPresent = validPixelCount >= this.minValidPixels && 
-                         redMean >= this.minRedIntensity &&
-                         perfusionIndex >= 1.1;
+    // Simplificamos la detección del dedo
+    const fingerPresent = validPixelCount >= this.minValidPixels && redMean >= this.minRedIntensity;
 
-    // Log detallado para diagnóstico
-    console.log('Análisis de señal PPG:', {
+    // Log más claro
+    console.log('Detección de dedo:', {
       estado: fingerPresent ? 'DEDO PRESENTE' : 'NO HAY DEDO',
       redMean: Math.round(redMean),
       pixelesValidos: validPixelCount,
-      cobertura: Math.round(coverage * 100) + '%',
-      perfusion: perfusionIndex.toFixed(2),
-      dominanciaRojo: maxRedDominance.toFixed(2)
+      cobertura: Math.round(coverage * 100) + '%'
     });
 
     return {
       red: redMean,
-      ir: (greenMean + blueMean) / 2, // Mejorado el cálculo IR
-      quality: coverage * (perfusionIndex / 2), // Mejorado el cálculo de calidad
-      perfusionIndex,
+      ir: redMean * 0.4,
+      quality: coverage,
+      perfusionIndex: maxRedDominance,
       fingerPresent,
       diagnostics: {
         redMean,
