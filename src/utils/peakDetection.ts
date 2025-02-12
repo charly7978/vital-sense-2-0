@@ -8,33 +8,40 @@
  */
 export class PeakDetector {
   private adaptiveThreshold = 0;
-  private readonly minPeakDistance = 180;
+  private readonly minPeakDistance = 250; // Aumentado de 180 a 250ms para evitar falsos positivos
   private lastPeakTime = 0;
   private readonly bufferSize = 15;
-  private readonly minAmplitude = 0.002;
+  private readonly minAmplitude = 0.005; // Aumentado para exigir picos más claros
   private readonly adaptiveRate = 0.35;
   private peakBuffer: number[] = [];
   private timeBuffer: number[] = [];
   private frameCount = 0;
-  private readonly maxBPM = 250;
-  private readonly minBPM = 30;
+  private readonly maxBPM = 220;
+  private readonly minBPM = 40;
   private lastPeakValues: number[] = [];
   private readonly peakMemory = 5;
+  private readonly minPeakProminence = 0.1; // Nuevo: mínima diferencia con valores circundantes
 
   detectPeak(signal: number[], peakThreshold: number = 1.0): boolean {
-    if (signal.length < 3) return false;
+    if (signal.length < 5) return false; // Aumentado de 3 a 5 para mejor contexto
 
-    // Obtener el valor actual y los dos anteriores
+    // Obtener más contexto alrededor del punto analizado
     const current = signal[signal.length - 1];
     const prev1 = signal[signal.length - 2];
     const prev2 = signal[signal.length - 3];
+    const prev3 = signal[signal.length - 4]; // Nuevo: más contexto
+    const prev4 = signal[signal.length - 5]; // Nuevo: más contexto
 
-    // Calcular diferencias
+    // Calcular diferencias usando más puntos
     const diff1 = prev1 - current;
     const diff2 = prev1 - prev2;
+    const diff3 = prev2 - prev3; // Nueva diferencia
+    const diff4 = prev3 - prev4; // Nueva diferencia
 
-    // Un pico ocurre cuando ambas diferencias son positivas (pico local)
-    const isPotentialPeak = diff1 > 0 && diff2 > 0;
+    // Un pico debe tener una forma específica
+    const isPotentialPeak = diff1 > 0 && diff2 > 0 && 
+                           diff3 < 0 && diff4 < 0 && // Nueva condición: forma más clara
+                           Math.abs(diff1) > this.minPeakProminence; // Nueva condición: prominencia
 
     if (isPotentialPeak) {
       const now = Date.now();
@@ -47,14 +54,15 @@ export class PeakDetector {
       // Calcular umbral adaptativo basado en picos previos
       if (this.peakBuffer.length > 0) {
         const avgPeak = this.peakBuffer.reduce((a, b) => a + b, 0) / this.peakBuffer.length;
-        this.adaptiveThreshold = avgPeak * 0.4; // Reducido significativamente para mayor sensibilidad
+        this.adaptiveThreshold = avgPeak * 0.6; // Aumentado de 0.4 a 0.6 para ser más exigente
       } else {
-        // Umbral inicial más bajo para comenzar a detectar
-        this.adaptiveThreshold = Math.max(current * 0.3, this.minAmplitude);
+        this.adaptiveThreshold = Math.max(current * 0.4, this.minAmplitude);
       }
 
-      // Validar que el pico supere el umbral
-      if (prev1 > this.adaptiveThreshold) {
+      // Validar que el pico supere el umbral y tenga suficiente amplitud
+      if (prev1 > this.adaptiveThreshold && 
+          Math.abs(prev1 - Math.min(current, prev2)) > this.minAmplitude) {
+        
         // Actualizar buffers
         this.peakBuffer.push(prev1);
         this.timeBuffer.push(now);
@@ -67,7 +75,8 @@ export class PeakDetector {
 
         // Validar BPM resultante si tenemos suficientes datos
         if (this.timeBuffer.length >= 2) {
-          const interval = this.timeBuffer[this.timeBuffer.length - 1] - this.timeBuffer[this.timeBuffer.length - 2];
+          const interval = this.timeBuffer[this.timeBuffer.length - 1] - 
+                          this.timeBuffer[this.timeBuffer.length - 2];
           const bpm = 60000 / interval;
           
           if (bpm < this.minBPM || bpm > this.maxBPM) {
