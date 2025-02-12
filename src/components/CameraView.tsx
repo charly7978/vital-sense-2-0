@@ -39,7 +39,9 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
 
   const processFrame = () => {
     if (!isActive || !webcamRef.current?.video || !canvasRef.current) {
-      animationFrameRef.current = requestAnimationFrame(processFrame);
+      if (isActive) {
+        animationFrameRef.current = requestAnimationFrame(processFrame);
+      }
       return;
     }
 
@@ -74,7 +76,9 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
       });
     }
 
-    animationFrameRef.current = requestAnimationFrame(processFrame);
+    if (isActive) {
+      animationFrameRef.current = requestAnimationFrame(processFrame);
+    }
   };
 
   useEffect(() => {
@@ -113,7 +117,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
           }
           
           setVideoInitialized(false);
-          animationFrameRef.current = requestAnimationFrame(processFrame);
+          processFrame();
         } else {
           // Desactivar la linterna y detener la transmisión
           if (mediaStream) {
