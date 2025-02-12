@@ -22,9 +22,9 @@ const SignalQualityIndicator: React.FC<SignalQualityIndicatorProps> = ({
   const getSignalQualityIndicator = () => {
     if (!fingerPresent) {
       return (
-        <div className="flex items-center space-x-2 text-gray-400 animate-pulse">
+        <div className="flex items-center space-x-2 text-red-500 animate-pulse">
           <Hand className="w-6 h-6" />
-          <span>Coloque su dedo sobre la cámara</span>
+          <span>No se detecta dedo - Coloque su dedo sobre la cámara</span>
         </div>
       );
     }
