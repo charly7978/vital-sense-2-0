@@ -5,7 +5,7 @@ export class SignalExtractor {
   private readonly MAX_RED_THRESHOLD = 240;
   private readonly MIN_VALID_PIXELS = 30;
   private lastFingerPresent: boolean = false;
-  private readonly STABILITY_THRESHOLD = 3; // Reducido a 3 frames para más rapidez
+  private readonly STABILITY_THRESHOLD = 3;
   private stabilityCounter: number = 0;
 
   extractChannels(imageData: ImageData): { 
@@ -40,37 +40,40 @@ export class SignalExtractor {
     const redMedian = this.calculateMedian(redValues);
     const pixelRatio = validPixelCount / (this.ROI_SIZE * this.ROI_SIZE);
     
-    // Condiciones más inteligentes para la detección
-    const currentFingerPresent = redMedian >= this.MIN_RED_THRESHOLD && 
-                                validPixelCount >= this.MIN_VALID_PIXELS &&
-                                pixelRatio >= 0.3;
-
-    // Lógica de estabilidad mejorada
-    if (currentFingerPresent === this.lastFingerPresent) {
-      this.stabilityCounter = Math.min(this.stabilityCounter + 1, this.STABILITY_THRESHOLD);
-    } else if (currentFingerPresent) {
-      // Si detectamos un dedo, incrementamos más rápido
-      this.stabilityCounter = Math.min(this.stabilityCounter + 1, this.STABILITY_THRESHOLD);
-    } else {
-      // Si no detectamos dedo, decrementamos gradualmente
-      this.stabilityCounter = Math.max(this.stabilityCounter - 1, 0);
+    // Verificación más estricta de la presencia del dedo
+    const hasValidSignal = redMedian >= this.MIN_RED_THRESHOLD && validPixelCount >= this.MIN_VALID_PIXELS;
+    const hasStrongSignal = redMedian >= this.MIN_RED_THRESHOLD * 1.5 && validPixelCount >= this.MIN_VALID_PIXELS * 1.2;
+    
+    // Si no hay señal válida, resetear inmediatamente
+    if (!hasValidSignal) {
+      this.stabilityCounter = 0;
+      this.lastFingerPresent = false;
+      return {
+        red: redMedian,
+        ir: this.calculateMedian(greenValues),
+        quality: 0,
+        fingerPresent: false
+      };
     }
 
-    // Cambio de estado más fluido
-    let finalFingerPresent = this.lastFingerPresent;
-    if (this.stabilityCounter >= this.STABILITY_THRESHOLD || 
-        (currentFingerPresent && redMedian > this.MIN_RED_THRESHOLD * 1.5)) { // Detección inmediata si la señal es muy fuerte
-      finalFingerPresent = currentFingerPresent;
-      this.lastFingerPresent = currentFingerPresent;
+    // Lógica de estabilidad para señales válidas
+    if (hasStrongSignal) {
+      this.stabilityCounter = this.STABILITY_THRESHOLD; // Detección inmediata para señales fuertes
+    } else if (hasValidSignal) {
+      this.stabilityCounter = Math.min(this.stabilityCounter + 1, this.STABILITY_THRESHOLD);
     }
+
+    const fingerPresent = this.stabilityCounter >= this.STABILITY_THRESHOLD;
+    this.lastFingerPresent = fingerPresent;
 
     // Log detallado para debugging
     console.log('Detección de dedo:', {
       redMedian,
       validPixelCount,
-      currentDetection: currentFingerPresent,
+      hasValidSignal,
+      hasStrongSignal,
       stabilityCounter: this.stabilityCounter,
-      finalState: finalFingerPresent,
+      finalState: fingerPresent,
       pixelRatio
     });
 
@@ -78,7 +81,7 @@ export class SignalExtractor {
       red: redMedian,
       ir: this.calculateMedian(greenValues),
       quality: pixelRatio,
-      fingerPresent: finalFingerPresent
+      fingerPresent: fingerPresent
     };
   }
 
