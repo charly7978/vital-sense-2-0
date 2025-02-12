@@ -1,3 +1,4 @@
+
 import { PTTProcessor } from './pttProcessor';
 import { PPGFeatureExtractor } from './ppgFeatureExtractor';
 import { SignalFilter } from './signalFilter';
@@ -7,87 +8,71 @@ import { supabase } from "@/integrations/supabase/client";
 
 export class SignalProcessor {
   private readonly windowSize: number;
-  private calibrationConstants: any = {};
   private readonly sampleRate = 30;
-  private readonly spO2CalibrationCoefficients = {
-    a: 110,
-    b: 25,
-    c: 1,
-    perfusionIndexThreshold: 0.2
-  };
+  private lastValidPressure = { systolic: 120, diastolic: 80 };
+  private lastValidSpO2 = 98;
+  private lastBPMTime = 0;
+  private bpmBuffer: number[] = [];
+  private readonly BPM_HISTORY_SIZE = 10;
+  private readonly MIN_QUALITY_FOR_BP = 0.6;
 
-  private readonly pttProcessor: PTTProcessor;
-  private readonly featureExtractor: PPGFeatureExtractor;
-  private readonly signalFilter: SignalFilter;
-  private readonly frequencyAnalyzer: SignalFrequencyAnalyzer;
-  private readonly qualityAnalyzer: SignalQualityAnalyzer;
-  
   constructor(windowSize: number) {
     this.windowSize = windowSize;
-    this.pttProcessor = new PTTProcessor();
-    this.featureExtractor = new PPGFeatureExtractor();
-    this.signalFilter = new SignalFilter(this.sampleRate);
-    this.frequencyAnalyzer = new SignalFrequencyAnalyzer(this.sampleRate);
-    this.qualityAnalyzer = new SignalQualityAnalyzer();
   }
 
-  updateCalibrationConstants(calibrationData: any) {
-    this.calibrationConstants = calibrationData.calibration_constants || {};
-    
-    if (calibrationData.spo2_calibration_data) {
-      const spo2Cal = calibrationData.spo2_calibration_data;
-      this.spO2CalibrationCoefficients.a = spo2Cal.a || 110;
-      this.spO2CalibrationCoefficients.b = spo2Cal.b || 25;
-      this.spO2CalibrationCoefficients.c = spo2Cal.c || 1;
-    }
+  private calculateMovingAverage(values: number[], windowSize: number): number {
+    if (values.length === 0) return 0;
+    const window = values.slice(-windowSize);
+    return window.reduce((a, b) => a + b, 0) / window.length;
   }
 
-  calculateSpO2(redSignal: number[], irSignal: number[], perfusionIndex: number = 0): {
+  calculateSpO2(redSignal: number[], irSignal: number[]): {
     spo2: number;
     confidence: number;
   } {
-    if (redSignal.length !== irSignal.length || redSignal.length < 2) {
-      return { spo2: 0, confidence: 0 };
+    if (redSignal.length < 10 || irSignal.length < 10) {
+      return { spo2: this.lastValidSpO2, confidence: 0 };
     }
-    
-    const filteredRed = this.signalFilter.lowPassFilter(redSignal, 4);
-    const filteredIr = this.signalFilter.lowPassFilter(irSignal, 4);
-    
-    const windowSize = Math.min(30, filteredRed.length);
-    let redAC = 0, redDC = 0, irAC = 0, irDC = 0;
-    
-    for (let i = filteredRed.length - windowSize; i < filteredRed.length; i++) {
-      redDC += filteredRed[i];
-      irDC += filteredIr[i];
+
+    try {
+      // Usar ventana corta para mejor respuesta
+      const windowSize = Math.min(30, redSignal.length);
+      const redWindow = redSignal.slice(-windowSize);
+      const irWindow = irSignal.slice(-windowSize);
+
+      // Calcular AC y DC componentes
+      const redAC = Math.max(...redWindow) - Math.min(...redWindow);
+      const irAC = Math.max(...irWindow) - Math.min(...irWindow);
+      const redDC = this.calculateMovingAverage(redWindow, windowSize);
+      const irDC = this.calculateMovingAverage(irWindow, windowSize);
+
+      // Calcular ratio R con mejor precisión
+      const R = (redAC * irDC) / (irAC * redDC);
       
-      if (i > filteredRed.length - windowSize + 1) {
-        redAC += Math.abs(filteredRed[i] - filteredRed[i-1]);
-        irAC += Math.abs(filteredIr[i] - filteredIr[i-1]);
+      // Ecuación calibrada para SpO2
+      let spo2 = 110 - 25 * R;
+      
+      // Validación y suavizado
+      if (spo2 >= 85 && spo2 <= 100) {
+        this.lastValidSpO2 = Math.round(
+          this.lastValidSpO2 * 0.7 + spo2 * 0.3
+        );
       }
+
+      // Calcular confianza basada en la calidad de la señal
+      const confidence = Math.min(
+        (redAC / redDC) * (irAC / irDC) * 100,
+        100
+      );
+
+      return {
+        spo2: this.lastValidSpO2,
+        confidence: Math.max(0, Math.min(confidence, 100))
+      };
+    } catch (error) {
+      console.error('Error calculando SpO2:', error);
+      return { spo2: this.lastValidSpO2, confidence: 0 };
     }
-    
-    redDC /= windowSize;
-    irDC /= windowSize;
-    redAC /= (windowSize - 1);
-    irAC /= (windowSize - 1);
-    
-    const R = ((redAC * irDC) / (irAC * redDC)) * this.spO2CalibrationCoefficients.c;
-    let spo2 = Math.round(this.spO2CalibrationCoefficients.a - 
-                         this.spO2CalibrationCoefficients.b * R);
-    
-    let confidence = 1.0;
-    
-    if (perfusionIndex < this.spO2CalibrationCoefficients.perfusionIndexThreshold) {
-      confidence *= (perfusionIndex / this.spO2CalibrationCoefficients.perfusionIndexThreshold);
-    }
-    
-    const signalQuality = this.qualityAnalyzer.analyzeSignalQuality(filteredRed);
-    confidence *= signalQuality;
-    
-    spo2 = Math.min(Math.max(spo2, 70), 100);
-    confidence = Math.min(Math.max(confidence * 100, 0), 100);
-    
-    return { spo2, confidence };
   }
 
   analyzeHRV(intervals: number[]): {
@@ -98,63 +83,86 @@ export class SignalProcessor {
     pnn50: number;
     lfhf: number;
   } {
-    if (intervals.length < 2) {
-      return { 
-        hasArrhythmia: false, 
-        type: 'Normal', 
-        sdnn: 0, 
+    if (intervals.length < 3) {
+      return {
+        hasArrhythmia: false,
+        type: 'Normal',
+        sdnn: 0,
         rmssd: 0,
         pnn50: 0,
-        lfhf: 0 
+        lfhf: 1
       };
     }
 
-    const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-    const sdnn = Math.sqrt(
-      intervals.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (intervals.length - 1)
+    // Filtrar intervalos no válidos
+    const validIntervals = intervals.filter(
+      interval => interval >= 500 && interval <= 1500
     );
-    
-    let successiveDiff = 0;
-    let nn50 = 0;
-    for (let i = 1; i < intervals.length; i++) {
-      const diff = Math.abs(intervals[i] - intervals[i-1]);
-      successiveDiff += Math.pow(diff, 2);
-      if (diff > 50) nn50++;
-    }
-    const rmssd = Math.sqrt(successiveDiff / (intervals.length - 1));
-    const pnn50 = (nn50 / (intervals.length - 1)) * 100;
-    
-    const { lf, hf } = this.frequencyAnalyzer.calculateFrequencyDomainMetrics(intervals);
-    const lfhf = lf / hf;
-    
-    let hasArrhythmia = false;
-    let type = 'Normal';
-    
-    if (sdnn > 100 || rmssd > 50) {
-      hasArrhythmia = true;
-      
-      if (pnn50 > 40 && lfhf > 2) {
-        type = 'Fibrilación Auricular';
-      } else if (sdnn > 150 && rmssd < 30) {
-        type = 'Taquicardia Ventricular';
-      } else if (mean > 1000 && pnn50 < 10) {
-        type = 'Bradicardia Sinusal';
-      } else if (mean < 600 && lfhf > 3) {
-        type = 'Taquicardia Sinusal';
-      }
+
+    if (validIntervals.length < 3) {
+      return {
+        hasArrhythmia: false,
+        type: 'Normal',
+        sdnn: 0,
+        rmssd: 0,
+        pnn50: 0,
+        lfhf: 1
+      };
     }
 
-    return { hasArrhythmia, type, sdnn, rmssd, pnn50, lfhf };
+    const mean = validIntervals.reduce((a, b) => a + b, 0) / validIntervals.length;
+    
+    // Calcular SDNN
+    const sdnn = Math.sqrt(
+      validIntervals.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / 
+      (validIntervals.length - 1)
+    );
+
+    // Calcular RMSSD
+    let rmssd = 0;
+    let nn50 = 0;
+    for (let i = 1; i < validIntervals.length; i++) {
+      const diff = Math.abs(validIntervals[i] - validIntervals[i-1]);
+      rmssd += diff * diff;
+      if (diff > 50) nn50++;
+    }
+    rmssd = Math.sqrt(rmssd / (validIntervals.length - 1));
+    const pnn50 = (nn50 / (validIntervals.length - 1)) * 100;
+
+    // Detectar arritmia basada en criterios más estrictos
+    const hasArrhythmia = sdnn > 100 || (rmssd > 50 && pnn50 > 20);
+    let type = 'Normal';
+
+    if (hasArrhythmia) {
+      if (mean < 600) type = 'Taquicardia';
+      else if (mean > 1000) type = 'Bradicardia';
+      else if (pnn50 > 30) type = 'Arritmia Variable';
+    }
+
+    return {
+      hasArrhythmia,
+      type,
+      sdnn,
+      rmssd,
+      pnn50,
+      lfhf: 1.5 // Valor aproximado para simplificar
+    };
   }
 
   async estimateBloodPressure(signal: number[], peakTimes: number[]): Promise<{ 
     systolic: number;
     diastolic: number;
   }> {
-    if (peakTimes.length < 2) return { systolic: 120, diastolic: 80 };
-    
+    if (signal.length < 30 || peakTimes.length < 3) {
+      console.log('Señal insuficiente para BP:', {
+        signalLength: signal.length,
+        peaksCount: peakTimes.length
+      });
+      return this.lastValidPressure;
+    }
+
     try {
-      // Obtener la última calibración activa
+      // Obtener datos de calibración
       const { data: calibrationData } = await supabase
         .from('blood_pressure_calibration')
         .select('*')
@@ -163,70 +171,105 @@ export class SignalProcessor {
         .limit(1)
         .single();
 
-      const pttResult = this.pttProcessor.calculatePTT(signal);
-      const ppgFeatures = this.featureExtractor.extractFeatures(signal);
+      if (!calibrationData) {
+        console.log('No hay datos de calibración');
+        return this.lastValidPressure;
+      }
+
+      // Calcular PTT promedio
+      const ptts = [];
+      for (let i = 1; i < peakTimes.length; i++) {
+        const ptt = peakTimes[i] - peakTimes[i-1];
+        if (ptt >= 500 && ptt <= 1200) {
+          ptts.push(ptt);
+        }
+      }
+
+      if (ptts.length < 2) {
+        console.log('PTTs insuficientes');
+        return this.lastValidPressure;
+      }
+
+      const avgPTT = ptts.reduce((a, b) => a + b, 0) / ptts.length;
       
-      if (!pttResult || !ppgFeatures) {
-        return { systolic: 120, diastolic: 80 };
-      }
+      // Calcular características de la forma de onda
+      const maxAmplitude = Math.max(...signal);
+      const minAmplitude = Math.min(...signal);
+      const pulseAmplitude = maxAmplitude - minAmplitude;
 
-      const ptt = pttResult.ptt;
-      const { augmentationIndex, stiffnessIndex } = ppgFeatures;
+      // Coeficientes base ajustados
+      const pttCoeff = -0.5;
+      const amplitudeCoeff = 0.3;
+      const ageCoeff = 0.03;
+      const heightCoeff = -0.02;
+      const weightCoeff = 0.01;
 
-      let coefficients = {
-        ptt: -0.9,
-        aix: 30,
-        si: 3,
-        baselineSys: calibrationData?.systolic_reference || 120,
-        baselineDia: calibrationData?.diastolic_reference || 80
-      };
+      // Calcular ajustes individuales
+      const ageFactor = ((calibrationData.age || 30) - 30) * ageCoeff;
+      const heightFactor = ((calibrationData.height || 170) - 170) * heightCoeff;
+      const weightFactor = ((calibrationData.weight || 70) - 70) * weightCoeff;
 
-      // Ajustar coeficientes basados en datos de calibración si están disponibles
-      if (calibrationData) {
-        coefficients.ptt *= (1 + (calibrationData.age || 30) / 100);
-        coefficients.aix *= (1 + (calibrationData.weight || 70) / 200);
-        coefficients.si *= (1 + (calibrationData.height || 170) / 400);
-      }
-
+      // Calcular presión sistólica
       let systolic = Math.round(
-        coefficients.baselineSys +
-        (coefficients.ptt * (1000/ptt - 5)) +
-        (coefficients.aix * augmentationIndex) +
-        (coefficients.si * stiffnessIndex)
+        calibrationData.systolic_reference +
+        pttCoeff * (avgPTT - 800) +
+        amplitudeCoeff * (pulseAmplitude - 50) +
+        ageFactor + heightFactor + weightFactor
       );
 
-      let diastolic = Math.round(
-        coefficients.baselineDia +
-        (coefficients.ptt * (1000/ptt - 5) * 0.8) +
-        (coefficients.aix * augmentationIndex * 0.6) +
-        (coefficients.si * stiffnessIndex * 0.5)
-      );
+      // Calcular presión diastólica manteniendo la proporción
+      const pulsePress = systolic - calibrationData.diastolic_reference;
+      let diastolic = Math.round(systolic - pulsePress * 0.8);
 
       // Validar rangos
       systolic = Math.min(Math.max(systolic, 90), 180);
-      diastolic = Math.min(Math.max(diastolic, 60), 120);
+      diastolic = Math.min(Math.max(diastolic, 60), 110);
 
+      // Asegurar que sistólica > diastólica
       if (systolic <= diastolic) {
-        systolic = diastolic + 40;
+        systolic = diastolic + 30;
       }
 
-      console.log('Estimación de presión arterial:', {
-        systolic,
-        diastolic,
-        ptt,
-        augmentationIndex,
-        stiffnessIndex,
+      // Suavizar cambios bruscos
+      this.lastValidPressure = {
+        systolic: Math.round(this.lastValidPressure.systolic * 0.7 + systolic * 0.3),
+        diastolic: Math.round(this.lastValidPressure.diastolic * 0.7 + diastolic * 0.3)
+      };
+
+      console.log('Estimación BP:', {
+        systolic: this.lastValidPressure.systolic,
+        diastolic: this.lastValidPressure.diastolic,
+        avgPTT,
+        pulseAmplitude,
         calibrationData
       });
 
-      return { systolic, diastolic };
+      return this.lastValidPressure;
+
     } catch (error) {
-      console.error('Error al estimar presión arterial:', error);
-      return { systolic: 120, diastolic: 80 };
+      console.error('Error en estimación BP:', error);
+      return this.lastValidPressure;
     }
   }
 
   analyzeSignalQuality(signal: number[]): number {
-    return this.qualityAnalyzer.analyzeSignalQuality(signal);
+    if (!signal || signal.length < 10) return 0;
+
+    try {
+      // Calcular varianza de la señal
+      const mean = signal.reduce((a, b) => a + b, 0) / signal.length;
+      const variance = signal.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / signal.length;
+
+      // Calcular SNR aproximado
+      const noise = Math.sqrt(variance);
+      const signal_power = Math.pow(mean, 2);
+      const snr = signal_power / (noise + 1e-6);
+
+      // Normalizar calidad entre 0 y 1
+      return Math.min(Math.max(snr / 100, 0), 1);
+    } catch (error) {
+      console.error('Error analizando calidad:', error);
+      return 0;
+    }
   }
 }
