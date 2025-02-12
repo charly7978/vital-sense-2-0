@@ -10,7 +10,6 @@ interface CameraViewProps {
   isActive: boolean;
 }
 
-// Extendemos la interfaz MediaTrackConstraintSet para incluir torch
 declare global {
   interface MediaTrackConstraintSet {
     torch?: boolean;
@@ -23,6 +22,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   const animationFrameRef = useRef<number | null>(null);
   const { toast } = useToast();
   const [videoInitialized, setVideoInitialized] = useState(false);
+  const [fingerPresent, setFingerPresent] = useState(false);
   const isMobile = useIsMobile();
   const isAndroid = /android/i.test(navigator.userAgent);
 
@@ -93,11 +93,8 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
             webcamRef.current.video!.srcObject = mediaStream;
           }
 
-          // Configurar la linterna para Android
           if (isAndroid) {
             const track = mediaStream.getVideoTracks()[0];
-            
-            // Intentar activar la linterna
             try {
               await track.applyConstraints({
                 advanced: [{ torch: true }]
@@ -115,7 +112,6 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
           setVideoInitialized(false);
           animationFrameRef.current = requestAnimationFrame(processFrame);
         } else {
-          // Desactivar la linterna y detener la transmisión
           if (mediaStream) {
             const track = mediaStream.getVideoTracks()[0];
             if (isAndroid) {
@@ -171,12 +167,21 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
           </div>
         )}
         {isActive && (
-          <Webcam
-            ref={webcamRef}
-            className="w-full h-full object-cover"
-            videoConstraints={getDeviceConstraints()}
-            forceScreenshotSourceSize
-          />
+          <>
+            <Webcam
+              ref={webcamRef}
+              className="w-full h-full object-cover"
+              videoConstraints={getDeviceConstraints()}
+              forceScreenshotSourceSize
+            />
+            <div className={`absolute bottom-0 left-0 right-0 p-4 transition-all duration-300 ${
+              fingerPresent ? 'bg-green-500/80' : 'bg-red-500/80'
+            }`}>
+              <p className="text-white text-center font-medium">
+                {fingerPresent ? '✅ Dedo detectado' : '❌ Coloca el dedo sobre la cámara'}
+              </p>
+            </div>
+          </>
         )}
       </div>
       <canvas ref={canvasRef} className="hidden" />

@@ -8,8 +8,9 @@ import { SignalNormalizer } from './signalNormalization';
 import { SignalFilter } from './signalFilter';
 import { SignalFrequencyAnalyzer } from './signalFrequencyAnalyzer';
 import { MLModel } from './mlModel';
+import EventEmitter from 'events';
 
-export class PPGProcessor {
+export class PPGProcessor extends EventEmitter {
   private readings: VitalReading[] = [];
   private redBuffer: number[] = [];
   private irBuffer: number[] = [];
@@ -24,7 +25,7 @@ export class PPGProcessor {
   private readonly frequencyAnalyzer: SignalFrequencyAnalyzer;
   private beepPlayer: BeepPlayer;
   private signalBuffer: number[] = [];
-  private readonly bufferSize = 90; // Reducido de 150 a 90 para evitar acumulación
+  private readonly bufferSize = 90;
   private readonly qualityThreshold = 0.2;
   private mlModel: MLModel;
   private lastProcessingTime: number = 0;
@@ -32,7 +33,8 @@ export class PPGProcessor {
   private lastValidBpm: number = 0;
   private lastValidSpO2: number = 98;
   private noFingerTimer: number | null = null;
-  private readonly RESET_DELAY = 1000; // 1 segundo sin dedo para resetear
+  private readonly RESET_DELAY = 1000;
+  private lastFingerState: boolean = false;
   
   private sensitivitySettings: SensitivitySettings = {
     signalAmplification: 1.5,
@@ -41,6 +43,7 @@ export class PPGProcessor {
   };
   
   constructor() {
+    super(); // Inicializamos EventEmitter
     console.log('Inicializando PPGProcessor...');
     this.beepPlayer = new BeepPlayer();
     this.signalProcessor = new SignalProcessor(this.windowSize);
@@ -68,6 +71,13 @@ export class PPGProcessor {
     
     try {
       const { red, ir, quality, fingerPresent } = this.signalExtractor.extractChannels(imageData);
+
+      // Emitir evento si el estado del dedo cambió
+      if (fingerPresent !== this.lastFingerState) {
+        this.lastFingerState = fingerPresent;
+        this.emit('fingerStateChange', fingerPresent);
+        console.log('Estado del dedo actualizado:', fingerPresent);
+      }
 
       // Control de frecuencia de procesamiento
       if (now - this.lastProcessingTime < this.minProcessingInterval) {
