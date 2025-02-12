@@ -1,9 +1,9 @@
 
 export class SignalExtractor {
-  private readonly minRedIntensity = 40;  // Reducido para mejor detección
-  private readonly maxRedIntensity = 250; // Aumentado el rango superior
-  private readonly minValidPixels = 400;  // Reducido para ser más sensible
-  private readonly redDominanceThreshold = 1.2; // Reducido para mejor detección
+  private readonly minRedIntensity = 30;  // Reducido aún más
+  private readonly maxRedIntensity = 255; // Máximo posible
+  private readonly minValidPixels = 200;  // Reducido significativamente
+  private readonly redDominanceThreshold = 1.1; // Casi cualquier dominancia del rojo
   private readonly pixelStep = 2;
   private frameCount = 0;
 
@@ -24,7 +24,7 @@ export class SignalExtractor {
     const { width, height, data } = imageData;
     const centerX = Math.floor(width / 2);
     const centerY = Math.floor(height / 2);
-    const regionSize = Math.floor(Math.min(width, height) * 0.25);
+    const regionSize = Math.floor(Math.min(width, height) * 0.3); // Aumentado el área de detección
 
     let validPixelCount = 0;
     let totalRedValue = 0;
@@ -33,7 +33,7 @@ export class SignalExtractor {
     let totalBlueValue = 0;
     const totalPixelsInRegion = Math.pow(regionSize * 2, 2);
 
-    // Análisis más detallado de la imagen
+    // Análisis de la imagen
     for (let y = centerY - regionSize; y < centerY + regionSize; y += this.pixelStep) {
       if (y < 0 || y >= height) continue;
       
@@ -45,14 +45,11 @@ export class SignalExtractor {
         const green = data[i + 1];
         const blue = data[i + 2];
         
-        // Cálculo mejorado de dominancia del rojo
-        const redOverGreen = red / (green + 1);
-        const redOverBlue = red / (blue + 1);
-        const redDominance = Math.min(redOverGreen, redOverBlue);
-        
+        // Cálculo simplificado de dominancia del rojo
+        const redDominance = (red / (Math.max(green, blue) + 1));
         maxRedDominance = Math.max(maxRedDominance, redDominance);
 
-        // Verificación más sensible de píxel de piel
+        // Verificación más permisiva de píxel de piel
         if (red >= this.minRedIntensity && 
             red <= this.maxRedIntensity && 
             redDominance >= this.redDominanceThreshold) {
@@ -64,19 +61,18 @@ export class SignalExtractor {
       }
     }
 
-    // Cálculos más detallados
+    // Cálculos
     const coverage = validPixelCount / (totalPixelsInRegion / (this.pixelStep * this.pixelStep));
     const redMean = validPixelCount > 0 ? totalRedValue / validPixelCount : 0;
     const greenMean = validPixelCount > 0 ? totalGreenValue / validPixelCount : 0;
     const blueMean = validPixelCount > 0 ? totalBlueValue / validPixelCount : 0;
     
-    // Detección más sensible del dedo
-    const fingerPresent = coverage > 0.15 && // Reducido a 15% para más sensibilidad
-                         validPixelCount >= this.minValidPixels && 
-                         redMean >= this.minRedIntensity;
+    // Detección mucho más sensible del dedo
+    const fingerPresent = coverage > 0.05 && // Reducido a solo 5% de cobertura
+                         validPixelCount >= this.minValidPixels;
 
-    // Logging más frecuente y detallado
-    if (this.frameCount % 15 === 0) { // Aumentada la frecuencia de logging
+    // Logging más frecuente
+    if (this.frameCount % 10 === 0) { // Cada 10 frames
       console.log('Diagnóstico detallado de detección de dedo:', {
         cobertura: coverage.toFixed(3),
         porcentajeCobertura: (coverage * 100).toFixed(1) + '%',
@@ -87,11 +83,13 @@ export class SignalExtractor {
         promedioAzul: blueMean.toFixed(1),
         minimoRojo: this.minRedIntensity,
         dominanciaRojo: maxRedDominance.toFixed(2),
-        proporcionRV: (redMean / greenMean).toFixed(2),
-        proporcionRA: (redMean / blueMean).toFixed(2),
+        proporcionRV: (redMean / (greenMean + 1)).toFixed(2),
+        proporcionRA: (redMean / (blueMean + 1)).toFixed(2),
         hayDedo: fingerPresent,
-        umbralCobertura: '15%',
-        umbralDominancia: this.redDominanceThreshold
+        umbralCobertura: '5%',
+        umbralDominancia: this.redDominanceThreshold,
+        tamanoRegion: regionSize,
+        areaTotal: totalPixelsInRegion
       });
     }
 
