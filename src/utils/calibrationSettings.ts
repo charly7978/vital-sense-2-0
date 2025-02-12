@@ -64,7 +64,7 @@ export const calibrationSettings: CalibrationSettings = {
 
   // Configuraciones de filtrado
   NOISE_REDUCTION: {
-    value: 1.2,
+    value: 2.9,
     min: 0.5,  // Mínimo filtrado útil
     max: 2.0,  // Máximo antes de perder demasiada información
     step: 0.1, // Ajustes finos
