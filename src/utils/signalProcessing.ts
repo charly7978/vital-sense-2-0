@@ -1,9 +1,9 @@
-
 import { PTTProcessor } from './pttProcessor';
 import { PPGFeatureExtractor } from './ppgFeatureExtractor';
 import { SignalFilter } from './signalFilter';
 import { SignalFrequencyAnalyzer } from './signalFrequencyAnalyzer';
 import { SignalQualityAnalyzer } from './signalQualityAnalyzer';
+import { supabase } from "@/integrations/supabase/client";
 
 export class SignalProcessor {
   private readonly windowSize: number;
@@ -147,75 +147,83 @@ export class SignalProcessor {
     return { hasArrhythmia, type, sdnn, rmssd, pnn50, lfhf };
   }
 
-  estimateBloodPressure(signal: number[], peakTimes: number[]): { 
+  async estimateBloodPressure(signal: number[], peakTimes: number[]): Promise<{ 
     systolic: number;
     diastolic: number;
-  } {
+  }> {
     if (peakTimes.length < 2) return { systolic: 120, diastolic: 80 };
     
-    const pttResult = this.pttProcessor.calculatePTT(signal);
-    const ppgFeatures = this.featureExtractor.extractFeatures(signal);
-    
-    if (!pttResult || !ppgFeatures) {
+    try {
+      // Obtener la última calibración activa
+      const { data: calibrationData } = await supabase
+        .from('blood_pressure_calibration')
+        .select('*')
+        .eq('is_active', true)
+        .order('calibration_date', { ascending: false })
+        .limit(1)
+        .single();
+
+      const pttResult = this.pttProcessor.calculatePTT(signal);
+      const ppgFeatures = this.featureExtractor.extractFeatures(signal);
+      
+      if (!pttResult || !ppgFeatures) {
+        return { systolic: 120, diastolic: 80 };
+      }
+
+      const ptt = pttResult.ptt;
+      const { augmentationIndex, stiffnessIndex } = ppgFeatures;
+
+      let coefficients = {
+        ptt: -0.9,
+        aix: 30,
+        si: 3,
+        baselineSys: calibrationData?.systolic_reference || 120,
+        baselineDia: calibrationData?.diastolic_reference || 80
+      };
+
+      // Ajustar coeficientes basados en datos de calibración si están disponibles
+      if (calibrationData) {
+        coefficients.ptt *= (1 + (calibrationData.age || 30) / 100);
+        coefficients.aix *= (1 + (calibrationData.weight || 70) / 200);
+        coefficients.si *= (1 + (calibrationData.height || 170) / 400);
+      }
+
+      let systolic = Math.round(
+        coefficients.baselineSys +
+        (coefficients.ptt * (1000/ptt - 5)) +
+        (coefficients.aix * augmentationIndex) +
+        (coefficients.si * stiffnessIndex)
+      );
+
+      let diastolic = Math.round(
+        coefficients.baselineDia +
+        (coefficients.ptt * (1000/ptt - 5) * 0.8) +
+        (coefficients.aix * augmentationIndex * 0.6) +
+        (coefficients.si * stiffnessIndex * 0.5)
+      );
+
+      // Validar rangos
+      systolic = Math.min(Math.max(systolic, 90), 180);
+      diastolic = Math.min(Math.max(diastolic, 60), 120);
+
+      if (systolic <= diastolic) {
+        systolic = diastolic + 40;
+      }
+
+      console.log('Estimación de presión arterial:', {
+        systolic,
+        diastolic,
+        ptt,
+        augmentationIndex,
+        stiffnessIndex,
+        calibrationData
+      });
+
+      return { systolic, diastolic };
+    } catch (error) {
+      console.error('Error al estimar presión arterial:', error);
       return { systolic: 120, diastolic: 80 };
     }
-
-    const ptt = pttResult.ptt;
-    const { augmentationIndex, stiffnessIndex } = ppgFeatures;
-
-    const coefficients = {
-      ptt: -0.9,
-      aix: 30,
-      si: 3,
-      baselineSys: 120,
-      baselineDia: 80
-    };
-
-    let systolic = Math.round(
-      coefficients.baselineSys +
-      (coefficients.ptt * (1000/ptt - 5)) +
-      (coefficients.aix * augmentationIndex) +
-      (coefficients.si * stiffnessIndex)
-    );
-
-    let diastolic = Math.round(
-      coefficients.baselineDia +
-      (coefficients.ptt * (1000/ptt - 5) * 0.8) +
-      (coefficients.aix * augmentationIndex * 0.6) +
-      (coefficients.si * stiffnessIndex * 0.5)
-    );
-
-    systolic = Math.min(Math.max(systolic, 90), 180);
-    diastolic = Math.min(Math.max(diastolic, 60), 120);
-
-    if (systolic <= diastolic) {
-      systolic = diastolic + 40;
-    }
-
-    return { systolic, diastolic };
-  }
-
-  estimateBloodPressureWithCalibration(
-    signal: number[], 
-    peakTimes: number[],
-    calibrationData: any
-  ): { 
-    systolic: number;
-    diastolic: number;
-  } {
-    const baseBP = this.estimateBloodPressure(signal, peakTimes);
-    const calibrationFactor = this.calculateCalibrationFactor(calibrationData);
-    
-    return {
-      systolic: Math.round(baseBP.systolic * calibrationFactor),
-      diastolic: Math.round(baseBP.diastolic * calibrationFactor)
-    };
-  }
-
-  private calculateCalibrationFactor(calibrationData: any): number {
-    const referenceSystolic = calibrationData.systolic || 120;
-    const estimatedSystolic = 120;
-    return referenceSystolic / estimatedSystolic;
   }
 
   analyzeSignalQuality(signal: number[]): number {

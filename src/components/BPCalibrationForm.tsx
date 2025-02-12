@@ -48,6 +48,14 @@ const BPCalibrationForm = () => {
         description: "Los valores de referencia han sido guardados exitosamente.",
       });
 
+      // Limpiar el formulario después de guardar
+      setSystolic(120);
+      setDiastolic(80);
+      setAge(30);
+      setWeight(70);
+      setHeight(170);
+      setNotes('');
+
     } catch (error) {
       console.error('Error al guardar calibración:', error);
       toast({

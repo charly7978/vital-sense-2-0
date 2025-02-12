@@ -16,7 +16,7 @@ export interface PPGData {
   readings: VitalReading[];
   isPeak?: boolean;
   signalQuality: number;
-  redValue: number;  // Añadimos esta propiedad
+  redValue: number;
   hrvMetrics?: {
     sdnn: number;
     rmssd: number;
