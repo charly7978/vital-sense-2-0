@@ -1,15 +1,15 @@
 
 export class PeakDetector {
   private adaptiveThreshold = 0;
-  private readonly minPeakDistance = 250; // Ajustado para 60-240 BPM
+  private readonly minPeakDistance = 200; // Reducido para mejor detección
   private lastPeakTime = 0;
-  private readonly bufferSize = 30;
-  private readonly minAmplitude = 0.008; // Reducido para mayor sensibilidad
-  private readonly adaptiveRate = 0.15; // Ajustado para mejor adaptación
+  private readonly bufferSize = 15; // Reducido para respuesta más rápida
+  private readonly minAmplitude = 0.003; // Reducido significativamente para máxima sensibilidad
+  private readonly adaptiveRate = 0.3; // Aumentado para adaptación más rápida
   private peakBuffer: number[] = [];
   private timeBuffer: number[] = [];
   private frameCount = 0;
-  private readonly maxBPM = 220;
+  private readonly maxBPM = 250; // Aumentado rango
   private readonly minBPM = 30;
   private lastPeakValues: number[] = [];
   private readonly peakMemory = 5;
@@ -24,7 +24,7 @@ export class PeakDetector {
       return false;
     }
 
-    if (signalBuffer.length < 5) {
+    if (signalBuffer.length < 3) { // Reducido requisito mínimo
       return false;
     }
 
@@ -37,14 +37,14 @@ export class PeakDetector {
     const trend = this.calculateTrend(recentValues);
     const detrended = currentValue - trend;
 
-    // Mejorado el cálculo del umbral dinámico
+    // Mejorado el cálculo del umbral dinámico para mayor sensibilidad
     const dynamicThreshold = this.calculateDynamicThreshold(recentValues, avgValue, stdDev);
     this.adaptiveThreshold = (this.adaptiveThreshold * (1 - this.adaptiveRate)) + 
                             (dynamicThreshold * this.adaptiveRate);
 
-    // Validaciones más precisas
+    // Validaciones más permisivas para detección de picos
     const hasSignificantAmplitude = detrended > this.minAmplitude * stdDev;
-    const isAboveThreshold = currentValue > (this.adaptiveThreshold * 0.85);
+    const isAboveThreshold = currentValue > (this.adaptiveThreshold * 0.6); // Reducido significativamente
     const isPotentialPeak = this.validatePeakCharacteristics(currentValue, signalBuffer, avgValue, stdDev);
 
     if ((hasSignificantAmplitude || isAboveThreshold) && isPotentialPeak) {
@@ -95,9 +95,10 @@ export class PeakDetector {
     const skewness = this.calculateSkewness(values, mean, stdDev);
     const kurtosis = this.calculateKurtosis(values, mean, stdDev);
     
-    const thresholdFactor = 0.4 + 
-                           Math.abs(skewness) * 0.1 + 
-                           Math.max(0, kurtosis - 3) * 0.05;
+    // Ajustado para mayor sensibilidad
+    const thresholdFactor = 0.25 + 
+                           Math.abs(skewness) * 0.05 + 
+                           Math.max(0, kurtosis - 3) * 0.02;
     
     return mean + thresholdFactor * stdDev;
   }
@@ -115,15 +116,16 @@ export class PeakDetector {
   }
 
   private validatePeakCharacteristics(currentValue: number, signalBuffer: number[], mean: number, stdDev: number): boolean {
-    const window = 4;
+    const window = 3; // Reducido de 4
     const samples = signalBuffer.slice(-window);
     
     const firstDerivative = samples.map((v, i, arr) => i > 0 ? v - arr[i-1] : 0);
     const secondDerivative = firstDerivative.map((v, i, arr) => i > 0 ? v - arr[i-1] : 0);
     
-    const isRising = firstDerivative[firstDerivative.length - 2] > -0.1;
-    const isPeaking = firstDerivative[firstDerivative.length - 1] < 0.1;
-    const isConcaveDown = secondDerivative[secondDerivative.length - 1] < 0.1;
+    // Criterios más permisivos
+    const isRising = firstDerivative[firstDerivative.length - 2] > -0.15;
+    const isPeaking = firstDerivative[firstDerivative.length - 1] < 0.15;
+    const isConcaveDown = secondDerivative[secondDerivative.length - 1] < 0.15;
     
     const relativeAmplitude = (currentValue - mean) / stdDev;
     const isSignificant = relativeAmplitude > this.minAmplitude;
@@ -148,7 +150,8 @@ export class PeakDetector {
       const variability = recentIntervals.reduce((acc, interval) => 
         acc + Math.pow(interval - avgInterval, 2), 0) / recentIntervals.length;
       
-      const allowedVariation = Math.min(0.5, 0.4 + variability / avgInterval);
+      // Aumentado el rango de variación permitido
+      const allowedVariation = Math.min(0.6, 0.5 + variability / avgInterval);
       
       return Math.abs(currentInterval - avgInterval) <= avgInterval * allowedVariation;
     }
@@ -157,7 +160,7 @@ export class PeakDetector {
   }
 
   private calculateConfidence(value: number, mean: number, stdDev: number, interval: number): number {
-    const amplitudeConfidence = Math.min(1, (value - mean) / (3 * stdDev));
+    const amplitudeConfidence = Math.min(1, (value - mean) / (2.5 * stdDev)); // Reducido de 3 a 2.5
     const timingConfidence = this.calculateTimingConfidence(interval);
     const shapeConfidence = this.calculateShapeConfidence();
     
