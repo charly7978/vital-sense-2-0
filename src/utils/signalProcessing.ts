@@ -169,7 +169,7 @@ export class SignalProcessor {
         .eq('is_active', true)
         .order('calibration_date', { ascending: false })
         .limit(1)
-        .maybeSingle(); // Cambiado de .single() a .maybeSingle()
+        .maybeSingle();
 
       if (error) {
         console.error('Error obteniendo calibración:', error);
@@ -202,19 +202,19 @@ export class SignalProcessor {
       const minAmplitude = Math.min(...signal);
       const pulseAmplitude = maxAmplitude - minAmplitude;
 
-      // Coeficientes base ajustados
-      const pttCoeff = -0.5;
-      const amplitudeCoeff = 0.3;
-      const ageCoeff = 0.03;
-      const heightCoeff = -0.02;
-      const weightCoeff = 0.01;
+      // Coeficientes ajustados para menor sensibilidad
+      const pttCoeff = -0.3; // Reducido de -0.5 a -0.3
+      const amplitudeCoeff = 0.2; // Reducido de 0.3 a 0.2
+      const ageCoeff = 0.02; // Reducido de 0.03 a 0.02
+      const heightCoeff = -0.01; // Reducido de -0.02 a -0.01
+      const weightCoeff = 0.005; // Reducido de 0.01 a 0.005
 
       // Calcular ajustes individuales
       const ageFactor = ((calibrationData.age || 30) - 30) * ageCoeff;
       const heightFactor = ((calibrationData.height || 170) - 170) * heightCoeff;
       const weightFactor = ((calibrationData.weight || 70) - 70) * weightCoeff;
 
-      // Calcular presión sistólica
+      // Calcular presión sistólica con menor sensibilidad
       let systolic = Math.round(
         calibrationData.systolic_reference +
         pttCoeff * (avgPTT - 800) +
@@ -222,23 +222,23 @@ export class SignalProcessor {
         ageFactor + heightFactor + weightFactor
       );
 
-      // Calcular presión diastólica manteniendo la proporción
+      // Calcular presión diastólica manteniendo la proporción pero con más suavizado
       const pulsePress = systolic - calibrationData.diastolic_reference;
-      let diastolic = Math.round(systolic - pulsePress * 0.8);
+      let diastolic = Math.round(systolic - pulsePress * 0.7); // Cambiado de 0.8 a 0.7
 
-      // Validar rangos
-      systolic = Math.min(Math.max(systolic, 90), 180);
-      diastolic = Math.min(Math.max(diastolic, 60), 110);
+      // Validar rangos con límites más estrictos
+      systolic = Math.min(Math.max(systolic, 100), 160);
+      diastolic = Math.min(Math.max(diastolic, 60), 100);
 
       // Asegurar que sistólica > diastólica
       if (systolic <= diastolic) {
         systolic = diastolic + 30;
       }
 
-      // Suavizar cambios bruscos
+      // Suavizar cambios con más peso al valor anterior
       this.lastValidPressure = {
-        systolic: Math.round(this.lastValidPressure.systolic * 0.7 + systolic * 0.3),
-        diastolic: Math.round(this.lastValidPressure.diastolic * 0.7 + diastolic * 0.3)
+        systolic: Math.round(this.lastValidPressure.systolic * 0.8 + systolic * 0.2),
+        diastolic: Math.round(this.lastValidPressure.diastolic * 0.8 + diastolic * 0.2)
       };
 
       console.log('Estimación BP:', {
