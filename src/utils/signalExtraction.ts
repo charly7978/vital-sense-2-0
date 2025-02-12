@@ -7,6 +7,8 @@ export class SignalExtractor {
   private lastFingerPresent: boolean = false;
   private readonly STABILITY_THRESHOLD = 3;
   private stabilityCounter: number = 0;
+  private readonly INSTABILITY_THRESHOLD = 5; // Nuevo: cuántos frames malos necesitamos para considerar inestabilidad
+  private instabilityCounter: number = 0; // Nuevo: contador de frames inestables
 
   extractChannels(imageData: ImageData): { 
     red: number;
@@ -40,31 +42,36 @@ export class SignalExtractor {
     const redMedian = this.calculateMedian(redValues);
     const pixelRatio = validPixelCount / (this.ROI_SIZE * this.ROI_SIZE);
     
-    // Verificación más estricta de la presencia del dedo
+    // Verificación de señal válida
     const hasValidSignal = redMedian >= this.MIN_RED_THRESHOLD && validPixelCount >= this.MIN_VALID_PIXELS;
     const hasStrongSignal = redMedian >= this.MIN_RED_THRESHOLD * 1.5 && validPixelCount >= this.MIN_VALID_PIXELS * 1.2;
     
-    // Si no hay señal válida, resetear inmediatamente
-    if (!hasValidSignal) {
-      this.stabilityCounter = 0;
-      this.lastFingerPresent = false;
-      return {
-        red: redMedian,
-        ir: this.calculateMedian(greenValues),
-        quality: 0,
-        fingerPresent: false
-      };
-    }
-
-    // Lógica de estabilidad para señales válidas
+    // Lógica de estabilidad mejorada
     if (hasStrongSignal) {
-      this.stabilityCounter = this.STABILITY_THRESHOLD; // Detección inmediata para señales fuertes
+      // Señal fuerte: incrementar estabilidad, resetear inestabilidad
+      this.stabilityCounter = Math.min(this.stabilityCounter + 2, this.STABILITY_THRESHOLD);
+      this.instabilityCounter = 0;
     } else if (hasValidSignal) {
+      // Señal válida: incrementar estabilidad gradualmente, resetear inestabilidad
       this.stabilityCounter = Math.min(this.stabilityCounter + 1, this.STABILITY_THRESHOLD);
+      this.instabilityCounter = 0;
+    } else {
+      // Señal inválida: incrementar inestabilidad
+      this.instabilityCounter++;
+      // Solo reducimos estabilidad si hay suficiente inestabilidad acumulada
+      if (this.instabilityCounter >= this.INSTABILITY_THRESHOLD) {
+        this.stabilityCounter = Math.max(0, this.stabilityCounter - 1);
+      }
     }
 
+    // Determinación del estado final
     const fingerPresent = this.stabilityCounter >= this.STABILITY_THRESHOLD;
-    this.lastFingerPresent = fingerPresent;
+    
+    // Solo actualizamos lastFingerPresent cuando hay un cambio definitivo
+    if (fingerPresent !== this.lastFingerPresent && 
+        (fingerPresent ? this.stabilityCounter >= this.STABILITY_THRESHOLD : this.instabilityCounter >= this.INSTABILITY_THRESHOLD)) {
+      this.lastFingerPresent = fingerPresent;
+    }
 
     // Log detallado para debugging
     console.log('Detección de dedo:', {
@@ -73,7 +80,8 @@ export class SignalExtractor {
       hasValidSignal,
       hasStrongSignal,
       stabilityCounter: this.stabilityCounter,
-      finalState: fingerPresent,
+      instabilityCounter: this.instabilityCounter,
+      finalState: this.lastFingerPresent,
       pixelRatio
     });
 
@@ -81,7 +89,7 @@ export class SignalExtractor {
       red: redMedian,
       ir: this.calculateMedian(greenValues),
       quality: pixelRatio,
-      fingerPresent: fingerPresent
+      fingerPresent: this.lastFingerPresent
     };
   }
 
