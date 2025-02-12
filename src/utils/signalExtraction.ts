@@ -1,20 +1,21 @@
 
 export class SignalExtractor {
-  private readonly minIntensity = 30; // Aumentado para mejor detección
-  private readonly maxIntensity = 245;
-  private readonly smoothingWindow = 10;
+  private readonly minIntensity = 50; // Aumentado para mejor detección
+  private readonly maxIntensity = 240;
+  private readonly smoothingWindow = 5; // Reducido para mejor respuesta en tiempo real
   private lastRedValues: number[] = [];
   private lastIrValues: number[] = [];
   private frameCount = 0;
-  private readonly minValidPixels = 100; // Aumentado para requerir más área de dedo
-  private readonly redDominanceThreshold = 1.2; // Aumentado para asegurar que sea dedo
-  private readonly stabilityThreshold = 0.2;
+  private readonly minValidPixels = 500; // Aumentado significativamente
+  private readonly redDominanceThreshold = 1.5; // Más estricto
+  private readonly stabilityThreshold = 0.3;
   private lastStabilityValues: number[] = [];
   private readonly pixelStep = 2;
+  private readonly minRedRange = 30; // Mínima variación requerida
 
   private kalmanState = {
-    red: { q: 0.05, r: 1.2, p: 1, x: 0, k: 0 },
-    ir: { q: 0.05, r: 1.2, p: 1, x: 0, k: 0 }
+    red: { q: 0.1, r: 0.8, p: 1, x: 0, k: 0 }, // Ajustado para respuesta más rápida
+    ir: { q: 0.1, r: 0.8, p: 1, x: 0, k: 0 }
   };
 
   private applyKalmanFilter(measurement: number, state: typeof this.kalmanState.red) {
@@ -26,20 +27,23 @@ export class SignalExtractor {
   }
 
   private calculateMean(values: number[]): number {
+    if (values.length === 0) return 0;
     return values.reduce((a, b) => a + b, 0) / values.length;
   }
 
   private calculateStability(value: number): number {
     this.lastStabilityValues.push(value);
-    if (this.lastStabilityValues.length > 15) {
+    if (this.lastStabilityValues.length > 10) { // Reducido para mejor respuesta
       this.lastStabilityValues.shift();
     }
 
-    if (this.lastStabilityValues.length < 5) return 0;
+    if (this.lastStabilityValues.length < 3) return 0;
 
     const mean = this.calculateMean(this.lastStabilityValues);
+    if (mean === 0) return 0;
+    
     const variance = this.lastStabilityValues.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / this.lastStabilityValues.length;
-    return Math.max(0.1, 1 - Math.min(1, Math.sqrt(variance) / mean));
+    return Math.max(0, 1 - Math.min(1, Math.sqrt(variance) / mean));
   }
 
   extractChannels(imageData: ImageData): { red: number; ir: number; quality: number; perfusionIndex: number } {
@@ -48,7 +52,7 @@ export class SignalExtractor {
       const { width, height, data } = imageData;
       const centerX = Math.floor(width / 2);
       const centerY = Math.floor(height / 2);
-      const regionSize = Math.floor(Math.min(width, height) * 0.4);
+      const regionSize = Math.floor(Math.min(width, height) * 0.3); // Reducido para ser más preciso
 
       const validPixels = {
         red: [] as number[],
@@ -59,7 +63,7 @@ export class SignalExtractor {
         min: { red: 255, ir: 255 }
       };
 
-      // Optimizado el bucle de procesamiento de píxeles
+      // Análisis de píxeles más preciso
       for (let y = centerY - regionSize; y < centerY + regionSize; y += this.pixelStep) {
         if (y < 0 || y >= height) continue;
         
@@ -71,11 +75,13 @@ export class SignalExtractor {
           const green = data[i + 1];
           const blue = data[i + 2];
           
-          // Mejorada la detección de dedo verificando dominancia del rojo
-          if (red > this.minIntensity && red < this.maxIntensity && 
-              red > green * this.redDominanceThreshold && 
-              red > blue * this.redDominanceThreshold) {
-            
+          // Detección de dedo más estricta
+          const isRedDominant = red > green * this.redDominanceThreshold && 
+                              red > blue * this.redDominanceThreshold;
+          const isInRange = red >= this.minIntensity && red <= this.maxIntensity;
+          const isBrightEnough = (red + green + blue) / 3 > 40; // Verificación de brillo
+          
+          if (isRedDominant && isInRange && isBrightEnough) {
             const ir = Math.round((red * 0.5 + green * 0.3 + blue * 0.2));
             
             validPixels.red.push(red);
@@ -91,21 +97,30 @@ export class SignalExtractor {
         }
       }
 
-      // Verificación más estricta de la presencia del dedo
-      if (validPixels.count < this.minValidPixels || 
-          validPixels.max.red - validPixels.min.red < 20) { // Añadido check de rango dinámico
-        console.log('No se detecta dedo:', {
-          pixelCount: validPixels.count,
-          minRequired: this.minValidPixels,
-          redRange: validPixels.max.red - validPixels.min.red
-        });
+      // Verificación estricta de presencia de dedo
+      const redRange = validPixels.max.red - validPixels.min.red;
+      const hasEnoughPixels = validPixels.count >= this.minValidPixels;
+      const hasEnoughVariation = redRange >= this.minRedRange;
+      const meanRed = validPixels.count > 0 ? validPixels.sum.red / validPixels.count : 0;
+
+      if (!hasEnoughPixels || !hasEnoughVariation || meanRed < this.minIntensity) {
+        if (this.frameCount % 10 === 0) {
+          console.log('No se detecta dedo correctamente:', {
+            pixelCount: validPixels.count,
+            minRequired: this.minValidPixels,
+            redRange,
+            minRedRange: this.minRedRange,
+            meanRed,
+            minIntensity: this.minIntensity
+          });
+        }
         return { red: 0, ir: 0, quality: 0, perfusionIndex: 0 };
       }
 
+      // Procesamiento de señal más preciso
       const avgRed = validPixels.sum.red / validPixels.count;
       const avgIr = validPixels.sum.ir / validPixels.count;
 
-      // Manejo del buffer de valores
       if (this.lastRedValues.length >= this.smoothingWindow) {
         this.lastRedValues.shift();
         this.lastIrValues.shift();
@@ -113,43 +128,35 @@ export class SignalExtractor {
       this.lastRedValues.push(avgRed);
       this.lastIrValues.push(avgIr);
 
-      // Aplicar filtros Kalman
-      const filteredRed = this.applyKalmanFilter(
-        this.calculateMean(this.lastRedValues),
-        this.kalmanState.red
-      );
-
-      const filteredIr = this.applyKalmanFilter(
-        this.calculateMean(this.lastIrValues),
-        this.kalmanState.ir
-      );
+      const filteredRed = this.applyKalmanFilter(avgRed, this.kalmanState.red);
+      const filteredIr = this.applyKalmanFilter(avgIr, this.kalmanState.ir);
 
       const stability = this.calculateStability(filteredRed);
-      const perfusionIndex = validPixels.max.red > 0 ? 
-        (validPixels.max.red - validPixels.min.red) / validPixels.max.red * 100 : 0;
+      const perfusionIndex = (redRange / validPixels.max.red) * 100;
 
-      // Cálculo de calidad mejorado
+      // Cálculo de calidad más preciso
       const qualities = {
-        pixel: Math.min(1, validPixels.count / (this.minValidPixels * 2)),
+        pixel: Math.min(1, validPixels.count / (this.minValidPixels * 1.5)),
         stability,
-        red: Math.min(1, (avgRed / avgIr) / this.redDominanceThreshold),
-        perfusion: Math.min(1, perfusionIndex / 30)
+        redDominance: Math.min(1, (avgRed / avgIr) / this.redDominanceThreshold),
+        perfusion: Math.min(1, perfusionIndex / 20)
       };
 
       const quality = Math.min(
         qualities.pixel,
         qualities.stability,
-        qualities.red,
+        qualities.redDominance,
         qualities.perfusion
       );
 
-      if (this.frameCount % 30 === 0) {
-        console.log('Métricas de calidad:', {
+      if (this.frameCount % 10 === 0) { // Logging más frecuente
+        console.log('Métricas en tiempo real:', {
           ...qualities,
-          finalQuality: quality,
-          perfusionIndex,
-          pixelCount: validPixels.count,
-          redRange: validPixels.max.red - validPixels.min.red
+          calidad: quality,
+          pixeles: validPixels.count,
+          rangoRojo: redRange,
+          estabilidad: stability,
+          perfusion: perfusionIndex
         });
       }
 
