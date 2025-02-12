@@ -24,7 +24,7 @@ export class PPGProcessor {
   private beepPlayer: BeepPlayer;
   private signalBuffer: number[] = [];
   private readonly bufferSize = 15;
-  private readonly qualityThreshold = 0.2;
+  private readonly qualityThreshold = 0.15; // Reducido de 0.2
   private mlModel: MLModel;
   private lastProcessingTime: number = 0;
   private readonly minProcessingInterval = 50;

@@ -1,10 +1,10 @@
 
 export class SignalExtractor {
-  private readonly minRedIntensity = 140;
+  private readonly minRedIntensity = 100; // Reducido de 140
   private readonly maxRedIntensity = 255;
-  private readonly minValidPixels = 950;
-  private readonly redDominanceThreshold = 1.4;
-  private readonly pixelStep = 2;
+  private readonly minValidPixels = 500; // Reducido de 950
+  private readonly redDominanceThreshold = 1.2; // Reducido de 1.4
+  private readonly pixelStep = 1; // Reducido de 2 para mayor precisión
   
   extractChannels(imageData: ImageData): { 
     red: number; 
@@ -24,7 +24,7 @@ export class SignalExtractor {
     const { width, height, data } = imageData;
     const centerX = Math.floor(width / 2);
     const centerY = Math.floor(height / 2);
-    const regionSize = Math.floor(Math.min(width, height) * 0.3);
+    const regionSize = Math.floor(Math.min(width, height) * 0.4); // Aumentado de 0.3
 
     let validPixelCount = 0;
     let totalRedValue = 0;
@@ -49,6 +49,7 @@ export class SignalExtractor {
         const redDominance = red / (Math.max(green, blue) + 1);
         maxRedDominance = Math.max(maxRedDominance, redDominance);
 
+        // Condiciones más permisivas
         if (red >= this.minRedIntensity && red <= this.maxRedIntensity && redDominance >= this.redDominanceThreshold) {
           validPixelCount++;
           totalRedValue += red;
@@ -77,7 +78,10 @@ export class SignalExtractor {
         min: Math.min(...rawRedValues).toFixed(1),
         max: Math.max(...rawRedValues).toFixed(1),
         variacion: (Math.max(...rawRedValues) - Math.min(...rawRedValues)).toFixed(1)
-      } : 'Sin datos'
+      } : 'Sin datos',
+      umbralRojo: this.minRedIntensity,
+      umbralDominancia: this.redDominanceThreshold,
+      umbralPixeles: this.minValidPixels
     });
 
     return {
