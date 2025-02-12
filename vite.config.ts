@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       host: "localhost",
       protocol: "ws",
-      clientPort: 443
+      port: 8080 // Cambiado de clientPort: 443 a port: 8080
     },
     watch: {
       usePolling: true
