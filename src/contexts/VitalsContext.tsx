@@ -80,11 +80,12 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const vitals = await ppgProcessor.processFrame(imageData);
       
       if (vitals) {
-        setMeasurementQuality(vitals.signalQuality);
-        setReadings(vitals.readings);
-        setFingerPresent(vitals.redValue > 150); // Umbral ajustado según los logs
-
-        if (vitals.redValue > 150) {  // Solo procesar si hay dedo presente
+        const isFingerDetected = vitals.redValue > 150;
+        setFingerPresent(isFingerDetected);
+        
+        if (isFingerDetected) {
+          setReadings(vitals.readings);
+          
           if (vitals.isPeak) {
             await beepPlayer.playBeep('heartbeat');
             setValidReadingsCount(prev => prev + 1);
@@ -105,6 +106,14 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
           setHasArrhythmia(vitals.hasArrhythmia);
           setArrhythmiaType(vitals.arrhythmiaType);
+        } else {
+          setReadings([]);
+          setBpm(0);
+          setSpo2(0);
+          setSystolic(0);
+          setDiastolic(0);
+          setHasArrhythmia(false);
+          setArrhythmiaType('Normal');
         }
       }
 

@@ -3,15 +3,9 @@ import React from 'react';
 import { useToast } from "@/hooks/use-toast";
 import CameraView from './CameraView';
 import VitalChart from './VitalChart';
-import BPCalibrationForm from './BPCalibrationForm';
 import VitalSignsDisplay from './vitals/VitalSignsDisplay';
-import SignalQualityIndicator from './vitals/SignalQualityIndicator';
 import MeasurementControls from './vitals/MeasurementControls';
-import SensitivityControls from './SensitivityControls';
-import { PPGProcessor } from '../utils/ppgProcessor';
 import { useVitals } from '@/contexts/VitalsContext';
-
-const ppgProcessor = new PPGProcessor();
 
 const HeartRateMonitor: React.FC = () => {
   const { 
@@ -23,15 +17,10 @@ const HeartRateMonitor: React.FC = () => {
     arrhythmiaType,
     readings,
     isStarted,
-    measurementProgress,
-    measurementQuality,
-    sensitivitySettings,
-    updateSensitivitySettings,
+    fingerPresent,
     toggleMeasurement,
     processFrame
   } = useVitals();
-
-  const { toast } = useToast();
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-5xl mx-auto p-4">
@@ -53,10 +42,16 @@ const HeartRateMonitor: React.FC = () => {
           <div className="aspect-video w-full max-w-md mx-auto">
             <CameraView onFrame={processFrame} isActive={isStarted} />
           </div>
-          {isStarted && measurementQuality < 0.01 && (
-            <div className="mt-2 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-              <p className="text-yellow-300 text-sm">
-                Coloque su dedo sobre la cámara y manténgalo estable
+          {isStarted && (
+            <div className={`mt-2 p-3 rounded-lg text-center ${
+              fingerPresent 
+                ? "bg-green-500/20 border border-green-500/30" 
+                : "bg-red-500/20 border border-red-500/30"
+            }`}>
+              <p className={`text-lg font-medium ${
+                fingerPresent ? "text-green-400" : "text-red-400"
+              }`}>
+                {fingerPresent ? "DEDO DETECTADO" : "COLOQUE EL DEDO EN LA CÁMARA"}
               </p>
             </div>
           )}
@@ -64,14 +59,6 @@ const HeartRateMonitor: React.FC = () => {
       </div>
 
       <div className="space-y-4">
-        {isStarted && (
-          <SignalQualityIndicator
-            isStarted={isStarted}
-            measurementQuality={measurementQuality}
-            measurementProgress={measurementProgress}
-          />
-        )}
-
         <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4">
           <h3 className="text-lg font-medium mb-2 text-gray-100">Señal PPG en Tiempo Real</h3>
           <VitalChart data={readings} color="#ea384c" />
