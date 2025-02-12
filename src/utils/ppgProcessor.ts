@@ -56,7 +56,7 @@ export class PPGProcessor {
   };
   
   constructor() {
-    console.log('Inicializando PPGProcessor y BeepPlayer...');
+    console.log('Inicializando PPGProcessor...');
     this.beepPlayer = new BeepPlayer();
     this.signalProcessor = new SignalProcessor(this.windowSize);
     this.signalExtractor = new SignalExtractor();
@@ -258,28 +258,12 @@ export class PPGProcessor {
         this.peakTimes.shift();
       }
       
-      // Reproducir beep solo cuando detectamos un latido real y la señal es de buena calidad
       try {
-        console.log('🔊 Intentando reproducir beep de latido...');
-        
-        // Verificar que beepPlayer esté inicializado
-        if (!this.beepPlayer) {
-          console.log('⚠️ BeepPlayer no inicializado, creando nueva instancia...');
-          this.beepPlayer = new BeepPlayer();
-        }
-        
-        // Llamar a playBeep y esperar explícitamente la promesa
-        await Promise.resolve(this.beepPlayer.playBeep('heartbeat'))
-          .then(() => {
-            console.log('✅ Beep de latido reproducido exitosamente');
-          })
-          .catch(err => {
-            console.error('❌ Error específico al reproducir beep:', err);
-            // Intentar reinicializar beepPlayer si hay error
-            this.beepPlayer = new BeepPlayer();
-          });
-      } catch (err) {
-        console.error('🛑 Error general al reproducir beep:', err);
+        console.log('🔊 Reproduciendo beep de latido...');
+        await this.beepPlayer.playBeep('heartbeat');
+        console.log('✅ Beep reproducido correctamente');
+      } catch (error) {
+        console.error('❌ Error reproduciendo beep:', error);
       }
     }
 
