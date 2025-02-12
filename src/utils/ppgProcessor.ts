@@ -8,6 +8,8 @@ import { SignalNormalizer } from './signalNormalization';
 import { SignalFilter } from './signalFilter';
 import { SignalFrequencyAnalyzer } from './signalFrequencyAnalyzer';
 import { MLModel } from './mlModel';
+import { VitalsValidator } from './vitalsValidator';
+import { PPGDataManager } from './ppgDataManager';
 
 export class PPGProcessor {
   private readings: VitalReading[] = [];
@@ -22,18 +24,15 @@ export class PPGProcessor {
   private readonly signalNormalizer: SignalNormalizer;
   private readonly signalFilter: SignalFilter;
   private readonly frequencyAnalyzer: SignalFrequencyAnalyzer;
+  private readonly vitalsValidator: VitalsValidator;
+  private readonly dataManager: PPGDataManager;
   private beepPlayer: BeepPlayer;
   private signalBuffer: number[] = [];
   private readonly bufferSize = 15;
-  private readonly qualityThreshold = 0.2; // NO MODIFICAR: Umbral crítico para calidad de señal
+  private readonly qualityThreshold = 0.2;
   private mlModel: MLModel;
   private lastProcessingTime: number = 0;
   private readonly minProcessingInterval = 50;
-  private lastValidBpm: number = 0;
-  private lastValidSystolic: number = 120;
-  private lastValidDiastolic: number = 80;
-  private lastCleanupTime: number = 0;
-  private readonly cleanupInterval: number = 2000;
   
   private sensitivitySettings: SensitivitySettings = {
     signalAmplification: 1.5,
@@ -67,70 +66,8 @@ export class PPGProcessor {
     this.signalFilter = new SignalFilter(this.samplingRate);
     this.frequencyAnalyzer = new SignalFrequencyAnalyzer(this.samplingRate);
     this.mlModel = new MLModel();
-  }
-
-  private validateVitalSigns(bpm: number, systolic: number, diastolic: number): {
-    bpm: number;
-    systolic: number;
-    diastolic: number;
-  } {
-    const validBpm = bpm >= 40 && bpm <= 200 ? bpm : this.lastValidBpm || 0;
-    const validSystolic = systolic >= 90 && systolic <= 180 ? systolic : this.lastValidSystolic;
-    const validDiastolic = diastolic >= 60 && diastolic <= 120 ? diastolic : this.lastValidDiastolic;
-    
-    if (validSystolic <= validDiastolic) {
-      return {
-        bpm: validBpm,
-        systolic: this.lastValidSystolic,
-        diastolic: this.lastValidDiastolic
-      };
-    }
-
-    this.lastValidBpm = validBpm;
-    this.lastValidSystolic = validSystolic;
-    this.lastValidDiastolic = validDiastolic;
-
-    return {
-      bpm: validBpm,
-      systolic: validSystolic,
-      diastolic: validDiastolic
-    };
-  }
-
-  private cleanupOldData() {
-    const now = Date.now();
-    
-    if (now - this.lastCleanupTime < this.cleanupInterval) {
-      return;
-    }
-    
-    this.lastCleanupTime = now;
-    const maxAge = 10000;
-
-    try {
-      if (this.readings.length > 0) {
-        const recentReadings = this.readings.filter(reading => now - reading.timestamp < maxAge);
-        this.readings = recentReadings;
-      }
-
-      if (this.redBuffer.length > this.windowSize) {
-        this.redBuffer = this.redBuffer.slice(-this.windowSize);
-      }
-      
-      if (this.irBuffer.length > this.windowSize) {
-        this.irBuffer = this.irBuffer.slice(-this.windowSize);
-      }
-      
-      if (this.peakTimes.length > 5) {
-        this.peakTimes = this.peakTimes.slice(-5);
-      }
-      
-      if (this.signalBuffer.length > this.bufferSize) {
-        this.signalBuffer = this.signalBuffer.slice(-this.bufferSize);
-      }
-    } catch (error) {
-      console.error('Error durante la limpieza de datos:', error);
-    }
+    this.vitalsValidator = new VitalsValidator();
+    this.dataManager = new PPGDataManager();
   }
 
   async processFrame(imageData: ImageData): Promise<PPGData | null> {
@@ -180,7 +117,15 @@ export class PPGProcessor {
       this.readings.push({ timestamp: now, value: normalizedValue });
       this.signalBuffer.push(normalizedValue);
 
-      this.cleanupOldData();
+      this.dataManager.cleanupData(
+        this.readings,
+        this.redBuffer,
+        this.irBuffer,
+        this.peakTimes,
+        this.signalBuffer,
+        this.windowSize,
+        this.bufferSize
+      );
 
       const isPeak = this.peakDetector.isRealPeak(normalizedValue, now, this.signalBuffer);
 
@@ -206,7 +151,7 @@ export class PPGProcessor {
       const hrvAnalysis = this.signalProcessor.analyzeHRV(intervals);
       const spo2Result = this.signalProcessor.calculateSpO2(this.redBuffer, this.irBuffer);
       const bp = this.signalProcessor.estimateBloodPressure(filteredRed, this.peakTimes);
-      const validatedVitals = this.validateVitalSigns(calculatedBpm, bp.systolic, bp.diastolic);
+      const validatedVitals = this.vitalsValidator.validateVitalSigns(calculatedBpm, bp.systolic, bp.diastolic);
 
       console.log('Mediciones calculadas:', {
         bpm: validatedVitals.bpm,
