@@ -1,6 +1,6 @@
 
 export class SignalExtractor {
-  private readonly minRedIntensity = 150;  // Mantenemos este umbral
+  private readonly minRedIntensity = 145;  // Ajuste muy sutil de 150 a 145 (3.3% más sensible)
   private readonly maxRedIntensity = 255;
   private readonly minValidPixels = 950;   // Ajuste sutil de 1000 a 950 (5% más sensible)
   private readonly redDominanceThreshold = 1.5;  // Mantenemos este umbral
