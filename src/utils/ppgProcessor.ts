@@ -1,5 +1,5 @@
 
-import { VitalReading, PPGData, SensitivitySettings } from './types';
+import { VitalReading, PPGData, SensitivitySettings, ProcessingSettings } from './types';
 import { BeepPlayer } from './audioUtils';
 import { SignalProcessor } from './signalProcessing';
 import { SignalExtractor } from './signalExtraction';
@@ -8,9 +8,8 @@ import { SignalNormalizer } from './signalNormalization';
 import { SignalFilter } from './signalFilter';
 import { SignalFrequencyAnalyzer } from './signalFrequencyAnalyzer';
 import { MLModel } from './mlModel';
-import { EventEmitter } from './events';
 
-export class PPGProcessor extends EventEmitter {
+export class PPGProcessor {
   private readings: VitalReading[] = [];
   private redBuffer: number[] = [];
   private irBuffer: number[] = [];
@@ -25,7 +24,7 @@ export class PPGProcessor extends EventEmitter {
   private readonly frequencyAnalyzer: SignalFrequencyAnalyzer;
   private beepPlayer: BeepPlayer;
   private signalBuffer: number[] = [];
-  private readonly bufferSize = 90;
+  private readonly bufferSize = 90; // Reducido de 150 a 90 para evitar acumulación
   private readonly qualityThreshold = 0.2;
   private mlModel: MLModel;
   private lastProcessingTime: number = 0;
@@ -33,8 +32,7 @@ export class PPGProcessor extends EventEmitter {
   private lastValidBpm: number = 0;
   private lastValidSpO2: number = 98;
   private noFingerTimer: number | null = null;
-  private readonly RESET_DELAY = 1000;
-  private lastFingerState: boolean = false;
+  private readonly RESET_DELAY = 1000; // 1 segundo sin dedo para resetear
   
   private sensitivitySettings: SensitivitySettings = {
     signalAmplification: 1.5,
@@ -43,7 +41,6 @@ export class PPGProcessor extends EventEmitter {
   };
   
   constructor() {
-    super();
     console.log('Inicializando PPGProcessor...');
     this.beepPlayer = new BeepPlayer();
     this.signalProcessor = new SignalProcessor(this.windowSize);
@@ -55,7 +52,7 @@ export class PPGProcessor extends EventEmitter {
     this.mlModel = new MLModel();
   }
 
-  private resetValues(): void {
+  private resetValues() {
     this.redBuffer = [];
     this.irBuffer = [];
     this.peakTimes = [];
@@ -72,12 +69,7 @@ export class PPGProcessor extends EventEmitter {
     try {
       const { red, ir, quality, fingerPresent } = this.signalExtractor.extractChannels(imageData);
 
-      if (fingerPresent !== this.lastFingerState) {
-        this.lastFingerState = fingerPresent;
-        this.emit('fingerStateChange', fingerPresent);
-        console.log('Estado del dedo actualizado:', fingerPresent);
-      }
-
+      // Control de frecuencia de procesamiento
       if (now - this.lastProcessingTime < this.minProcessingInterval) {
         return {
           bpm: this.lastValidBpm,
@@ -133,27 +125,34 @@ export class PPGProcessor extends EventEmitter {
 
       this.noFingerTimer = null;
 
+      // Limitar tamaño del buffer antes de agregar nuevos valores
       if (this.redBuffer.length >= this.bufferSize) {
-        this.redBuffer = this.redBuffer.slice(-Math.floor(this.bufferSize * 0.8));
+        this.redBuffer = this.redBuffer.slice(-Math.floor(this.bufferSize * 0.8)); // Mantener solo el 80% más reciente
         this.irBuffer = this.irBuffer.slice(-Math.floor(this.bufferSize * 0.8));
       }
 
+      // Amplificar y almacenar señales
       const amplifiedRed = red * this.sensitivitySettings.signalAmplification;
       const amplifiedIr = ir * this.sensitivitySettings.signalAmplification;
       
       this.redBuffer.push(amplifiedRed);
       this.irBuffer.push(amplifiedIr);
 
+      // Filtrar señal
       const filteredRed = this.signalFilter.lowPassFilter(this.redBuffer);
+
+      // Normalizar señal
       const normalizedValue = this.signalNormalizer.normalizeSignal(
         filteredRed[filteredRed.length - 1]
       );
       
+      // Mantener tamaño de lecturas
       this.readings.push({ timestamp: now, value: normalizedValue });
       if (this.readings.length > this.bufferSize) {
         this.readings = this.readings.slice(-Math.floor(this.bufferSize * 0.8));
       }
       
+      // Detectar picos con señal filtrada
       const isPeak = this.peakDetector.detectPeak(
         filteredRed,
         this.sensitivitySettings.peakDetection
@@ -164,6 +163,7 @@ export class PPGProcessor extends EventEmitter {
         await this.beepPlayer.playBeep('heartbeat');
       }
 
+      // Mantener solo picos recientes
       this.peakTimes = this.peakTimes.filter(t => now - t < 5000);
 
       if (this.redBuffer.length < Math.floor(this.bufferSize * 0.5)) {
@@ -171,6 +171,7 @@ export class PPGProcessor extends EventEmitter {
         return null;
       }
 
+      // Análisis y cálculos
       const { frequencies, magnitudes } = this.frequencyAnalyzer.performFFT(filteredRed);
       const dominantFreqIndex = magnitudes.indexOf(Math.max(...magnitudes));
       const dominantFreq = frequencies[dominantFreqIndex];
@@ -214,7 +215,7 @@ export class PPGProcessor extends EventEmitter {
     }
   }
 
-  updateSensitivitySettings(settings: SensitivitySettings): void {
+  updateSensitivitySettings(settings: SensitivitySettings) {
     this.sensitivitySettings = settings;
   }
 }
