@@ -44,16 +44,13 @@ const HeartRateMonitor: React.FC = () => {
           </div>
           {isStarted && (
             <div 
-              className={`mt-2 p-3 rounded-lg text-center transition-colors duration-150 ${
+              className={`mt-2 p-3 rounded-lg text-center ${
                 fingerPresent 
-                  ? "bg-[#0A4119] border border-green-500" 
-                  : "bg-[#3D0F0F] border border-red-500"
+                  ? "bg-green-950 border-2 border-green-500" 
+                  : "bg-red-950 border-2 border-red-500"
               }`}
-              style={{
-                willChange: 'background-color, border-color'
-              }}
             >
-              <p className={`text-lg font-semibold ${
+              <p className={`text-lg ${
                 fingerPresent ? "text-green-400" : "text-red-400"
               }`}>
                 {fingerPresent ? "DEDO DETECTADO" : "COLOQUE EL DEDO EN LA CÁMARA"}
