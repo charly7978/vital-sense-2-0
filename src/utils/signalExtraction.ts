@@ -1,6 +1,6 @@
 
 export class SignalExtractor {
-  private readonly minRedIntensity = 145;  // Ajuste previo de 150 a 145 (3.3% más sensible)
+  private readonly minRedIntensity = 140;  // Ajuste sutil de 145 a 140 (3.4% más sensible) para mejorar detección y señal
   private readonly maxRedIntensity = 255;
   private readonly minValidPixels = 950;   // Ajuste previo de 1000 a 950 (5% más sensible)
   private readonly redDominanceThreshold = 1.4;  // Ajuste adicional de 1.45 a 1.4 (3.4% más permisivo)
