@@ -73,9 +73,13 @@ export class PPGProcessor {
     systolic: number;
     diastolic: number;
   } {
-    const validBpm = bpm >= 40 && bpm <= 200 ? bpm : this.lastValidBpm || 0;
-    const validSystolic = systolic >= 90 && systolic <= 180 ? systolic : this.lastValidSystolic;
-    const validDiastolic = diastolic >= 60 && diastolic <= 120 ? diastolic : this.lastValidDiastolic;
+    const validBpm = bpm >= 40 && bpm <= 200 && !isNaN(bpm) ? 
+      Math.round(bpm) : this.lastValidBpm || 0;
+
+    const validSystolic = systolic >= 90 && systolic <= 180 && !isNaN(systolic) ? 
+      Math.round(systolic) : this.lastValidSystolic;
+    const validDiastolic = diastolic >= 60 && diastolic <= 120 && !isNaN(diastolic) ? 
+      Math.round(diastolic) : this.lastValidDiastolic;
     
     if (validSystolic <= validDiastolic) {
       return {
@@ -85,9 +89,11 @@ export class PPGProcessor {
       };
     }
 
-    this.lastValidBpm = validBpm;
-    this.lastValidSystolic = validSystolic;
-    this.lastValidDiastolic = validDiastolic;
+    if (validBpm > 0) this.lastValidBpm = validBpm;
+    if (validSystolic > validDiastolic) {
+      this.lastValidSystolic = validSystolic;
+      this.lastValidDiastolic = validDiastolic;
+    }
 
     return {
       bpm: validBpm,
@@ -107,7 +113,6 @@ export class PPGProcessor {
     const maxAge = 10000;
 
     try {
-      // Usar método defensivo para limpiar los arrays
       if (this.readings.length > 0) {
         const recentReadings = this.readings.filter(reading => now - reading.timestamp < maxAge);
         this.readings = recentReadings;
@@ -207,6 +212,14 @@ export class PPGProcessor {
       const spo2Result = this.signalProcessor.calculateSpO2(this.redBuffer, this.irBuffer);
       const bp = this.signalProcessor.estimateBloodPressure(filteredRed, this.peakTimes);
       const validatedVitals = this.validateVitalSigns(calculatedBpm, bp.systolic, bp.diastolic);
+
+      console.log('Mediciones calculadas:', {
+        bpm: validatedVitals.bpm,
+        spo2: spo2Result.spo2,
+        presion: `${validatedVitals.systolic}/${validatedVitals.diastolic}`,
+        intervalosRR: intervals.length,
+        confianza: spo2Result.confidence
+      });
 
       return {
         bpm: validatedVitals.bpm,
