@@ -1,10 +1,12 @@
 
 export class SignalExtractor {
-  private readonly minRedIntensity = 100; // Reducido de 140
+  // IMPORTANTE: NO MODIFICAR ESTOS VALORES - Son críticos para la detección del dedo
+  // Valores probados y verificados para la detección correcta
+  private readonly minRedIntensity = 140; // Umbral mínimo para detección de dedo
   private readonly maxRedIntensity = 255;
-  private readonly minValidPixels = 500; // Reducido de 950
-  private readonly redDominanceThreshold = 1.2; // Reducido de 1.4
-  private readonly pixelStep = 1; // Reducido de 2 para mayor precisión
+  private readonly minValidPixels = 950; // Cantidad mínima de píxeles para considerar dedo presente
+  private readonly redDominanceThreshold = 1.4; // Ratio R/(G|B) para confirmar que es sangre
+  private readonly pixelStep = 2; // Paso de muestreo para balance rendimiento/precisión
   
   extractChannels(imageData: ImageData): { 
     red: number; 
@@ -24,7 +26,7 @@ export class SignalExtractor {
     const { width, height, data } = imageData;
     const centerX = Math.floor(width / 2);
     const centerY = Math.floor(height / 2);
-    const regionSize = Math.floor(Math.min(width, height) * 0.4); // Aumentado de 0.3
+    const regionSize = Math.floor(Math.min(width, height) * 0.3); // Región óptima probada
 
     let validPixelCount = 0;
     let totalRedValue = 0;
@@ -49,7 +51,7 @@ export class SignalExtractor {
         const redDominance = red / (Math.max(green, blue) + 1);
         maxRedDominance = Math.max(maxRedDominance, redDominance);
 
-        // Condiciones más permisivas
+        // NO MODIFICAR: Criterios validados para detección de sangre en PPG
         if (red >= this.minRedIntensity && red <= this.maxRedIntensity && redDominance >= this.redDominanceThreshold) {
           validPixelCount++;
           totalRedValue += red;
@@ -64,7 +66,7 @@ export class SignalExtractor {
     const redMean = validPixelCount > 0 ? totalRedValue / validPixelCount : 0;
     const fingerPresent = validPixelCount >= this.minValidPixels && redMean >= this.minRedIntensity;
 
-    // Log detallado del procesamiento
+    // Log detallado para diagnóstico
     console.log('Procesamiento de imagen:', {
       timestamp: Date.now(),
       dimensiones: `${width}x${height}`,
@@ -79,6 +81,7 @@ export class SignalExtractor {
         max: Math.max(...rawRedValues).toFixed(1),
         variacion: (Math.max(...rawRedValues) - Math.min(...rawRedValues)).toFixed(1)
       } : 'Sin datos',
+      // Valores de referencia para debugging
       umbralRojo: this.minRedIntensity,
       umbralDominancia: this.redDominanceThreshold,
       umbralPixeles: this.minValidPixels
