@@ -1,3 +1,4 @@
+
 import { VitalReading, PPGData, SensitivitySettings, ProcessingSettings } from './types';
 import { BeepPlayer } from './audioUtils';
 import { SignalProcessor } from './signalProcessing';
@@ -67,7 +68,26 @@ export class PPGProcessor {
     
     try {
       if (now - this.lastProcessingTime < this.minProcessingInterval) {
-        return null;
+        return {
+          bpm: 0,
+          spo2: 0,
+          systolic: 0,
+          diastolic: 0,
+          hasArrhythmia: false,
+          arrhythmiaType: 'Normal',
+          signalQuality: 0,
+          confidence: 0,
+          readings: [],
+          isPeak: false,
+          redValue: 0,
+          fingerPresent: false,
+          hrvMetrics: {
+            sdnn: 0,
+            rmssd: 0,
+            pnn50: 0,
+            lfhf: 0
+          }
+        };
       }
       this.lastProcessingTime = now;
 
@@ -91,6 +111,7 @@ export class PPGProcessor {
           readings: this.readings,
           isPeak: false,
           redValue: red,
+          fingerPresent: false,
           hrvMetrics: {
             sdnn: 0,
             rmssd: 0,
@@ -192,6 +213,7 @@ export class PPGProcessor {
         readings: this.readings,
         isPeak,
         redValue: red,
+        fingerPresent: true,
         hrvMetrics: {
           sdnn: hrvAnalysis.sdnn,
           rmssd: hrvAnalysis.rmssd,
