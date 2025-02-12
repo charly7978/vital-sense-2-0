@@ -25,6 +25,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   const [videoInitialized, setVideoInitialized] = useState(false);
   const isMobile = useIsMobile();
   const isAndroid = /android/i.test(navigator.userAgent);
+  const [cameraError, setCameraError] = useState<string | null>(null);
 
   const getDeviceConstraints = () => {
     const constraints: MediaTrackConstraints = {
@@ -35,6 +36,26 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
     };
 
     return constraints;
+  };
+
+  const handleCameraError = (error: any) => {
+    console.error('Error de cámara:', error);
+    let errorMessage = "Error al acceder a la cámara";
+    
+    if (error.name === 'NotAllowedError') {
+      errorMessage = "Por favor, permite el acceso a la cámara para continuar";
+    } else if (error.name === 'NotFoundError') {
+      errorMessage = "No se encontró ninguna cámara disponible";
+    } else if (error.name === 'NotReadableError') {
+      errorMessage = "La cámara está siendo usada por otra aplicación";
+    }
+
+    setCameraError(errorMessage);
+    toast({
+      variant: "destructive",
+      title: "Error de cámara",
+      description: errorMessage
+    });
   };
 
   const processFrame = () => {
@@ -101,14 +122,13 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
           if (isAndroid) {
             const track = mediaStream.getVideoTracks()[0];
             
-            // Intentar activar la linterna
             try {
               await track.applyConstraints({
                 advanced: [{ torch: true }]
               });
               console.log('Linterna activada exitosamente');
             } catch (torchError) {
-              console.error('Error al activar la linterna:', torchError);
+              console.warn('No se pudo activar la linterna:', torchError);
               toast({
                 title: "Aviso",
                 description: "Por favor, asegúrate de tener buena iluminación para la medición."
@@ -116,6 +136,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
             }
           }
           
+          setCameraError(null);
           setVideoInitialized(false);
           processFrame();
         } else {
@@ -128,7 +149,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
                   advanced: [{ torch: false }]
                 });
               } catch (error) {
-                console.error('Error al desactivar la linterna:', error);
+                console.warn('Error al desactivar la linterna:', error);
               }
             }
             mediaStream.getTracks().forEach(track => track.stop());
@@ -139,12 +160,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
           }
         }
       } catch (error) {
-        console.error('Error setting up camera:', error);
-        toast({
-          variant: "destructive",
-          title: "Error de cámara",
-          description: "No se pudo inicializar la cámara correctamente."
-        });
+        handleCameraError(error);
       }
     };
 
@@ -156,7 +172,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
         if (isAndroid) {
           track.applyConstraints({
             advanced: [{ torch: false }]
-          }).catch(console.error);
+          }).catch(console.warn);
         }
         mediaStream.getTracks().forEach(track => track.stop());
       }
@@ -169,17 +185,24 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   return (
     <div className="relative w-full max-w-md mx-auto">
       <div className="relative aspect-video rounded-2xl overflow-hidden bg-black/5 backdrop-blur-sm">
-        {!isActive && (
+        {!isActive && !cameraError && (
           <div className="absolute inset-0 flex items-center justify-center">
             <Camera className="w-8 h-8 text-gray-400" />
           </div>
         )}
-        {isActive && (
+        {cameraError && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
+            <Camera className="w-8 h-8 text-red-400 mb-2" />
+            <p className="text-sm text-red-400">{cameraError}</p>
+          </div>
+        )}
+        {isActive && !cameraError && (
           <Webcam
             ref={webcamRef}
             className="w-full h-full object-cover"
             videoConstraints={getDeviceConstraints()}
             forceScreenshotSourceSize
+            onUserMediaError={handleCameraError}
           />
         )}
       </div>
