@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import CameraView from './CameraView';
 import VitalChart from './VitalChart';
@@ -22,6 +22,11 @@ const HeartRateMonitor: React.FC = () => {
     processFrame
   } = useVitals();
 
+  // Log del estado en tiempo real para debugging
+  useEffect(() => {
+    console.log('Estado UI:', { fingerPresent, isStarted });
+  }, [fingerPresent, isStarted]);
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-5xl mx-auto p-4">
       <div className="space-y-4">
@@ -42,21 +47,19 @@ const HeartRateMonitor: React.FC = () => {
           <div className="aspect-video w-full max-w-md mx-auto">
             <CameraView onFrame={processFrame} isActive={isStarted} />
           </div>
-          {isStarted && (
-            <div 
-              className={`mt-2 p-3 rounded-lg text-center ${
-                fingerPresent 
-                  ? "bg-green-950 border-2 border-green-500" 
-                  : "bg-red-950 border-2 border-red-500"
-              }`}
-            >
-              <p className={`text-lg ${
-                fingerPresent ? "text-green-400" : "text-red-400"
-              }`}>
-                {fingerPresent ? "DEDO DETECTADO" : "COLOQUE EL DEDO EN LA CÁMARA"}
-              </p>
-            </div>
-          )}
+          <div className="mt-4 text-center">
+            {isStarted ? (
+              <div className={fingerPresent ? "text-green-400" : "text-red-400"}>
+                <span className="text-lg">
+                  {fingerPresent ? "DEDO DETECTADO" : "NO HAY DEDO"}
+                </span>
+              </div>
+            ) : (
+              <div className="text-gray-400">
+                <span className="text-lg">MEDICIÓN DETENIDA</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
