@@ -29,8 +29,10 @@ const beepPlayer = new BeepPlayer();
 const ppgProcessor = new PPGProcessor();
 
 const MEASUREMENT_DURATION = 30; // seconds
-const MIN_QUALITY_THRESHOLD = 0.3; // Umbral mínimo de calidad para considerar mediciones válidas
-const MIN_READINGS_FOR_BP = 10; // Mínimo de lecturas válidas para calcular presión arterial
+const MIN_QUALITY_THRESHOLD = 0.3;
+const MIN_READINGS_FOR_BP = 10;
+const NO_FINGER_THRESHOLD = 0.2; // Umbral para detectar cuando no hay dedo
+const CONSECUTIVE_LOW_QUALITY_LIMIT = 5; // Número de frames consecutivos con baja calidad para resetear
 
 export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [bpm, setBpm] = useState<number>(0);
@@ -46,6 +48,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [measurementQuality, setMeasurementQuality] = useState(0);
   const [measurementStartTime, setMeasurementStartTime] = useState<number | null>(null);
   const [validReadingsCount, setValidReadingsCount] = useState(0);
+  const [consecutiveLowQualityCount, setConsecutiveLowQualityCount] = useState(0);
   const [sensitivitySettings, setSensitivitySettings] = useState<SensitivitySettings>({
     signalAmplification: 1.5,
     noiseReduction: 1.2,
@@ -63,6 +66,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setArrhythmiaType('Normal');
     setReadings([]);
     setValidReadingsCount(0);
+    setConsecutiveLowQualityCount(0);
   }, []);
 
   const updateSensitivitySettings = useCallback((newSettings: SensitivitySettings) => {
@@ -77,9 +81,27 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const vitals = await ppgProcessor.processFrame(imageData);
       
-      // Solo actualizar mediciones si la calidad es suficiente
-      if (vitals && vitals.signalQuality > MIN_QUALITY_THRESHOLD) {
-        setMeasurementQuality(vitals.signalQuality);
+      // Verificar si no hay dedo presente
+      if (!vitals || vitals.signalQuality < NO_FINGER_THRESHOLD) {
+        setConsecutiveLowQualityCount(prev => prev + 1);
+        
+        if (consecutiveLowQualityCount >= CONSECUTIVE_LOW_QUALITY_LIMIT) {
+          console.log('No se detecta dedo o señal muy baja:', vitals?.signalQuality || 0);
+          resetMeasurements();
+          setMeasurementQuality(0);
+        }
+        return;
+      }
+
+      // Resetear contador si la calidad es buena
+      if (vitals.signalQuality > MIN_QUALITY_THRESHOLD) {
+        setConsecutiveLowQualityCount(0);
+      }
+
+      setMeasurementQuality(vitals.signalQuality);
+
+      // Solo procesar si la calidad es suficiente
+      if (vitals.signalQuality > MIN_QUALITY_THRESHOLD) {
         setValidReadingsCount(prev => prev + 1);
 
         if (vitals.isPeak) {
@@ -87,14 +109,17 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           await beepPlayer.playBeep('heartbeat');
         }
 
+        // Actualizar BPM solo si es válido y hay suficiente calidad
         if (vitals.bpm > 40 && vitals.bpm < 200) {
           setBpm(vitals.bpm);
         }
 
+        // Actualizar SpO2 solo si es válido y hay suficiente calidad
         if (vitals.spo2 >= 80 && vitals.spo2 <= 100) {
           setSpo2(vitals.spo2);
         }
 
+        // Actualizar presión arterial solo si hay suficientes lecturas válidas
         if (validReadingsCount >= MIN_READINGS_FOR_BP) {
           if (vitals.systolic > 0 && vitals.diastolic > 0 && 
               vitals.systolic > vitals.diastolic &&
@@ -108,10 +133,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setHasArrhythmia(vitals.hasArrhythmia);
         setArrhythmiaType(vitals.arrhythmiaType);
         setReadings(ppgProcessor.getReadings());
-      } else {
-        // Si la calidad es baja, resetear las mediciones
-        console.log('Calidad de señal baja:', vitals?.signalQuality || 0);
-        resetMeasurements();
       }
     } catch (error) {
       console.error('Error processing frame:', error);
@@ -121,7 +142,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         description: "Error al procesar la imagen de la cámara."
       });
     }
-  }, [isStarted, validReadingsCount, toast, resetMeasurements]);
+  }, [isStarted, consecutiveLowQualityCount, validReadingsCount, toast, resetMeasurements]);
 
   const toggleMeasurement = useCallback(() => {
     setIsStarted(prev => !prev);
