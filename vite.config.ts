@@ -22,7 +22,8 @@ export default defineConfig(({ mode }) => ({
         "https://lovable.dev",
         "https://gptengineer.app",
         "http://localhost:3000",
-        "http://localhost:8080"
+        "http://localhost:8080",
+        "https://*.lovableproject.com"
       ],
       methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
