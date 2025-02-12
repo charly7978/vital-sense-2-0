@@ -15,7 +15,7 @@ export class PPGProcessor {
   private irBuffer: number[] = [];
   private peakTimes: number[] = [];
   private readonly samplingRate = 30;
-  private readonly windowSize = 150; // Aumentado para mejor análisis
+  private readonly windowSize = 150;
   private readonly signalProcessor: SignalProcessor;
   private readonly signalExtractor: SignalExtractor;
   private readonly peakDetector: PeakDetector;
@@ -24,16 +24,15 @@ export class PPGProcessor {
   private readonly frequencyAnalyzer: SignalFrequencyAnalyzer;
   private beepPlayer: BeepPlayer;
   private signalBuffer: number[] = [];
-  private readonly bufferSize = 30; // Aumentado para mejor detección
+  private readonly bufferSize = 90;
   private readonly qualityThreshold = 0.2;
   private mlModel: MLModel;
   private lastProcessingTime: number = 0;
-  private readonly minProcessingInterval = 33; // ~30fps
+  private readonly minProcessingInterval = 33;
   private lastValidBpm: number = 0;
-  private lastValidSystolic: number = 120;
-  private lastValidDiastolic: number = 80;
-  private lastCleanupTime: number = 0;
-  private readonly cleanupInterval: number = 2000;
+  private lastValidSpO2: number = 98;
+  private noFingerTimer: number | null = null;
+  private readonly RESET_DELAY = 1000; // 1 segundo sin dedo para resetear
   
   private sensitivitySettings: SensitivitySettings = {
     signalAmplification: 1.5,
@@ -53,49 +52,15 @@ export class PPGProcessor {
     this.mlModel = new MLModel();
   }
 
-  private validateVitalSigns(bpm: number, systolic: number, diastolic: number): {
-    bpm: number;
-    systolic: number;
-    diastolic: number;
-  } {
-    const validBpm = bpm >= 40 && bpm <= 200 ? bpm : this.lastValidBpm;
-    const validSystolic = systolic >= 90 && systolic <= 180 ? systolic : this.lastValidSystolic;
-    const validDiastolic = diastolic >= 60 && diastolic <= 120 ? diastolic : this.lastValidDiastolic;
-    
-    this.lastValidBpm = validBpm;
-    this.lastValidSystolic = validSystolic;
-    this.lastValidDiastolic = validDiastolic;
-
-    return { bpm: validBpm, systolic: validSystolic, diastolic: validDiastolic };
-  }
-
-  private cleanupOldData() {
-    const now = Date.now();
-    if (now - this.lastCleanupTime < this.cleanupInterval) return;
-    
-    this.lastCleanupTime = now;
-    const maxAge = 10000;
-
-    try {
-      // Mantener solo las últimas N muestras
-      if (this.redBuffer.length > this.windowSize) {
-        this.redBuffer = this.redBuffer.slice(-this.windowSize);
-      }
-      
-      if (this.irBuffer.length > this.windowSize) {
-        this.irBuffer = this.irBuffer.slice(-this.windowSize);
-      }
-      
-      if (this.peakTimes.length > this.windowSize) {
-        this.peakTimes = this.peakTimes.slice(-this.windowSize);
-      }
-      
-      // Limpiar lecturas antiguas
-      const recentReadings = this.readings.filter(reading => now - reading.timestamp < maxAge);
-      this.readings = recentReadings;
-    } catch (error) {
-      console.error('Error durante limpieza:', error);
-    }
+  private resetValues() {
+    this.redBuffer = [];
+    this.irBuffer = [];
+    this.peakTimes = [];
+    this.signalBuffer = [];
+    this.lastValidBpm = 0;
+    this.lastValidSpO2 = 98;
+    this.readings = [];
+    console.log('PPGProcessor: valores reseteados');
   }
 
   async processFrame(imageData: ImageData): Promise<PPGData | null> {
@@ -109,8 +74,12 @@ export class PPGProcessor {
 
       const { red, ir, quality, fingerPresent } = this.signalExtractor.extractChannels(imageData);
       
-      if (!fingerPresent || quality < this.qualityThreshold) {
-        this.cleanupOldData();
+      if (!fingerPresent) {
+        if (this.noFingerTimer === null) {
+          this.noFingerTimer = now;
+        } else if (now - this.noFingerTimer >= this.RESET_DELAY) {
+          this.resetValues();
+        }
         return {
           bpm: 0,
           spo2: 0,
@@ -120,7 +89,7 @@ export class PPGProcessor {
           arrhythmiaType: 'Normal',
           signalQuality: 0,
           confidence: 0,
-          readings: [],
+          readings: this.readings,
           isPeak: false,
           redValue: red,
           hrvMetrics: {
@@ -132,6 +101,8 @@ export class PPGProcessor {
         };
       }
 
+      this.noFingerTimer = null;
+
       // Amplificar y almacenar señales
       const amplifiedRed = red * this.sensitivitySettings.signalAmplification;
       const amplifiedIr = ir * this.sensitivitySettings.signalAmplification;
@@ -139,6 +110,12 @@ export class PPGProcessor {
       this.redBuffer.push(amplifiedRed);
       this.irBuffer.push(amplifiedIr);
       
+      // Mantener tamaño de buffer
+      if (this.redBuffer.length > this.bufferSize) {
+        this.redBuffer = this.redBuffer.slice(-this.bufferSize);
+        this.irBuffer = this.irBuffer.slice(-this.bufferSize);
+      }
+
       // Filtrar señal
       const filteredRed = this.signalFilter.lowPassFilter(
         this.redBuffer, 
@@ -152,56 +129,66 @@ export class PPGProcessor {
       
       // Agregar a lecturas
       this.readings.push({ timestamp: now, value: normalizedValue });
+      if (this.readings.length > this.bufferSize) {
+        this.readings = this.readings.slice(-this.bufferSize);
+      }
       
-      // Detectar picos
+      // Detectar picos con señal filtrada
       const isPeak = this.peakDetector.detectPeak(
         filteredRed,
         this.sensitivitySettings.peakDetection
       );
 
-      if (isPeak) {
+      if (isPeak && quality > this.qualityThreshold) {
         this.peakTimes.push(now);
         await this.beepPlayer.playBeep('heartbeat');
       }
 
-      // Limpiar datos antiguos
-      this.cleanupOldData();
+      // Mantener solo los últimos picos relevantes
+      const recentPeaks = this.peakTimes.filter(t => now - t < 5000);
+      this.peakTimes = recentPeaks;
 
-      // Calcular métricas solo si tenemos suficientes datos
       if (this.redBuffer.length < this.bufferSize) {
         console.log('Buffer insuficiente:', this.redBuffer.length);
         return null;
       }
 
+      // Análisis de frecuencia y cálculo de BPM
       const { frequencies, magnitudes } = this.frequencyAnalyzer.performFFT(filteredRed);
       const dominantFreqIndex = magnitudes.indexOf(Math.max(...magnitudes));
       const dominantFreq = frequencies[dominantFreqIndex];
-      const calculatedBpm = Math.round(dominantFreq * 60);
+      let calculatedBpm = Math.round(dominantFreq * 60);
       
-      const intervals = [];
-      for (let i = 1; i < this.peakTimes.length; i++) {
-        intervals.push(this.peakTimes[i] - this.peakTimes[i-1]);
+      // Validar BPM
+      if (calculatedBpm >= 40 && calculatedBpm <= 200) {
+        this.lastValidBpm = Math.round(this.lastValidBpm * 0.7 + calculatedBpm * 0.3);
       }
-      
-      const hrvAnalysis = this.signalProcessor.analyzeHRV(intervals);
+
+      // Calcular SpO2
       const spo2Result = this.signalProcessor.calculateSpO2(this.redBuffer, this.irBuffer);
+      if (spo2Result.spo2 >= 80 && spo2Result.spo2 <= 100) {
+        this.lastValidSpO2 = Math.round(this.lastValidSpO2 * 0.7 + spo2Result.spo2 * 0.3);
+      }
+
+      // Análisis de ritmo cardíaco
+      const hrvAnalysis = this.signalProcessor.analyzeHRV(this.peakTimes);
       
+      // Calcular presión arterial
       const bp = await this.signalProcessor.estimateBloodPressure(filteredRed, this.peakTimes);
-      const validatedVitals = this.validateVitalSigns(calculatedBpm, bp.systolic, bp.diastolic);
 
       console.log('Procesamiento:', {
-        bpm: validatedVitals.bpm,
-        spo2: spo2Result.spo2,
+        bpm: this.lastValidBpm,
+        spo2: this.lastValidSpO2,
         quality,
         bufferSize: this.redBuffer.length,
         peakCount: this.peakTimes.length
       });
 
       return {
-        bpm: validatedVitals.bpm,
-        spo2: Math.min(100, Math.max(75, spo2Result.spo2)),
-        systolic: validatedVitals.systolic,
-        diastolic: validatedVitals.diastolic,
+        bpm: this.lastValidBpm,
+        spo2: this.lastValidSpO2,
+        systolic: bp.systolic,
+        diastolic: bp.diastolic,
         hasArrhythmia: hrvAnalysis.hasArrhythmia,
         arrhythmiaType: hrvAnalysis.type,
         signalQuality: quality,
