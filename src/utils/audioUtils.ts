@@ -5,105 +5,72 @@ export class BeepPlayer {
   private isPlaying: boolean = false;
 
   constructor() {
-    // No inicializamos aquí, esperamos a la primera interacción
-    console.log('BeepPlayer constructor called');
-  }
-
-  private async createAudioContext() {
-    if (this.audioContext) {
-      return;
-    }
-
+    // Inicializar el contexto de audio inmediatamente
     try {
-      console.log('Creating new AudioContext...');
+      console.log('Iniciando BeepPlayer...');
       this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      
-      if (this.audioContext.state === 'suspended') {
-        console.log('Resuming suspended audio context...');
-        await this.audioContext.resume();
-      }
-
       this.gainNode = this.audioContext.createGain();
       this.gainNode.connect(this.audioContext.destination);
-      console.log('AudioContext created successfully:', {
+      console.log('BeepPlayer inicializado:', {
         state: this.audioContext.state,
         sampleRate: this.audioContext.sampleRate
       });
     } catch (error) {
-      console.error('Error creating AudioContext:', error);
-      throw error;
+      console.error('Error al inicializar BeepPlayer:', error);
     }
   }
 
   async playBeep(type: 'heartbeat' | 'warning' | 'success' = 'heartbeat'): Promise<void> {
-    if (this.isPlaying) {
-      console.log('Already playing, skipping');
+    if (this.isPlaying || !this.audioContext || !this.gainNode) {
+      console.log('Skip: ya reproduciendo o no inicializado');
       return;
     }
 
     try {
-      // Crear contexto si no existe
-      if (!this.audioContext) {
-        await this.createAudioContext();
-      }
-
-      if (!this.audioContext || !this.gainNode) {
-        throw new Error('Audio initialization failed');
-      }
-
       // Asegurar que el contexto esté activo
-      if (this.audioContext.state !== 'running') {
-        console.log('Resuming audio context...');
+      if (this.audioContext.state === 'suspended') {
+        console.log('Reactivando contexto de audio...');
         await this.audioContext.resume();
       }
 
       this.isPlaying = true;
+      console.log('Comenzando reproducción de beep tipo:', type);
 
-      // Crear nuevo oscilador para cada beep
       const oscillator = this.audioContext.createOscillator();
       const gainNode = this.audioContext.createGain();
       
       oscillator.connect(gainNode);
       gainNode.connect(this.audioContext.destination);
 
-      // Configurar el tipo de sonido
+      const now = this.audioContext.currentTime;
+
       if (type === 'heartbeat') {
-        oscillator.frequency.value = 440; // Frecuencia más audible
-        gainNode.gain.value = 0;
-        
-        const now = this.audioContext.currentTime;
-        
-        // Primer pulso (más fuerte)
+        // Sonido más simple y corto para latidos
+        oscillator.frequency.value = 600; // Frecuencia más alta para ser más audible
         gainNode.gain.setValueAtTime(0, now);
-        gainNode.gain.linearRampToValueAtTime(1.0, now + 0.02);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-        
-        // Segundo pulso (más suave)
-        gainNode.gain.setValueAtTime(0.7, now + 0.1);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+        gainNode.gain.linearRampToValueAtTime(0.3, now + 0.01); // Subida rápida
+        gainNode.gain.linearRampToValueAtTime(0, now + 0.1); // Bajada gradual
         
         oscillator.start(now);
-        oscillator.stop(now + 0.2);
+        oscillator.stop(now + 0.1);
       } else {
-        // Otros tipos de beep
+        // Beeps más largos para warning y success
         oscillator.frequency.value = type === 'warning' ? 880 : 1760;
-        gainNode.gain.value = 0.5;
+        gainNode.gain.value = 0.2;
         oscillator.start();
-        oscillator.stop(this.audioContext.currentTime + 0.15);
+        oscillator.stop(now + 0.2);
       }
 
-      // Limpiar después de reproducir
       oscillator.onended = () => {
+        console.log('Beep completado');
         oscillator.disconnect();
         gainNode.disconnect();
         this.isPlaying = false;
-        console.log('Beep completed');
       };
 
     } catch (error) {
-      console.error('Error playing beep:', error);
+      console.error('Error reproduciendo beep:', error);
       this.isPlaying = false;
-      throw error;
     }
   }
 }
