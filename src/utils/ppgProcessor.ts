@@ -127,7 +127,7 @@ export class PPGProcessor {
 
       // Limitar tamaño del buffer antes de agregar nuevos valores
       if (this.redBuffer.length >= this.bufferSize) {
-        this.redBuffer = this.redBuffer.slice(-Math.floor(this.bufferSize * 0.8)); // Mantener solo el 80% más reciente
+        this.redBuffer = this.redBuffer.slice(-Math.floor(this.bufferSize * 0.8));
         this.irBuffer = this.irBuffer.slice(-Math.floor(this.bufferSize * 0.8));
       }
 
@@ -146,7 +146,6 @@ export class PPGProcessor {
         filteredRed[filteredRed.length - 1]
       );
       
-      // Mantener tamaño de lecturas
       this.readings.push({ timestamp: now, value: normalizedValue });
       if (this.readings.length > this.bufferSize) {
         this.readings = this.readings.slice(-Math.floor(this.bufferSize * 0.8));
@@ -163,27 +162,32 @@ export class PPGProcessor {
         await this.beepPlayer.playBeep('heartbeat');
       }
 
-      // Mantener solo picos recientes
-      this.peakTimes = this.peakTimes.filter(t => now - t < 5000);
+      // Mantener solo picos recientes (últimos 5 segundos)
+      const recentPeakTimes = this.peakTimes.filter(t => now - t < 5000);
+      this.peakTimes = recentPeakTimes;
 
-      if (this.redBuffer.length < Math.floor(this.bufferSize * 0.5)) {
-        console.log('Buffer insuficiente:', this.redBuffer.length);
-        return null;
+      // Calcular BPM basado en intervalos entre picos
+      if (recentPeakTimes.length >= 2) {
+        const intervals = [];
+        for (let i = 1; i < recentPeakTimes.length; i++) {
+          intervals.push(recentPeakTimes[i] - recentPeakTimes[i-1]);
+        }
+        const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+        const calculatedBpm = Math.round(60000 / avgInterval);
+        
+        if (calculatedBpm >= 40 && calculatedBpm <= 200) {
+          this.lastValidBpm = Math.round(
+            this.lastValidBpm * 0.7 + calculatedBpm * 0.3
+          );
+        }
       }
 
-      // Análisis y cálculos
-      const { frequencies, magnitudes } = this.frequencyAnalyzer.performFFT(filteredRed);
-      const dominantFreqIndex = magnitudes.indexOf(Math.max(...magnitudes));
-      const dominantFreq = frequencies[dominantFreqIndex];
-      let calculatedBpm = Math.round(dominantFreq * 60);
-      
-      if (calculatedBpm >= 40 && calculatedBpm <= 200) {
-        this.lastValidBpm = Math.round(this.lastValidBpm * 0.7 + calculatedBpm * 0.3);
-      }
-
+      // Calcular SpO2
       const spo2Result = this.signalProcessor.calculateSpO2(this.redBuffer, this.irBuffer);
-      if (spo2Result.spo2 >= 80 && spo2Result.spo2 <= 100) {
-        this.lastValidSpO2 = Math.round(this.lastValidSpO2 * 0.7 + spo2Result.spo2 * 0.3);
+      if (spo2Result.spo2 >= 80 && spo2Result.spo2 <= 100 && quality > this.qualityThreshold) {
+        this.lastValidSpO2 = Math.round(
+          this.lastValidSpO2 * 0.7 + spo2Result.spo2 * 0.3
+        );
       }
 
       const hrvAnalysis = this.signalProcessor.analyzeHRV(this.peakTimes);
