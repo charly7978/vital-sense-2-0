@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Hand, SignalHigh } from 'lucide-react';
+import { Activity } from 'lucide-react';
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 
@@ -15,9 +15,22 @@ const SignalQualityIndicator: React.FC<SignalQualityIndicatorProps> = ({
   isStarted,
   measurementQuality,
   measurementProgress,
-  fingerPresent
 }) => {
   if (!isStarted) return null;
+
+  // Convertimos la calidad a porcentaje
+  const qualityPercentage = Math.round(measurementQuality * 100);
+
+  // Determinamos el estado de la calidad de señal
+  const getQualityStatus = () => {
+    if (qualityPercentage >= 80) return { color: 'text-green-500', text: 'EXCELENTE' };
+    if (qualityPercentage >= 60) return { color: 'text-blue-500', text: 'BUENA' };
+    if (qualityPercentage >= 40) return { color: 'text-yellow-500', text: 'REGULAR' };
+    if (qualityPercentage >= 20) return { color: 'text-orange-500', text: 'DÉBIL' };
+    return { color: 'text-red-500', text: 'MUY DÉBIL' };
+  };
+
+  const qualityStatus = getQualityStatus();
 
   return (
     <>
@@ -33,20 +46,38 @@ const SignalQualityIndicator: React.FC<SignalQualityIndicatorProps> = ({
 
       <div className={cn(
         "bg-black/30 backdrop-blur-sm rounded-xl p-4 transition-all duration-300",
-        fingerPresent ? "border border-green-500/20" : "border border-red-500/20"
+        qualityStatus.color
       )}>
-        <div className="flex items-center justify-center space-x-2">
-          {fingerPresent ? (
-            <div className="flex items-center space-x-2 text-green-500">
-              <SignalHigh className="w-6 h-6" />
-              <span className="font-semibold">DEDO DETECTADO</span>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Activity className={cn("w-5 h-5", qualityStatus.color)} />
+              <span className="text-sm font-medium text-gray-200">Calidad de Señal</span>
             </div>
-          ) : (
-            <div className="flex items-center space-x-2 text-red-500 animate-pulse">
-              <Hand className="w-6 h-6" />
-              <span className="font-semibold">DEDO NO DETECTADO</span>
-            </div>
-          )}
+            <span className={cn("font-bold", qualityStatus.color)}>
+              {qualityPercentage}%
+            </span>
+          </div>
+          
+          <div>
+            <Progress 
+              value={qualityPercentage} 
+              className={cn(
+                "h-2",
+                qualityPercentage >= 80 && "bg-green-500/20",
+                qualityPercentage >= 60 && qualityPercentage < 80 && "bg-blue-500/20",
+                qualityPercentage >= 40 && qualityPercentage < 60 && "bg-yellow-500/20",
+                qualityPercentage >= 20 && qualityPercentage < 40 && "bg-orange-500/20",
+                qualityPercentage < 20 && "bg-red-500/20"
+              )}
+            />
+          </div>
+
+          <div className="text-center">
+            <span className={cn("font-semibold text-sm", qualityStatus.color)}>
+              {qualityStatus.text}
+            </span>
+          </div>
         </div>
       </div>
     </>
