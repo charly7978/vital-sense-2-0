@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useCallback } from 'react';
 import { BeepPlayer } from '../utils/audioUtils';
 import { PPGProcessor } from '../utils/ppgProcessor';
 import { useToast } from "@/hooks/use-toast";
-import type { VitalReading, SensitivitySettings } from '../utils/types';
+import type { VitalReading } from '../utils/types';
 
 interface VitalsContextType {
   bpm: number;
@@ -18,10 +18,8 @@ interface VitalsContextType {
   measurementProgress: number;
   measurementQuality: number;
   fingerPresent: boolean;
-  sensitivitySettings: SensitivitySettings;
   toggleMeasurement: () => void;
   processFrame: (imageData: ImageData) => void;
-  updateSensitivitySettings: (settings: SensitivitySettings) => void;
 }
 
 const VitalsContext = createContext<VitalsContextType | undefined>(undefined);
@@ -47,11 +45,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [fingerPresent, setFingerPresent] = useState<boolean>(false);
   const [measurementStartTime, setMeasurementStartTime] = useState<number | null>(null);
   const [validReadingsCount, setValidReadingsCount] = useState(0);
-  const [sensitivitySettings, setSensitivitySettings] = useState<SensitivitySettings>({
-    signalAmplification: 2.0,
-    noiseReduction: 1.0,
-    peakDetection: 1.1
-  });
 
   const { toast } = useToast();
 
@@ -66,11 +59,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setValidReadingsCount(0);
     setFingerPresent(false);
     setMeasurementQuality(0);
-  }, []);
-
-  const updateSensitivitySettings = useCallback((newSettings: SensitivitySettings) => {
-    setSensitivitySettings(newSettings);
-    ppgProcessor.updateSensitivitySettings(newSettings);
   }, []);
 
   const processFrame = useCallback(async (imageData: ImageData) => {
@@ -192,10 +180,8 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     measurementProgress,
     measurementQuality,
     fingerPresent,
-    sensitivitySettings,
     toggleMeasurement,
-    processFrame,
-    updateSensitivitySettings
+    processFrame
   };
 
   return <VitalsContext.Provider value={value}>{children}</VitalsContext.Provider>;
