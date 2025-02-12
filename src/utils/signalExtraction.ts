@@ -1,9 +1,12 @@
 
 export class SignalExtractor {
   private readonly ROI_SIZE = 32;
-  private readonly MIN_RED_THRESHOLD = 150;
+  private readonly MIN_RED_THRESHOLD = 130; // Reducido para mayor sensibilidad
   private readonly MAX_RED_THRESHOLD = 240;
   private readonly MIN_VALID_PIXELS = 20;
+  private lastFingerPresent: boolean = false;
+  private readonly STABILITY_THRESHOLD = 3; // Número de frames consecutivos para cambiar estado
+  private stabilityCounter: number = 0;
 
   extractChannels(imageData: ImageData): { 
     red: number;
@@ -34,22 +37,37 @@ export class SignalExtractor {
       }
     }
 
-    // Detección inmediata basada en valor rojo promedio
     const redMedian = this.calculateMedian(redValues);
-    const fingerPresent = redMedian >= this.MIN_RED_THRESHOLD;
+    const currentFingerPresent = redMedian >= this.MIN_RED_THRESHOLD && validPixelCount >= this.MIN_VALID_PIXELS;
 
-    // Log inmediato del estado
+    // Lógica de estabilidad
+    if (currentFingerPresent === this.lastFingerPresent) {
+      this.stabilityCounter = Math.min(this.stabilityCounter + 1, this.STABILITY_THRESHOLD);
+    } else {
+      this.stabilityCounter = Math.max(this.stabilityCounter - 1, 0);
+    }
+
+    // Solo cambiamos el estado si hay suficiente estabilidad
+    let finalFingerPresent = this.lastFingerPresent;
+    if (this.stabilityCounter >= this.STABILITY_THRESHOLD || this.stabilityCounter === 0) {
+      finalFingerPresent = currentFingerPresent;
+      this.lastFingerPresent = currentFingerPresent;
+    }
+
+    // Log detallado para debugging
     console.log('Detección de dedo:', {
       redMedian,
       validPixelCount,
-      fingerPresent
+      currentDetection: currentFingerPresent,
+      stabilityCounter: this.stabilityCounter,
+      finalState: finalFingerPresent
     });
 
     return {
       red: redMedian,
       ir: this.calculateMedian(greenValues),
       quality: validPixelCount / (this.ROI_SIZE * this.ROI_SIZE),
-      fingerPresent
+      fingerPresent: finalFingerPresent
     };
   }
 
