@@ -160,7 +160,7 @@ export class SignalExtractor {
     return (
       redMedian >= this.MIN_RED_THRESHOLD &&
       redMedian <= this.MAX_RED_THRESHOLD &&
-      quality > 0.3 &&
+      quality > 0.05 && // Reducido de 0.3 a 0.05 basado en los logs
       perfusionIndex > 0.01 &&
       this.lastValidReadings.length >= Math.floor(this.HISTORY_SIZE / 2)
     );
