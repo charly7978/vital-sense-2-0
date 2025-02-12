@@ -1,12 +1,18 @@
 
 export class SignalExtractor {
   private readonly ROI_SIZE = 32;
-  private readonly MIN_RED_THRESHOLD = 135; // Sutilmente aumentado de 130 a 135
+  private readonly MIN_RED_THRESHOLD = 135;
   private readonly MAX_RED_THRESHOLD = 240;
-  private readonly MIN_VALID_PIXELS = 25; // Sutilmente aumentado de 20 a 25
+  private readonly MIN_VALID_PIXELS = 25;
   private lastFingerPresent: boolean = false;
-  private readonly STABILITY_THRESHOLD = 4; // Sutilmente aumentado de 3 a 4 frames
+  private readonly STABILITY_THRESHOLD = 4;
   private stabilityCounter: number = 0;
+  
+  // Nuevos parámetros para histéresis
+  private readonly HYSTERESIS_HIGH = 140; // Umbral alto para activación
+  private readonly HYSTERESIS_LOW = 130;  // Umbral bajo para desactivación
+  private readonly DEBOUNCE_TIME = 500;   // Tiempo mínimo entre cambios de estado (ms)
+  private lastStateChangeTime: number = 0;
 
   extractChannels(imageData: ImageData): { 
     red: number;
@@ -24,7 +30,7 @@ export class SignalExtractor {
     const greenValues: number[] = [];
     let validPixelCount = 0;
 
-    // Análisis directo de píxeles
+    // Análisis de píxeles
     for (let y = centerY - halfROI; y < centerY + halfROI; y++) {
       for (let x = centerX - halfROI; x < centerX + halfROI; x++) {
         const i = (y * width + x) * 4;
@@ -38,9 +44,30 @@ export class SignalExtractor {
     }
 
     const redMedian = this.calculateMedian(redValues);
-    const currentFingerPresent = redMedian >= this.MIN_RED_THRESHOLD && validPixelCount >= this.MIN_VALID_PIXELS;
+    const now = Date.now();
 
-    // Lógica de estabilidad
+    // Implementación de histéresis con debounce
+    let currentFingerPresent = this.lastFingerPresent;
+    
+    if (this.lastFingerPresent) {
+      // Si el dedo estaba presente, usar umbral bajo para desactivar
+      if (redMedian < this.HYSTERESIS_LOW && validPixelCount < this.MIN_VALID_PIXELS) {
+        if (now - this.lastStateChangeTime >= this.DEBOUNCE_TIME) {
+          currentFingerPresent = false;
+          this.lastStateChangeTime = now;
+        }
+      }
+    } else {
+      // Si el dedo no estaba presente, usar umbral alto para activar
+      if (redMedian > this.HYSTERESIS_HIGH && validPixelCount >= this.MIN_VALID_PIXELS) {
+        if (now - this.lastStateChangeTime >= this.DEBOUNCE_TIME) {
+          currentFingerPresent = true;
+          this.lastStateChangeTime = now;
+        }
+      }
+    }
+
+    // Lógica de estabilidad adicional
     if (currentFingerPresent === this.lastFingerPresent) {
       this.stabilityCounter = Math.min(this.stabilityCounter + 1, this.STABILITY_THRESHOLD);
     } else {
@@ -60,7 +87,8 @@ export class SignalExtractor {
       validPixelCount,
       currentDetection: currentFingerPresent,
       stabilityCounter: this.stabilityCounter,
-      finalState: finalFingerPresent
+      finalState: finalFingerPresent,
+      timeSinceLastChange: now - this.lastStateChangeTime
     });
 
     return {
