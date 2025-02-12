@@ -1,19 +1,25 @@
 
 export class PeakDetector {
   private adaptiveThreshold = 0;
-  private readonly minPeakDistance = 400; // Aumentado para evitar falsos positivos
+  private readonly minPeakDistance = 300; // Reducido para mejor detección
   private lastPeakTime = 0;
-  private readonly bufferSize = 15; // Aumentado para mejor detección
-  private readonly minAmplitude = 0.15; // Aumentado para mejor sensibilidad
-  private readonly adaptiveRate = 0.2; // Aumentado para adaptación más rápida
+  private readonly bufferSize = 20; // Aumentado para mejor análisis
+  private readonly minAmplitude = 0.1; // Reducido para mayor sensibilidad
+  private readonly adaptiveRate = 0.15; // Ajustado para adaptación más suave
   private peakBuffer: number[] = [];
   private timeBuffer: number[] = [];
   private frameCount = 0;
+  private readonly maxBPM = 180; // Límite superior de BPM fisiológico
+  private readonly minBPM = 40;  // Límite inferior de BPM fisiológico
 
   isRealPeak(currentValue: number, now: number, signalBuffer: number[]): boolean {
     this.frameCount++;
     
-    if (now - this.lastPeakTime < this.minPeakDistance) {
+    // Validación inicial de tiempo entre picos basada en límites fisiológicos
+    const minInterval = (60000 / this.maxBPM); // Intervalo mínimo basado en maxBPM
+    const timeSinceLastPeak = now - this.lastPeakTime;
+    
+    if (timeSinceLastPeak < minInterval) {
       return false;
     }
 
@@ -21,18 +27,20 @@ export class PeakDetector {
       return false;
     }
 
+    // Análisis de ventana móvil mejorado
     const recentValues = signalBuffer.slice(-this.bufferSize);
     const avgValue = recentValues.reduce((a, b) => a + b, 0) / recentValues.length;
     const stdDev = Math.sqrt(
       recentValues.reduce((a, b) => a + Math.pow(b - avgValue, 2), 0) / recentValues.length
     );
 
-    // Umbral adaptativo mejorado
-    this.adaptiveThreshold = avgValue + (stdDev * 0.8);
+    // Umbral adaptativo con mayor sensibilidad
+    this.adaptiveThreshold = avgValue + (stdDev * 0.7);
 
+    // Validaciones más precisas
     const isValidShape = this.validatePeakShape(currentValue, signalBuffer);
     const hasSignificantAmplitude = currentValue > this.adaptiveThreshold && 
-                                  currentValue > this.minAmplitude;
+                                  currentValue > avgValue + (this.minAmplitude * stdDev);
     const isLocalMaximum = this.isLocalMax(currentValue, signalBuffer);
 
     if (hasSignificantAmplitude && isLocalMaximum && isValidShape) {
@@ -41,12 +49,18 @@ export class PeakDetector {
       if (this.validatePeakInterval(currentInterval)) {
         this.lastPeakTime = now;
         this.updatePeakHistory(currentValue, now);
-        console.log('¡LATIDO DETECTADO!', {
-          valor: currentValue,
-          umbral: this.adaptiveThreshold,
-          intervalo: currentInterval,
-          bpmEstimado: 60000 / currentInterval
+        
+        // Log detallado para debugging
+        const bpm = 60000 / currentInterval;
+        console.log('Detección de latido:', {
+          valor: currentValue.toFixed(3),
+          umbral: this.adaptiveThreshold.toFixed(3),
+          intervalo: currentInterval.toFixed(0),
+          bpm: bpm.toFixed(1),
+          amplitud: (currentValue - avgValue).toFixed(3),
+          calidad: isValidShape ? 'Alta' : 'Media'
         });
+        
         return true;
       }
     }
@@ -55,36 +69,54 @@ export class PeakDetector {
   }
 
   private isLocalMax(currentValue: number, signalBuffer: number[]): boolean {
-    const window = 3; // Ventana de análisis
+    const window = 4; // Ventana aumentada para mejor precisión
     const recent = signalBuffer.slice(-window);
-    return currentValue > Math.max(...recent);
+    const localMax = Math.max(...recent);
+    return currentValue >= localMax && currentValue > recent[recent.length - 2];
   }
 
   private validatePeakShape(currentValue: number, signalBuffer: number[]): boolean {
-    if (signalBuffer.length < 4) return false;
+    if (signalBuffer.length < 5) return false;
 
-    const last4Values = [...signalBuffer.slice(-3), currentValue];
+    const samples = [...signalBuffer.slice(-4), currentValue];
     
-    // Verificar forma de onda más estricta
-    const isRising = last4Values[2] > last4Values[1] && last4Values[1] > last4Values[0];
-    const isPeak = currentValue > last4Values[2];
+    // Análisis de forma de onda mejorado
+    const firstDerivative = samples.slice(1).map((v, i) => v - samples[i]);
+    const isRising = firstDerivative[2] > 0 && firstDerivative[1] > 0;
+    const isPeaking = firstDerivative[3] < 0;
     
-    return isRising && isPeak;
+    // Verificar simetría del pico
+    const peakHeight = currentValue - samples[0];
+    const symmetry = Math.abs(firstDerivative[2]) / Math.abs(firstDerivative[3]);
+    const isSymmetric = symmetry > 0.5 && symmetry < 2.0;
+    
+    return isRising && isPeaking && isSymmetric;
   }
 
   private validatePeakInterval(currentInterval: number): boolean {
-    if (this.timeBuffer.length < 2) {
-      return currentInterval >= this.minPeakDistance;
+    // Validación basada en límites fisiológicos
+    const maxInterval = (60000 / this.minBPM);
+    const minInterval = (60000 / this.maxBPM);
+    
+    if (currentInterval < minInterval || currentInterval > maxInterval) {
+      return false;
     }
 
-    const recentIntervals = this.timeBuffer.slice(-3);
-    const avgInterval = recentIntervals.reduce((a, b) => a + b, 0) / recentIntervals.length;
-    
-    // Tolerancia más estricta
-    const maxVariation = 0.3;
-    const isWithinRange = Math.abs(currentInterval - avgInterval) <= avgInterval * maxVariation;
+    if (this.timeBuffer.length < 2) {
+      return true;
+    }
 
-    return isWithinRange && currentInterval >= this.minPeakDistance;
+    // Análisis de consistencia temporal
+    const recentIntervals = this.timeBuffer.slice(-3)
+      .map((t, i, arr) => i > 0 ? t - arr[i-1] : 0)
+      .filter(i => i > 0);
+    
+    if (recentIntervals.length === 0) return true;
+    
+    const avgInterval = recentIntervals.reduce((a, b) => a + b, 0) / recentIntervals.length;
+    const maxVariation = 0.25; // Reducido para mayor estabilidad
+    
+    return Math.abs(currentInterval - avgInterval) <= avgInterval * maxVariation;
   }
 
   private updatePeakHistory(peakValue: number, timestamp: number) {
@@ -96,14 +128,22 @@ export class PeakDetector {
     this.peakBuffer.push(peakValue);
     this.timeBuffer.push(timestamp);
 
-    // Log de calidad de detección
-    if (this.timeBuffer.length > 1) {
+    // Análisis de calidad mejorado
+    if (this.timeBuffer.length > 2) {
       const intervals = this.timeBuffer.slice(1).map((t, i) => t - this.timeBuffer[i]);
       const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-      console.log('Calidad de detección:', {
-        intervalPromedio: avgInterval,
-        bpmEstimado: 60000 / avgInterval,
-        cantidadPicos: this.peakBuffer.length
+      const bpm = 60000 / avgInterval;
+      
+      // Cálculo de variabilidad
+      const variability = Math.sqrt(
+        intervals.reduce((a, b) => a + Math.pow(b - avgInterval, 2), 0) / intervals.length
+      ) / avgInterval;
+      
+      console.log('Análisis de ritmo cardíaco:', {
+        bpm: bpm.toFixed(1),
+        variabilidad: (variabilidad * 100).toFixed(1) + '%',
+        confianza: ((1 - variability) * 100).toFixed(1) + '%',
+        muestras: this.peakBuffer.length
       });
     }
   }
