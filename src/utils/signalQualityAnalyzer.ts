@@ -4,6 +4,8 @@ export class SignalQualityAnalyzer {
   private readonly MAX_RED_INTENSITY = 255; // Valor máximo posible
   private readonly OPTIMAL_RED_RANGE = { min: 150, max: 230 }; // Rango óptimo para PPG
   private readonly MIN_VALID_PIXELS_RATIO = 0.2; // Mínimo ratio de píxeles válidos
+  private readonly STABILITY_WINDOW = 5; // Ventana para análisis de estabilidad
+  private lastQuality: number = 0; // Mantener la última calidad para suavizado
 
   analyzeSignalQuality(signal: number[]): number {
     // Si no hay señal, retornamos 0
@@ -44,22 +46,36 @@ export class SignalQualityAnalyzer {
       quality *= 0.7; // 30% de penalización por señal muy fuerte
     }
 
-    // NUEVO: Análisis de estabilidad en tiempo real
-    if (signal.length >= 5) {
-      const recentSamples = signal.slice(-5);
-      const recentVariance = this.calculateVariance(recentSamples);
-      const optimalVariance = 500; // Valor de varianza considerado óptimo
+    // Análisis de estabilidad mejorado
+    if (signal.length >= this.STABILITY_WINDOW) {
+      const recentSamples = signal.slice(-this.STABILITY_WINDOW);
       
-      // Penalización por varianza (0-30%)
+      // 1. Análisis de varianza suavizado
+      const recentVariance = this.calculateVariance(recentSamples);
+      const optimalVariance = 500;
       const varianceQuality = Math.max(0, 1 - Math.abs(recentVariance - optimalVariance) / optimalVariance);
-      quality *= (0.7 + 0.3 * varianceQuality);
-
-      // NUEVO: Análisis de tendencia
+      
+      // 2. Análisis de tendencia suavizado
       const trend = this.calculateTrend(recentSamples);
-      if (Math.abs(trend) > 50) { // Si hay un cambio muy brusco
-        quality *= 0.8; // 20% de penalización por inestabilidad
-      }
+      const trendQuality = Math.max(0, 1 - Math.abs(trend) / 100);
+      
+      // 3. Análisis de estabilidad local
+      const stabilityQuality = this.calculateLocalStability(recentSamples);
+
+      // Combinamos los factores de calidad con pesos
+      const combinedQuality = (
+        varianceQuality * 0.4 +  // 40% peso para varianza
+        trendQuality * 0.3 +     // 30% peso para tendencia
+        stabilityQuality * 0.3   // 30% peso para estabilidad local
+      );
+
+      // Aplicamos el factor combinado a la calidad
+      quality *= combinedQuality;
     }
+
+    // Suavizado temporal para evitar cambios bruscos
+    quality = this.lastQuality * 0.7 + quality * 0.3;
+    this.lastQuality = quality;
 
     // Log detallado para debugging
     console.log('Análisis de calidad:', {
@@ -77,7 +93,6 @@ export class SignalQualityAnalyzer {
     return samples.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / samples.length;
   }
 
-  // NUEVO: Calcula la tendencia de la señal
   private calculateTrend(samples: number[]): number {
     if (samples.length < 2) return 0;
     const firstHalf = samples.slice(0, Math.floor(samples.length / 2));
@@ -85,6 +100,17 @@ export class SignalQualityAnalyzer {
     const firstMean = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length;
     const secondMean = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
     return secondMean - firstMean;
+  }
+
+  private calculateLocalStability(samples: number[]): number {
+    let stabilityScore = 1;
+    for (let i = 1; i < samples.length; i++) {
+      const change = Math.abs(samples[i] - samples[i-1]);
+      if (change > 20) { // Cambio significativo
+        stabilityScore *= 0.9;
+      }
+    }
+    return stabilityScore;
   }
 
   private getQualityStatus(quality: number): string {
