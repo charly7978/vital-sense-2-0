@@ -108,60 +108,65 @@ export class PPGProcessor {
       }
       this.lastProcessingTime = now;
 
-      // 🔴 Paso 1: Extraer la señal
+      // 🔴 **Paso 1: Extraer la señal**
       const extractionResult = this.signalExtractor.extractChannels(imageData);
-      const { red, ir, quality, perfusionIndex, diagnostics } = extractionResult;
+      const { red, ir, quality, diagnostics } = extractionResult;
 
       console.log("🔍 Datos extraídos:", {
         red,
         ir,
-        quality: (quality * 100).toFixed(1) + "%",
+        calidad: (quality * 100).toFixed(1) + "%",
         variacionRojo: diagnostics.rawRedValues.length > 0 
           ? (Math.max(...diagnostics.rawRedValues) - Math.min(...diagnostics.rawRedValues)).toFixed(3) 
           : "N/A"
       });
 
-      // 🔴 Paso 2: Validar presencia de dedo
+      // 🔴 **Paso 2: Validar presencia de dedo**
       if (red < this.processingSettings.MIN_RED_VALUE) {
-        console.log("⚠ No se detecta el dedo. Ajustando sensibilidad...");
+        console.log(`⚠ No se detecta el dedo. Rojo detectado: ${red}`);
         return null;
       }
 
-      // 🔴 Paso 3: Verificar calidad de señal
-      if (quality < this.qualityThreshold) {
-        console.log("⚠ Señal de baja calidad. Ignorando medición.");
-        return null;
+      // 🔴 **Paso 3: Verificar calidad de señal**
+      if (quality < 0.5) {
+        console.log(`⚠ Señal de baja calidad (${(quality * 100).toFixed(1)}%). Probando ajuste...`);
+        // Permitimos medición con ajustes menores si la calidad es entre 0.3 y 0.5
+        if (quality >= 0.3) {
+          console.log("🔧 Ajuste menor aplicado. Intentando medir...");
+        } else {
+          return null;
+        }
       }
 
-      // 🔴 Paso 4: Comprobar variación en la señal
+      // 🔴 **Paso 4: Comprobar variación en la señal**
       const redVariation = Math.max(...this.redBuffer) - Math.min(...this.redBuffer);
-      if (redVariation < 10) {
+      if (redVariation < 5) {
         console.log("⚠ Variación mínima en la señal. Puede ser luz ambiental.");
         return null;
       }
 
-      // 🔴 Paso 5: Procesamiento de señal con sensibilidad ajustada
+      // ✅ **Ajustes en Sensibilidad**
       const amplifiedRed = red * this.sensitivitySettings.signalAmplification;
       const amplifiedIr = ir * this.sensitivitySettings.signalAmplification;
-      
+
       this.redBuffer.push(amplifiedRed);
       this.irBuffer.push(amplifiedIr);
-      
-      // Filtrado y normalización mejorados
+
+      // Procesamiento de señal mejorado
       const filteredRed = this.signalFilter.lowPassFilter(this.redBuffer, 
         4 * this.sensitivitySettings.noiseReduction);
       const normalizedValue = this.signalNormalizer.normalizeSignal(
         filteredRed[filteredRed.length - 1]
       );
-      
+
       // Almacenamiento de lecturas
       this.readings.push({ timestamp: now, value: normalizedValue });
       this.signalBuffer.push(normalizedValue);
 
-      // 🔴 Paso 6: Detección de picos y análisis
+      // Detección de picos
       const isPeak = this.peakDetector.isRealPeak(
-        normalizedValue, 
-        now, 
+        normalizedValue,
+        now,
         this.signalBuffer
       );
 
@@ -170,11 +175,10 @@ export class PPGProcessor {
         await this.beepPlayer.playBeep('heartbeat').catch(console.error);
       }
 
-      // 🔴 Paso 7: Cálculo de métricas vitales
+      // Cálculo de métricas vitales
       const spo2Result = this.signalProcessor.calculateSpO2(
-        this.redBuffer, 
-        this.irBuffer,
-        perfusionIndex
+        this.redBuffer,
+        this.irBuffer
       );
 
       const hrvIntervals = [];
@@ -186,7 +190,7 @@ export class PPGProcessor {
       const bpEstimation = this.signalProcessor.estimateBloodPressure(filteredRed, this.peakTimes);
       const bpm = this.calculateInstantaneousBPM(this.peakTimes);
 
-      // Limpieza de buffers antiguos
+      // Limpieza de buffers
       this.dataManager.cleanupData(
         this.readings,
         this.redBuffer,
@@ -199,7 +203,6 @@ export class PPGProcessor {
 
       console.log(`✔ Medición válida: BPM=${bpm}, SpO₂=${spo2Result.spo2}%`);
 
-      // 🔴 Paso 8: Preparar respuesta final
       const result: PPGData = {
         bpm,
         spo2: spo2Result.spo2,
