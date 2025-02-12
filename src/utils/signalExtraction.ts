@@ -8,10 +8,10 @@ export class SignalExtractor {
   private readonly STABILITY_THRESHOLD = 4;
   private stabilityCounter: number = 0;
   
-  // Nuevos parámetros para histéresis
-  private readonly HYSTERESIS_HIGH = 140; // Umbral alto para activación
-  private readonly HYSTERESIS_LOW = 130;  // Umbral bajo para desactivación
-  private readonly DEBOUNCE_TIME = 500;   // Tiempo mínimo entre cambios de estado (ms)
+  // Parámetros de histéresis ajustados
+  private readonly HYSTERESIS_HIGH = 145; // Aumentado de 140 a 145 para ser más estrictos en la activación
+  private readonly HYSTERESIS_LOW = 125;  // Reducido de 130 a 125 para ser más tolerantes en mantener la detección
+  private readonly DEBOUNCE_TIME = 750;   // Aumentado de 500 a 750ms para mayor estabilidad
   private lastStateChangeTime: number = 0;
 
   extractChannels(imageData: ImageData): { 
@@ -46,7 +46,7 @@ export class SignalExtractor {
     const redMedian = this.calculateMedian(redValues);
     const now = Date.now();
 
-    // Implementación de histéresis con debounce
+    // Implementación de histéresis con debounce mejorada
     let currentFingerPresent = this.lastFingerPresent;
     
     if (this.lastFingerPresent) {
