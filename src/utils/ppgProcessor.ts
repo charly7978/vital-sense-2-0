@@ -259,7 +259,11 @@ export class PPGProcessor {
       
       // Reproducir beep solo cuando detectamos un latido real y la señal es de buena calidad
       try {
-        await this.beepPlayer.playBeep('heartbeat');
+        console.log('Intentando reproducir beep de latido...');
+        await this.beepPlayer.playBeep('heartbeat').catch(err => {
+          console.error('Error específico al reproducir beep:', err);
+        });
+        console.log('Beep de latido reproducido exitosamente');
       } catch (err) {
         console.error('Error al reproducir beep:', err);
       }
