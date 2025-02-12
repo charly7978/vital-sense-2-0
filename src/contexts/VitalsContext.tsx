@@ -16,6 +16,7 @@ interface VitalsContextType {
   isStarted: boolean;
   measurementProgress: number;
   measurementQuality: number;
+  fingerPresent: boolean;
   sensitivitySettings: SensitivitySettings;
   toggleMeasurement: () => void;
   processFrame: (imageData: ImageData) => void;
@@ -28,10 +29,10 @@ const beepPlayer = new BeepPlayer();
 const ppgProcessor = new PPGProcessor();
 
 const MEASUREMENT_DURATION = 30; // seconds
-const MIN_QUALITY_THRESHOLD = 0.25; // Aumentado significativamente para mayor precisión
+const MIN_QUALITY_THRESHOLD = 0.25;
 const MIN_READINGS_FOR_BP = 10;
-const NO_FINGER_THRESHOLD = 0.3; // Mucho más estricto
-const CONSECUTIVE_LOW_QUALITY_LIMIT = 2; // Más rápido para detectar ausencia
+const NO_FINGER_THRESHOLD = 0.3;
+const CONSECUTIVE_LOW_QUALITY_LIMIT = 2;
 
 export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [bpm, setBpm] = useState<number>(0);
@@ -45,13 +46,14 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isStarted, setIsStarted] = useState<boolean>(false);
   const [measurementProgress, setMeasurementProgress] = useState(0);
   const [measurementQuality, setMeasurementQuality] = useState(0);
+  const [fingerPresent, setFingerPresent] = useState<boolean>(false);
   const [measurementStartTime, setMeasurementStartTime] = useState<number | null>(null);
   const [validReadingsCount, setValidReadingsCount] = useState(0);
   const [consecutiveLowQualityCount, setConsecutiveLowQualityCount] = useState(0);
   const [sensitivitySettings, setSensitivitySettings] = useState<SensitivitySettings>({
-    signalAmplification: 2.0, // Aumentado para mejor detección
-    noiseReduction: 1.0, // Reducido para ser más sensible
-    peakDetection: 1.1 // Reducido para detectar más picos
+    signalAmplification: 2.0,
+    noiseReduction: 1.0,
+    peakDetection: 1.1
   });
 
   const { toast } = useToast();
@@ -66,6 +68,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setReadings([]);
     setValidReadingsCount(0);
     setConsecutiveLowQualityCount(0);
+    setFingerPresent(false);
   }, []);
 
   const updateSensitivitySettings = useCallback((newSettings: SensitivitySettings) => {
@@ -80,26 +83,26 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const vitals = await ppgProcessor.processFrame(imageData);
       
-      // Verificar si no hay dedo presente
       if (!vitals || vitals.signalQuality < NO_FINGER_THRESHOLD) {
         setConsecutiveLowQualityCount(prev => prev + 1);
         
         if (consecutiveLowQualityCount >= CONSECUTIVE_LOW_QUALITY_LIMIT) {
           console.log('No se detecta dedo o señal muy baja:', vitals?.signalQuality || 0);
+          setFingerPresent(false);
           resetMeasurements();
           setMeasurementQuality(0);
         }
         return;
       }
 
-      // Resetear contador si la calidad es buena
+      setFingerPresent(true);
+
       if (vitals.signalQuality > MIN_QUALITY_THRESHOLD) {
         setConsecutiveLowQualityCount(0);
       }
 
       setMeasurementQuality(vitals.signalQuality);
 
-      // Solo procesar si la calidad es suficiente
       if (vitals.signalQuality > MIN_QUALITY_THRESHOLD) {
         setValidReadingsCount(prev => prev + 1);
 
@@ -108,17 +111,14 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           await beepPlayer.playBeep('heartbeat');
         }
 
-        // Actualizar BPM solo si es válido y hay suficiente calidad
         if (vitals.bpm > 40 && vitals.bpm < 200) {
           setBpm(vitals.bpm);
         }
 
-        // Actualizar SpO2 solo si es válido y hay suficiente calidad
         if (vitals.spo2 >= 80 && vitals.spo2 <= 100) {
           setSpo2(vitals.spo2);
         }
 
-        // Actualizar presión arterial solo si hay suficientes lecturas válidas
         if (validReadingsCount >= MIN_READINGS_FOR_BP) {
           if (vitals.systolic > 0 && vitals.diastolic > 0 && 
               vitals.systolic > vitals.diastolic &&
@@ -135,6 +135,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     } catch (error) {
       console.error('Error processing frame:', error);
+      setFingerPresent(false);
       toast({
         variant: "destructive",
         title: "Error en el procesamiento",
@@ -208,6 +209,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     isStarted,
     measurementProgress,
     measurementQuality,
+    fingerPresent,
     sensitivitySettings,
     toggleMeasurement,
     processFrame,
