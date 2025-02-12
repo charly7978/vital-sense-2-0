@@ -1,4 +1,3 @@
-
 import { VitalReading, PPGData, SensitivitySettings, ProcessingSettings } from './types';
 import { BeepPlayer } from './audioUtils';
 import { SignalProcessor } from './signalProcessing';
@@ -28,7 +27,7 @@ export class PPGProcessor {
   private readonly samplingRate = 30;             // Tasa de muestreo en Hz
   private readonly windowSize = 90;               // Tamaño de la ventana de análisis
   private readonly bufferSize = 15;               // Tamaño del buffer de señal
-  private readonly qualityThreshold = 0.2;        // Umbral mínimo de calidad de señal
+  private readonly qualityThreshold = 0.5;        // Umbral mínimo de calidad de señal
   private readonly minProcessingInterval = 50;    // Intervalo mínimo entre procesamiento (ms)
 
   // Instancias de procesadores especializados
@@ -65,16 +64,16 @@ export class PPGProcessor {
     MEASUREMENT_DURATION: 30,          // Duración de la medición en segundos
     MIN_FRAMES_FOR_CALCULATION: 15,    // Mínimo de frames para calcular
     MIN_PEAKS_FOR_VALID_HR: 2,        // Mínimo de picos para HR válido
-    MIN_PEAK_DISTANCE: 400,           // Distancia mínima entre picos (ms)
-    MAX_PEAK_DISTANCE: 1200,          // Distancia máxima entre picos (ms)
-    PEAK_THRESHOLD_FACTOR: 0.4,       // Factor de umbral para detección de picos
-    MIN_RED_VALUE: 15,                // Valor mínimo del canal rojo
-    MIN_RED_DOMINANCE: 1.2,           // Dominancia mínima del canal rojo
-    MIN_VALID_PIXELS_RATIO: 0.2,      // Ratio mínimo de píxeles válidos
+    MIN_PEAK_DISTANCE: 500,           // Distancia mínima entre picos (ms)
+    MAX_PEAK_DISTANCE: 1000,          // Distancia máxima entre picos (ms)
+    PEAK_THRESHOLD_FACTOR: 0.6,       // Factor de umbral para detección de picos
+    MIN_RED_VALUE: 30,                // Valor mínimo del canal rojo
+    MIN_RED_DOMINANCE: 1.5,           // Dominancia mínima del canal rojo
+    MIN_VALID_PIXELS_RATIO: 0.35,      // Ratio mínimo de píxeles válidos
     MIN_BRIGHTNESS: 80,               // Brillo mínimo requerido
     MIN_VALID_READINGS: 30,           // Mínimo de lecturas válidas
     FINGER_DETECTION_DELAY: 500,      // Retardo en detección de dedo (ms)
-    MIN_SPO2: 75                      // SpO2 mínimo válido
+    MIN_SPO2: 80                      // SpO2 mínimo válido
   };
   
   /**
