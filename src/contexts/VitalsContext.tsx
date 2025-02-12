@@ -5,9 +5,6 @@ import { PPGProcessor } from '../utils/ppgProcessor';
 import { useToast } from "@/hooks/use-toast";
 import type { VitalReading, SensitivitySettings } from '../utils/types';
 
-const beepPlayer = new BeepPlayer();
-const ppgProcessor = new PPGProcessor();
-
 interface VitalsContextType {
   bpm: number;
   spo2: number;
@@ -27,6 +24,9 @@ interface VitalsContextType {
 }
 
 const VitalsContext = createContext<VitalsContextType | undefined>(undefined);
+
+const beepPlayer = new BeepPlayer();
+const ppgProcessor = new PPGProcessor();
 
 const MEASUREMENT_DURATION = 30; // seconds
 
@@ -48,7 +48,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     noiseReduction: 1.2,
     peakDetection: 1.3
   });
-  
+
   const { toast } = useToast();
 
   const updateSensitivitySettings = useCallback((newSettings: SensitivitySettings) => {
@@ -58,7 +58,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const processFrame = useCallback(async (imageData: ImageData) => {
     if (!isStarted) return;
-    
+
     setIsProcessing(true);
     try {
       const vitals = await ppgProcessor.processFrame(imageData);
@@ -68,7 +68,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
 
         setMeasurementQuality(vitals.signalQuality);
-        
+
         if (vitals.signalQuality > 0) {
           setBpm(vitals.bpm || 0);
           setSpo2(vitals.spo2 || 0);
