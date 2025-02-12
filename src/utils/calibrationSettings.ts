@@ -4,7 +4,7 @@ import { CalibrationSettings } from './types';
 export const calibrationSettings: CalibrationSettings = {
   // Configuraciones de detección de señal
   MIN_RED_THRESHOLD: {
-    value: 135,
+    value: 155,
     min: 100,  // Por debajo habría demasiados falsos positivos
     max: 200,  // Por encima sería demasiado restrictivo
     step: 5,   // Ajustes en incrementos de 5 para cambios notables pero no bruscos
@@ -38,7 +38,7 @@ export const calibrationSettings: CalibrationSettings = {
 
   // Configuraciones de procesamiento de señal
   BUFFER_SIZE: {
-    value: 60,
+    value: 40,
     min: 30,   // Mínimo necesario para análisis válido
     max: 120,  // Máximo práctico antes de que la latencia sea problemática
     step: 5,   // Ajustes en grupos de 5 frames
@@ -73,7 +73,7 @@ export const calibrationSettings: CalibrationSettings = {
 
   // Configuraciones de BPM
   BPM_SMOOTHING: {
-    value: 0.7,
+    value: 1.1,
     min: 0.3,  // Mínimo para mantener algo de estabilidad
     max: 0.9,  // Máximo antes de volverse demasiado lento
     step: 0.05, // Ajustes finos
