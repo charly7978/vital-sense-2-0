@@ -51,6 +51,9 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     noiseReduction: 1.0,
     peakDetection: 1.1
   });
+  const [fingerDetectionCount, setFingerDetectionCount] = useState(0);
+  const DETECTION_THRESHOLD = 170;
+  const CONFIRMATION_FRAMES = 3;
 
   const { toast } = useToast();
 
@@ -80,10 +83,18 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const vitals = await ppgProcessor.processFrame(imageData);
       
       if (vitals) {
-        const isFingerDetected = vitals.redValue > 150;
-        setFingerPresent(isFingerDetected);
+        const currentFingerDetected = vitals.redValue > DETECTION_THRESHOLD;
         
-        if (isFingerDetected) {
+        if (currentFingerDetected) {
+          setFingerDetectionCount(prev => Math.min(prev + 1, CONFIRMATION_FRAMES));
+        } else {
+          setFingerDetectionCount(0);
+        }
+
+        const isFingerConfirmed = fingerDetectionCount >= CONFIRMATION_FRAMES;
+        setFingerPresent(isFingerConfirmed);
+        
+        if (isFingerConfirmed) {
           setReadings(vitals.readings);
           
           if (vitals.isPeak) {
@@ -125,7 +136,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         description: "Error al procesar la imagen de la cámara."
       });
     }
-  }, [isStarted, beepPlayer, toast]);
+  }, [isStarted, beepPlayer, toast, fingerDetectionCount]);
 
   const toggleMeasurement = useCallback(() => {
     setIsStarted(prev => !prev);
