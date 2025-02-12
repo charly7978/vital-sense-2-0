@@ -1,11 +1,11 @@
 
 export class SignalExtractor {
   private readonly ROI_SIZE = 32;
-  private readonly MIN_RED_THRESHOLD = 140;
+  private readonly MIN_RED_THRESHOLD = 135; // Sutilmente aumentado de 130 a 135
   private readonly MAX_RED_THRESHOLD = 240;
-  private readonly MIN_VALID_PIXELS = 30;
+  private readonly MIN_VALID_PIXELS = 25; // Sutilmente aumentado de 20 a 25
   private lastFingerPresent: boolean = false;
-  private readonly STABILITY_THRESHOLD = 3; // Reducido a 3 frames para más rapidez
+  private readonly STABILITY_THRESHOLD = 4; // Sutilmente aumentado de 3 a 4 frames
   private stabilityCounter: number = 0;
 
   extractChannels(imageData: ImageData): { 
@@ -38,28 +38,18 @@ export class SignalExtractor {
     }
 
     const redMedian = this.calculateMedian(redValues);
-    const pixelRatio = validPixelCount / (this.ROI_SIZE * this.ROI_SIZE);
-    
-    // Condiciones más inteligentes para la detección
-    const currentFingerPresent = redMedian >= this.MIN_RED_THRESHOLD && 
-                                validPixelCount >= this.MIN_VALID_PIXELS &&
-                                pixelRatio >= 0.3;
+    const currentFingerPresent = redMedian >= this.MIN_RED_THRESHOLD && validPixelCount >= this.MIN_VALID_PIXELS;
 
-    // Lógica de estabilidad mejorada
+    // Lógica de estabilidad
     if (currentFingerPresent === this.lastFingerPresent) {
       this.stabilityCounter = Math.min(this.stabilityCounter + 1, this.STABILITY_THRESHOLD);
-    } else if (currentFingerPresent) {
-      // Si detectamos un dedo, incrementamos más rápido
-      this.stabilityCounter = Math.min(this.stabilityCounter + 1, this.STABILITY_THRESHOLD);
     } else {
-      // Si no detectamos dedo, decrementamos gradualmente
       this.stabilityCounter = Math.max(this.stabilityCounter - 1, 0);
     }
 
-    // Cambio de estado más fluido
+    // Solo cambiamos el estado si hay suficiente estabilidad
     let finalFingerPresent = this.lastFingerPresent;
-    if (this.stabilityCounter >= this.STABILITY_THRESHOLD || 
-        (currentFingerPresent && redMedian > this.MIN_RED_THRESHOLD * 1.5)) { // Detección inmediata si la señal es muy fuerte
+    if (this.stabilityCounter >= this.STABILITY_THRESHOLD || this.stabilityCounter === 0) {
       finalFingerPresent = currentFingerPresent;
       this.lastFingerPresent = currentFingerPresent;
     }
@@ -70,14 +60,13 @@ export class SignalExtractor {
       validPixelCount,
       currentDetection: currentFingerPresent,
       stabilityCounter: this.stabilityCounter,
-      finalState: finalFingerPresent,
-      pixelRatio
+      finalState: finalFingerPresent
     });
 
     return {
       red: redMedian,
       ir: this.calculateMedian(greenValues),
-      quality: pixelRatio,
+      quality: validPixelCount / (this.ROI_SIZE * this.ROI_SIZE),
       fingerPresent: finalFingerPresent
     };
   }
