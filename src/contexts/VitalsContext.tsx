@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { BeepPlayer } from '../utils/audioUtils';
 import { PPGProcessor } from '../utils/ppgProcessor';
@@ -82,6 +81,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       
       if (vitals) {
         setMeasurementQuality(vitals.signalQuality);
+        setReadings(vitals.readings);
       }
 
       const isFingerDetected = vitals?.redValue > 15;
@@ -114,7 +114,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         setHasArrhythmia(vitals.hasArrhythmia);
         setArrhythmiaType(vitals.arrhythmiaType);
-        setReadings(ppgProcessor.getReadings());
       }
     } catch (error) {
       console.error('Error processing frame:', error);

@@ -1,18 +1,25 @@
-
 export class PeakDetector {
   private adaptiveThreshold = 0;
-  private readonly minPeakDistance = 180; // Reducido para mejor detección
+  private readonly minPeakDistance = 180;
   private lastPeakTime = 0;
-  private readonly bufferSize = 15; // Reducido para respuesta más rápida
-  private readonly minAmplitude = 0.002; // Reducido drásticamente para máxima sensibilidad
-  private readonly adaptiveRate = 0.35; // Aumentado para adaptación más rápida
+  private readonly bufferSize = 15;
+  private readonly minAmplitude = 0.002;
+  private readonly adaptiveRate = 0.35;
   private peakBuffer: number[] = [];
   private timeBuffer: number[] = [];
   private frameCount = 0;
-  private readonly maxBPM = 250; // Aumentado rango
+  private readonly maxBPM = 250;
   private readonly minBPM = 30;
   private lastPeakValues: number[] = [];
   private readonly peakMemory = 5;
+
+  detectPeak(signal: number[], peakThreshold: number = 1.0): boolean {
+    if (signal.length < 3) return false;
+
+    const currentValue = signal[signal.length - 1];
+    const now = Date.now();
+    return this.isRealPeak(currentValue, now, signal);
+  }
 
   isRealPeak(currentValue: number, now: number, signalBuffer: number[]): boolean {
     this.frameCount++;
