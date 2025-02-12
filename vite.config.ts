@@ -7,14 +7,23 @@ import { componentTagger } from "lovable-tagger";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
-    host: "0.0.0.0", // Permite conexiones desde cualquier IP
+    host: "0.0.0.0",
     port: 8080,
     hmr: {
-      host: "localhost",
-      protocol: "ws"
+      clientPort: 443,
+      path: '/',
+      timeout: 30000,
+      host: '4dadecf1-503f-48ab-8ca5-a4dfbf273434.lovableproject.com'
     },
     watch: {
       usePolling: true
+    },
+    cors: true, // Habilitar CORS para todos los orígenes en desarrollo
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET,HEAD,PUT,PATCH,POST,DELETE',
+      'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept',
+      'Access-Control-Allow-Credentials': 'true'
     }
   },
   plugins: [
@@ -27,4 +36,12 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: undefined
+      }
+    }
+  }
 }));
