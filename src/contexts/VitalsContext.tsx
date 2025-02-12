@@ -94,14 +94,16 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setIsStarted(prev => !prev);
     if (!isStarted) {
       resetMeasurements();
-      toast({
-        title: "Iniciando medición",
-        description: "La medición durará 30 segundos. Por favor, mantenga su dedo frente a la cámara."
-      });
+      if (toast) {
+        toast({
+          title: "Iniciando medición",
+          description: "La medición durará 30 segundos. Por favor, mantenga su dedo frente a la cámara."
+        });
+      }
     } else {
       resetMeasurements();
     }
-  }, [isStarted]);
+  }, [isStarted, toast]);
 
   const resetMeasurements = useCallback(() => {
     setBpm(0);
