@@ -1,12 +1,12 @@
 
 export class SignalExtractor {
-  private readonly minRedIntensity = 50;  // Aumentado basado en papers de PPG
+  private readonly minRedIntensity = 120;  // Aumentado significativamente - un dedo real bloquea mucha luz
   private readonly maxRedIntensity = 255;
-  private readonly minValidPixels = 500;  // Aumentado significativamente
-  private readonly redDominanceThreshold = 1.3; // Valor más estricto basado en literatura
-  private readonly pixelStep = 2; // Analizamos cada 2 píxeles para mejor rendimiento
-  private readonly minRedGreenRatio = 1.5; // Nueva métrica basada en estudios PPG
-  private readonly minRedBlueRatio = 1.5;  // Nueva métrica basada en estudios PPG
+  private readonly minValidPixels = 2000;  // Área mínima real de un dedo
+  private readonly redDominanceThreshold = 1.5; // El rojo debe ser claramente dominante
+  private readonly pixelStep = 1; // Analizar cada pixel para mayor precisión
+  private readonly minRedGreenRatio = 1.8; // El rojo debe ser mucho más fuerte que el verde
+  private readonly minRedBlueRatio = 1.8;  // El rojo debe ser mucho más fuerte que el azul
   private frameCount = 0;
 
   extractChannels(imageData: ImageData): { 
@@ -26,7 +26,7 @@ export class SignalExtractor {
     const { width, height, data } = imageData;
     const centerX = Math.floor(width / 2);
     const centerY = Math.floor(height / 2);
-    const regionSize = Math.floor(Math.min(width, height) * 0.3); // Área más concentrada
+    const regionSize = Math.floor(Math.min(width, height) * 0.25); // Área más pequeña y centrada
 
     let validPixelCount = 0;
     let totalRedValue = 0;
@@ -35,12 +35,15 @@ export class SignalExtractor {
     let totalBlueValue = 0;
     let validRedGreenRatios = 0;
     let validRedBlueRatios = 0;
+    let consecutiveValidPixels = 0;
+    let maxConsecutiveValidPixels = 0;
     const totalPixelsInRegion = Math.pow(regionSize * 2, 2);
 
-    // Análisis mejorado de la imagen
+    // Análisis más estricto de la imagen
     for (let y = centerY - regionSize; y < centerY + regionSize; y += this.pixelStep) {
       if (y < 0 || y >= height) continue;
       
+      let rowValidPixels = 0;
       for (let x = centerX - regionSize; x < centerX + regionSize; x += this.pixelStep) {
         if (x < 0 || x >= width) continue;
         
@@ -49,20 +52,19 @@ export class SignalExtractor {
         const green = data[i + 1];
         const blue = data[i + 2];
         
-        // Cálculo mejorado de ratios
+        // Cálculos más estrictos de ratios
         const redGreenRatio = red / (green + 1);
         const redBlueRatio = red / (blue + 1);
         const redDominance = red / (Math.max(green, blue) + 1);
         
-        maxRedDominance = Math.max(maxRedDominance, redDominance);
-
-        // Verificación más estricta con múltiples condiciones
+        // Verificación más estricta de píxel válido
         if (red >= this.minRedIntensity && 
             red <= this.maxRedIntensity && 
             redDominance >= this.redDominanceThreshold &&
             redGreenRatio >= this.minRedGreenRatio &&
             redBlueRatio >= this.minRedBlueRatio) {
           
+          rowValidPixels++;
           validPixelCount++;
           totalRedValue += red;
           totalGreenValue += green;
@@ -70,7 +72,17 @@ export class SignalExtractor {
 
           if (redGreenRatio >= this.minRedGreenRatio) validRedGreenRatios++;
           if (redBlueRatio >= this.minRedBlueRatio) validRedBlueRatios++;
+          
+          consecutiveValidPixels++;
+          maxConsecutiveValidPixels = Math.max(maxConsecutiveValidPixels, consecutiveValidPixels);
+        } else {
+          consecutiveValidPixels = 0;
         }
+      }
+      
+      // Verificar coherencia espacial
+      if (rowValidPixels < regionSize * 0.3) { // Al menos 30% de la fila debe ser válida
+        validPixelCount -= rowValidPixels;
       }
     }
 
@@ -80,45 +92,51 @@ export class SignalExtractor {
     const greenMean = validPixelCount > 0 ? totalGreenValue / validPixelCount : 0;
     const blueMean = validPixelCount > 0 ? totalBlueValue / validPixelCount : 0;
     
-    // Detección más robusta con múltiples factores
+    // Verificación más estricta de ratios
     const ratioQuality = Math.min(
       validRedGreenRatios / validPixelCount,
       validRedBlueRatios / validPixelCount
     );
     
-    const fingerPresent = coverage > 0.15 && // Aumentado a 15%
+    // Detección más estricta con coherencia espacial
+    const fingerPresent = coverage > 0.25 && // Debe cubrir al menos 25% del área
                          validPixelCount >= this.minValidPixels &&
-                         ratioQuality > 0.8; // Al menos 80% de píxeles válidos deben cumplir los ratios
+                         ratioQuality > 0.85 && // 85% de píxeles deben cumplir los ratios
+                         maxConsecutiveValidPixels > regionSize * 0.5; // Debe haber continuidad
 
-    // Logging detallado
+    // Logging más detallado
     console.log('Análisis detallado de frame:', {
       frameNum: this.frameCount,
       cobertura: {
         pixelesValidos: validPixelCount,
+        pixelesConsecutivos: maxConsecutiveValidPixels,
         porcentajeCobertura: (coverage * 100).toFixed(1) + '%',
-        porcentajeRequerido: '15%'
+        minimoRequerido: '25%'
       },
       intensidades: {
         promedioRojo: redMean.toFixed(1),
         promedioVerde: greenMean.toFixed(1),
-        promedioAzul: blueMean.toFixed(1)
+        promedioAzul: blueMean.toFixed(1),
+        minimoRojo: this.minRedIntensity
       },
       ratios: {
         calidadRatios: (ratioQuality * 100).toFixed(1) + '%',
         dominanciaRojo: maxRedDominance.toFixed(2),
-        umbralDominancia: this.redDominanceThreshold
+        umbralDominancia: this.redDominanceThreshold,
+        ratioRojoVerde: this.minRedGreenRatio,
+        ratioRojoAzul: this.minRedBlueRatio
       },
       deteccion: {
         dedoDetectado: fingerPresent,
         minimoPixelesValidos: this.minValidPixels,
-        minimoIntensidadRoja: this.minRedIntensity
+        coherenciaEspacial: maxConsecutiveValidPixels > regionSize * 0.5
       }
     });
 
     return {
       red: redMean,
-      ir: redMean * 0.6, // Ajustado basado en estudios PPG
-      quality: coverage * ratioQuality, // Calidad ponderada
+      ir: redMean * 0.5,
+      quality: coverage * ratioQuality * (maxConsecutiveValidPixels / (regionSize * 2)),
       perfusionIndex: maxRedDominance,
       fingerPresent,
       diagnostics: {

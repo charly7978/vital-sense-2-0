@@ -28,10 +28,10 @@ const beepPlayer = new BeepPlayer();
 const ppgProcessor = new PPGProcessor();
 
 const MEASUREMENT_DURATION = 30; // seconds
-const MIN_QUALITY_THRESHOLD = 0.12; // Aumentado para mayor precisión
+const MIN_QUALITY_THRESHOLD = 0.15; // Aumentado significativamente
 const MIN_READINGS_FOR_BP = 10;
-const NO_FINGER_THRESHOLD = 0.1; // Aumentado para evitar falsos positivos
-const CONSECUTIVE_LOW_QUALITY_LIMIT = 4; // Balanceado para respuesta rápida pero estable
+const NO_FINGER_THRESHOLD = 0.2; // Mucho más estricto
+const CONSECUTIVE_LOW_QUALITY_LIMIT = 3; // Más rápido para detectar ausencia
 
 export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [bpm, setBpm] = useState<number>(0);
