@@ -1,3 +1,4 @@
+
 export class PeakDetector {
   private adaptiveThreshold = 0;
   private readonly minPeakDistance = 180;
@@ -16,221 +17,69 @@ export class PeakDetector {
   detectPeak(signal: number[], peakThreshold: number = 1.0): boolean {
     if (signal.length < 3) return false;
 
-    const currentValue = signal[signal.length - 1];
-    const now = Date.now();
-    return this.isRealPeak(currentValue, now, signal);
-  }
+    // Obtener el valor actual y los dos anteriores
+    const current = signal[signal.length - 1];
+    const prev1 = signal[signal.length - 2];
+    const prev2 = signal[signal.length - 3];
 
-  isRealPeak(currentValue: number, now: number, signalBuffer: number[]): boolean {
-    this.frameCount++;
-    
-    const minInterval = (60000 / this.maxBPM);
-    const timeSinceLastPeak = now - this.lastPeakTime;
-    
-    if (timeSinceLastPeak < minInterval) {
-      return false;
-    }
+    // Un pico ocurre cuando el valor actual es menor que el anterior
+    // y el anterior es mayor que el que le precede
+    const isPotentialPeak = prev1 > current && prev1 > prev2;
 
-    if (signalBuffer.length < 3) { // Reducido requisito mínimo
-      return false;
-    }
-
-    const recentValues = signalBuffer.slice(-this.bufferSize);
-    const avgValue = recentValues.reduce((a, b) => a + b, 0) / recentValues.length;
-    const stdDev = Math.sqrt(
-      recentValues.reduce((a, b) => a + Math.pow(b - avgValue, 2), 0) / recentValues.length
-    );
-
-    const trend = this.calculateTrend(recentValues);
-    const detrended = currentValue - trend;
-
-    // Mejorado el cálculo del umbral dinámico para mayor sensibilidad
-    const dynamicThreshold = this.calculateDynamicThreshold(recentValues, avgValue, stdDev);
-    this.adaptiveThreshold = (this.adaptiveThreshold * (1 - this.adaptiveRate)) + 
-                            (dynamicThreshold * this.adaptiveRate);
-
-    // Validaciones mucho más permisivas para detección de picos
-    const hasSignificantAmplitude = detrended > this.minAmplitude * stdDev;
-    const isAboveThreshold = currentValue > (this.adaptiveThreshold * 0.5); // Reducido significativamente
-    const isPotentialPeak = this.validatePeakCharacteristics(currentValue, signalBuffer, avgValue, stdDev);
-
-    if ((hasSignificantAmplitude || isAboveThreshold) && isPotentialPeak) {
-      const currentInterval = now - this.lastPeakTime;
-      
-      if (this.validatePeakTiming(currentInterval)) {
-        this.lastPeakTime = now;
-        this.updatePeakHistory(currentValue, now);
-        
-        const bpm = 60000 / currentInterval;
-        const confidence = this.calculateConfidence(currentValue, avgValue, stdDev, currentInterval);
-        
-        console.log('Detección de latido:', {
-          valor: currentValue.toFixed(3),
-          umbral: this.adaptiveThreshold.toFixed(3),
-          tendencia: trend.toFixed(3),
-          detrendizado: detrended.toFixed(3),
-          intervalo: currentInterval.toFixed(0),
-          bpm: bpm.toFixed(1),
-          confianza: (confidence * 100).toFixed(1) + '%',
-          amplitud: (detrended / stdDev).toFixed(2)
-        });
-        
-        return true;
-      }
+    if (isPotentialPeak) {
+      const now = Date.now();
+      return this.validatePeak(prev1, now);
     }
 
     return false;
   }
 
-  private calculateTrend(values: number[]): number {
-    const n = values.length;
-    let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
-    
-    for (let i = 0; i < n; i++) {
-      sumX += i;
-      sumY += values[i];
-      sumXY += i * values[i];
-      sumXX += i * i;
-    }
-    
-    const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
-    const intercept = (sumY - slope * sumX) / n;
-    
-    return slope * (n - 1) + intercept;
-  }
-
-  private calculateDynamicThreshold(values: number[], mean: number, stdDev: number): number {
-    const skewness = this.calculateSkewness(values, mean, stdDev);
-    const kurtosis = this.calculateKurtosis(values, mean, stdDev);
-    
-    // Ajustado para máxima sensibilidad
-    const thresholdFactor = 0.2 + 
-                           Math.abs(skewness) * 0.03 + 
-                           Math.max(0, kurtosis - 3) * 0.01;
-    
-    return mean + thresholdFactor * stdDev;
-  }
-
-  private calculateSkewness(values: number[], mean: number, stdDev: number): number {
-    const n = values.length;
-    const m3 = values.reduce((acc, val) => acc + Math.pow(val - mean, 3), 0) / n;
-    return m3 / Math.pow(stdDev, 3);
-  }
-
-  private calculateKurtosis(values: number[], mean: number, stdDev: number): number {
-    const n = values.length;
-    const m4 = values.reduce((acc, val) => acc + Math.pow(val - mean, 4), 0) / n;
-    return m4 / Math.pow(stdDev, 4);
-  }
-
-  private validatePeakCharacteristics(currentValue: number, signalBuffer: number[], mean: number, stdDev: number): boolean {
-    const window = 3; // Reducido para mayor sensibilidad
-    const samples = signalBuffer.slice(-window);
-    
-    const firstDerivative = samples.map((v, i, arr) => i > 0 ? v - arr[i-1] : 0);
-    const secondDerivative = firstDerivative.map((v, i, arr) => i > 0 ? v - arr[i-1] : 0);
-    
-    // Criterios mucho más permisivos
-    const isRising = firstDerivative[firstDerivative.length - 2] > -0.2;
-    const isPeaking = firstDerivative[firstDerivative.length - 1] < 0.2;
-    const isConcaveDown = secondDerivative[secondDerivative.length - 1] < 0.2;
-    
-    const relativeAmplitude = (currentValue - mean) / stdDev;
-    const isSignificant = relativeAmplitude > this.minAmplitude;
-    
-    return (isRising && isPeaking) || (isConcaveDown && isSignificant);
-  }
-
-  private validatePeakTiming(currentInterval: number): boolean {
-    const maxInterval = (60000 / this.minBPM);
-    const minInterval = (60000 / this.maxBPM);
-    
-    if (currentInterval < minInterval || currentInterval > maxInterval) {
+  private validatePeak(peakValue: number, now: number): boolean {
+    // Validar intervalo mínimo entre picos
+    if (now - this.lastPeakTime < this.minPeakDistance) {
       return false;
     }
 
-    if (this.timeBuffer.length >= 3) {
-      const recentIntervals = this.timeBuffer.slice(-3)
-        .map((t, i, arr) => i > 0 ? t - arr[i-1] : 0)
-        .filter(i => i > 0);
-      
-      const avgInterval = recentIntervals.reduce((a, b) => a + b, 0) / recentIntervals.length;
-      const variability = recentIntervals.reduce((acc, interval) => 
-        acc + Math.pow(interval - avgInterval, 2), 0) / recentIntervals.length;
-      
-      // Aumentado significativamente el rango de variación permitido
-      const allowedVariation = Math.min(0.7, 0.6 + variability / avgInterval);
-      
-      return Math.abs(currentInterval - avgInterval) <= avgInterval * allowedVariation;
+    // Calcular y actualizar umbral adaptativo
+    if (this.peakBuffer.length > 0) {
+      const avgPeak = this.peakBuffer.reduce((a, b) => a + b, 0) / this.peakBuffer.length;
+      this.adaptiveThreshold = avgPeak * 0.6; // Reducido para mayor sensibilidad
     }
-    
-    return true;
-  }
 
-  private calculateConfidence(value: number, mean: number, stdDev: number, interval: number): number {
-    const amplitudeConfidence = Math.min(1, (value - mean) / (2 * stdDev)); // Reducido de 3 a 2
-    const timingConfidence = this.calculateTimingConfidence(interval);
-    const shapeConfidence = this.calculateShapeConfidence();
-    
-    return (amplitudeConfidence + timingConfidence + shapeConfidence) / 3;
-  }
+    // Validar amplitud mínima
+    if (peakValue < this.adaptiveThreshold) {
+      return false;
+    }
 
-  private calculateTimingConfidence(currentInterval: number): number {
-    if (this.timeBuffer.length < 2) return 0.5;
-    
-    const intervals = this.timeBuffer.slice(-3)
-      .map((t, i, arr) => i > 0 ? t - arr[i-1] : 0)
-      .filter(i => i > 0);
-    
-    const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-    const deviation = Math.abs(currentInterval - avgInterval) / avgInterval;
-    
-    return Math.max(0, 1 - deviation * 0.8); // Reducido factor de penalización
-  }
-
-  private calculateShapeConfidence(): number {
-    if (this.lastPeakValues.length < 2) return 0.5;
-    
-    const variations = this.lastPeakValues.slice(1)
-      .map((v, i) => Math.abs(v - this.lastPeakValues[i]) / this.lastPeakValues[i]);
-    
-    return Math.max(0, 1 - variations.reduce((a, b) => a + b, 0) / variations.length * 0.8); // Reducido factor de penalización
-  }
-
-  private updatePeakHistory(peakValue: number, timestamp: number) {
-    if (this.peakBuffer.length >= this.bufferSize) {
+    // Actualizar buffers
+    this.peakBuffer.push(peakValue);
+    this.timeBuffer.push(now);
+    if (this.peakBuffer.length > this.bufferSize) {
       this.peakBuffer.shift();
       this.timeBuffer.shift();
     }
-    
-    this.peakBuffer.push(peakValue);
-    this.timeBuffer.push(timestamp);
-    
-    this.lastPeakValues.push(peakValue);
-    if (this.lastPeakValues.length > this.peakMemory) {
-      this.lastPeakValues.shift();
+
+    // Validar intervalo para BPM realista
+    if (this.timeBuffer.length >= 2) {
+      const interval = this.timeBuffer[this.timeBuffer.length - 1] - this.timeBuffer[this.timeBuffer.length - 2];
+      const bpm = 60000 / interval;
+      if (bpm < this.minBPM || bpm > this.maxBPM) {
+        return false;
+      }
     }
 
-    if (this.timeBuffer.length > 2) {
-      const intervals = this.timeBuffer.slice(1).map((t, i) => t - this.timeBuffer[i]);
-      const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-      const bpm = 60000 / avgInterval;
-      
-      const variabilityValue = Math.sqrt(
-        intervals.reduce((a, b) => a + Math.pow(b - avgInterval, 2), 0) / intervals.length
-      ) / avgInterval;
-      
-      console.log('Análisis de ritmo cardíaco:', {
-        bpm: bpm.toFixed(1),
-        variabilidad: (variabilityValue * 100).toFixed(1) + '%',
-        confianza: ((1 - variabilityValue * 0.8) * 100).toFixed(1) + '%',
-        muestras: this.peakBuffer.length,
-        historialPicos: this.lastPeakValues.length
-      });
-    }
+    this.lastPeakTime = now;
+    console.log('Pico detectado:', {
+      valor: peakValue,
+      umbral: this.adaptiveThreshold,
+      intervaloPrevio: now - this.lastPeakTime,
+      bufferSize: this.peakBuffer.length
+    });
+
+    return true;
   }
 
-  getLastPeakTime(): number {
-    return this.lastPeakTime;
+  private calculateMovingAverage(values: number[]): number {
+    return values.reduce((a, b) => a + b, 0) / values.length;
   }
 }
