@@ -1,3 +1,4 @@
+
 import { VitalReading, PPGData, SensitivitySettings, ProcessingSettings } from './types';
 import { BeepPlayer } from './audioUtils';
 import { SignalProcessor } from './signalProcessing';
@@ -14,7 +15,7 @@ export class PPGProcessor {
   private irBuffer: number[] = [];
   private peakTimes: number[] = [];
   private readonly samplingRate = 30;
-  private readonly windowSize = 150;
+  private readonly windowSize = 90; // Reducido para procesar menos datos
   private readonly signalProcessor: SignalProcessor;
   private readonly signalExtractor: SignalExtractor;
   private readonly peakDetector: PeakDetector;
@@ -23,14 +24,16 @@ export class PPGProcessor {
   private readonly frequencyAnalyzer: SignalFrequencyAnalyzer;
   private beepPlayer: BeepPlayer;
   private signalBuffer: number[] = [];
-  private readonly bufferSize = 30;
+  private readonly bufferSize = 15; // Reducido para menor uso de memoria
   private readonly qualityThreshold = 0.2;
   private mlModel: MLModel;
   private lastProcessingTime: number = 0;
-  private readonly minProcessingInterval = 33;
+  private readonly minProcessingInterval = 50; // Aumentado a 20fps para reducir carga
   private lastValidBpm: number = 0;
   private lastValidSystolic: number = 120;
   private lastValidDiastolic: number = 80;
+  private lastCleanupTime: number = 0;
+  private readonly cleanupInterval: number = 2000; // Limpiar cada 2 segundos
   
   private sensitivitySettings: SensitivitySettings = {
     signalAmplification: 1.5,
@@ -96,21 +99,42 @@ export class PPGProcessor {
 
   private cleanupOldData() {
     const now = Date.now();
-    const maxAge = 30000;
+    
+    // Solo limpiar si ha pasado el intervalo definido
+    if (now - this.lastCleanupTime < this.cleanupInterval) {
+      return;
+    }
+    
+    this.lastCleanupTime = now;
+    const maxAge = 10000; // Reducido a 10 segundos
 
-    this.readings = this.readings.filter(reading => now - reading.timestamp < maxAge);
+    // Limpiar lecturas antiguas manteniendo solo las más recientes
+    const recentReadings = this.readings.filter(reading => now - reading.timestamp < maxAge);
+    if (recentReadings.length > 0) {
+      this.readings = recentReadings;
+    }
 
+    // Mantener buffers en tamaño óptimo
     if (this.redBuffer.length > this.windowSize) {
       this.redBuffer = this.redBuffer.slice(-this.windowSize);
     }
     if (this.irBuffer.length > this.windowSize) {
       this.irBuffer = this.irBuffer.slice(-this.windowSize);
     }
-    if (this.peakTimes.length > 10) {
-      this.peakTimes = this.peakTimes.slice(-10);
+    if (this.peakTimes.length > 5) { // Reducido a 5 picos
+      this.peakTimes = this.peakTimes.slice(-5);
     }
     if (this.signalBuffer.length > this.bufferSize) {
       this.signalBuffer = this.signalBuffer.slice(-this.bufferSize);
+    }
+
+    // Forzar liberación de memoria
+    if (global.gc) {
+      try {
+        global.gc();
+      } catch (e) {
+        console.log('No se pudo forzar garbage collection');
+      }
     }
   }
 
@@ -124,8 +148,10 @@ export class PPGProcessor {
 
     const { red, ir, quality } = this.signalExtractor.extractChannels(imageData);
     
+    // Limpiar memoria periódicamente
+    this.cleanupOldData();
+    
     if (quality < this.qualityThreshold || red < this.processingSettings.MIN_RED_VALUE) {
-      this.cleanupOldData();
       return {
         bpm: 0,
         spo2: 0,
@@ -161,8 +187,6 @@ export class PPGProcessor {
     
     this.readings.push({ timestamp: now, value: normalizedValue });
     this.signalBuffer.push(normalizedValue);
-
-    this.cleanupOldData();
 
     const isPeak = this.peakDetector.isRealPeak(normalizedValue, now, this.signalBuffer);
 
