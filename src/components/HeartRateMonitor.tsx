@@ -26,6 +26,7 @@ const HeartRateMonitor: React.FC = () => {
     isStarted,
     measurementProgress,
     measurementQuality,
+    fingerPresent,
     sensitivitySettings,
     updateSensitivitySettings,
     toggleMeasurement,
@@ -34,14 +35,14 @@ const HeartRateMonitor: React.FC = () => {
 
   const { toast } = useToast();
 
-  // Efecto para actualizar el mensaje en tiempo real
+  // Efecto para actualizar el mensaje basado en fingerPresent
   useEffect(() => {
     if (isStarted) {
-      setShowFingerMessage(measurementQuality < 0.01);
+      setShowFingerMessage(!fingerPresent);
     } else {
       setShowFingerMessage(false);
     }
-  }, [isStarted, measurementQuality]);
+  }, [isStarted, fingerPresent]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-7xl mx-auto p-4">
@@ -82,6 +83,7 @@ const HeartRateMonitor: React.FC = () => {
             isStarted={isStarted}
             measurementQuality={measurementQuality}
             measurementProgress={measurementProgress}
+            fingerPresent={fingerPresent}
           />
         )}
 

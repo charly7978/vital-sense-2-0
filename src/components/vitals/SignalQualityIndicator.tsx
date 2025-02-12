@@ -8,17 +8,19 @@ interface SignalQualityIndicatorProps {
   isStarted: boolean;
   measurementQuality: number;
   measurementProgress: number;
+  fingerPresent: boolean;
 }
 
 const SignalQualityIndicator: React.FC<SignalQualityIndicatorProps> = ({
   isStarted,
   measurementQuality,
-  measurementProgress
+  measurementProgress,
+  fingerPresent
 }) => {
   if (!isStarted) return null;
 
   const getSignalQualityIndicator = () => {
-    if (measurementQuality === 0 || measurementQuality < 0.01) {
+    if (!fingerPresent) {
       return (
         <div className="flex items-center space-x-2 text-gray-400 animate-pulse">
           <Hand className="w-6 h-6" />
