@@ -3,7 +3,7 @@ export class SignalExtractor {
   private readonly minRedIntensity = 145;  // Ajuste previo de 150 a 145 (3.3% más sensible)
   private readonly maxRedIntensity = 255;
   private readonly minValidPixels = 950;   // Ajuste previo de 1000 a 950 (5% más sensible)
-  private readonly redDominanceThreshold = 1.45;  // Ajuste muy sutil de 1.5 a 1.45 (3.3% más permisivo)
+  private readonly redDominanceThreshold = 1.4;  // Ajuste adicional de 1.45 a 1.4 (3.4% más permisivo)
   private readonly pixelStep = 2;
   
   extractChannels(imageData: ImageData): { 
