@@ -1,10 +1,11 @@
+
 export class PeakDetector {
   private adaptiveThreshold = 0;
-  private readonly minPeakDistance = 300; // Reducido para detectar frecuencias cardíacas más altas
+  private readonly minPeakDistance = 400; // Aumentado para evitar falsos positivos
   private lastPeakTime = 0;
-  private readonly bufferSize = 10;
-  private readonly minAmplitude = 0.1; // Reducido significativamente
-  private readonly adaptiveRate = 0.15;
+  private readonly bufferSize = 15; // Aumentado para mejor detección
+  private readonly minAmplitude = 0.15; // Aumentado para mejor sensibilidad
+  private readonly adaptiveRate = 0.2; // Aumentado para adaptación más rápida
   private peakBuffer: number[] = [];
   private timeBuffer: number[] = [];
   private frameCount = 0;
@@ -16,7 +17,7 @@ export class PeakDetector {
       return false;
     }
 
-    if (signalBuffer.length < 3) { // Reducido el requisito de buffer
+    if (signalBuffer.length < 5) {
       return false;
     }
 
@@ -26,19 +27,18 @@ export class PeakDetector {
       recentValues.reduce((a, b) => a + Math.pow(b - avgValue, 2), 0) / recentValues.length
     );
 
-    // Umbral adaptativo más sensible
-    this.adaptiveThreshold = avgValue + (stdDev * 0.5); // Reducido el multiplicador
+    // Umbral adaptativo mejorado
+    this.adaptiveThreshold = avgValue + (stdDev * 0.8);
 
     const isValidShape = this.validatePeakShape(currentValue, signalBuffer);
     const hasSignificantAmplitude = currentValue > this.adaptiveThreshold && 
                                   currentValue > this.minAmplitude;
-    const isLocalMaximum = currentValue > Math.max(...signalBuffer.slice(-2)); // Reducido el número de muestras
+    const isLocalMaximum = this.isLocalMax(currentValue, signalBuffer);
 
-    if (hasSignificantAmplitude && isLocalMaximum) {
+    if (hasSignificantAmplitude && isLocalMaximum && isValidShape) {
       const currentInterval = now - this.lastPeakTime;
       
-      // Más permisivo con los intervalos
-      if (currentInterval >= this.minPeakDistance) {
+      if (this.validatePeakInterval(currentInterval)) {
         this.lastPeakTime = now;
         this.updatePeakHistory(currentValue, now);
         console.log('¡LATIDO DETECTADO!', {
@@ -54,34 +54,35 @@ export class PeakDetector {
     return false;
   }
 
-  private validatePeakShape(currentValue: number, signalBuffer: number[]): boolean {
-    if (signalBuffer.length < 3) return true; // Más permisivo
+  private isLocalMax(currentValue: number, signalBuffer: number[]): boolean {
+    const window = 3; // Ventana de análisis
+    const recent = signalBuffer.slice(-window);
+    return currentValue > Math.max(...recent);
+  }
 
-    const last3Values = [...signalBuffer.slice(-2), currentValue];
+  private validatePeakShape(currentValue: number, signalBuffer: number[]): boolean {
+    if (signalBuffer.length < 4) return false;
+
+    const last4Values = [...signalBuffer.slice(-3), currentValue];
     
-    // Criterios más simples
-    const isRising = last3Values[2] > last3Values[1];
-    const isPeak = currentValue > last3Values[1];
+    // Verificar forma de onda más estricta
+    const isRising = last4Values[2] > last4Values[1] && last4Values[1] > last4Values[0];
+    const isPeak = currentValue > last4Values[2];
     
     return isRising && isPeak;
   }
 
   private validatePeakInterval(currentInterval: number): boolean {
-    if (this.timeBuffer.length >= this.bufferSize) {
-      this.timeBuffer.shift();
-      this.peakBuffer.shift();
-    }
-
     if (this.timeBuffer.length < 2) {
       return currentInterval >= this.minPeakDistance;
     }
 
-    const sortedIntervals = [...this.timeBuffer].sort((a, b) => a - b);
-    const medianInterval = sortedIntervals[Math.floor(sortedIntervals.length / 2)];
-
-    // Mayor tolerancia en la variación del intervalo
-    const maxVariation = 0.4; // Aumentado de 0.3
-    const isWithinRange = Math.abs(currentInterval - medianInterval) <= medianInterval * maxVariation;
+    const recentIntervals = this.timeBuffer.slice(-3);
+    const avgInterval = recentIntervals.reduce((a, b) => a + b, 0) / recentIntervals.length;
+    
+    // Tolerancia más estricta
+    const maxVariation = 0.3;
+    const isWithinRange = Math.abs(currentInterval - avgInterval) <= avgInterval * maxVariation;
 
     return isWithinRange && currentInterval >= this.minPeakDistance;
   }
@@ -94,6 +95,17 @@ export class PeakDetector {
     
     this.peakBuffer.push(peakValue);
     this.timeBuffer.push(timestamp);
+
+    // Log de calidad de detección
+    if (this.timeBuffer.length > 1) {
+      const intervals = this.timeBuffer.slice(1).map((t, i) => t - this.timeBuffer[i]);
+      const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+      console.log('Calidad de detección:', {
+        intervalPromedio: avgInterval,
+        bpmEstimado: 60000 / avgInterval,
+        cantidadPicos: this.peakBuffer.length
+      });
+    }
   }
 
   getLastPeakTime(): number {
