@@ -20,12 +20,12 @@ const SignalQualityIndicator: React.FC<SignalQualityIndicatorProps> = ({
   // Conversión directa a porcentaje del valor instantáneo
   const qualityPercentage = Math.round(measurementQuality * 100);
 
-  // Determinación instantánea del estado de la señal
+  // Determinación instantánea del estado de la señal con umbrales más estrictos
   const getQualityStatus = () => {
-    if (qualityPercentage >= 80) return { color: 'text-green-500', text: 'SEÑAL ÓPTIMA' };
-    if (qualityPercentage >= 60) return { color: 'text-blue-500', text: 'SEÑAL FUERTE' };
-    if (qualityPercentage >= 40) return { color: 'text-yellow-500', text: 'SEÑAL MODERADA' };
-    if (qualityPercentage >= 20) return { color: 'text-orange-500', text: 'SEÑAL DÉBIL' };
+    if (qualityPercentage >= 90) return { color: 'text-green-500', text: 'SEÑAL ÓPTIMA' };
+    if (qualityPercentage >= 75) return { color: 'text-blue-500', text: 'SEÑAL FUERTE' };
+    if (qualityPercentage >= 50) return { color: 'text-yellow-500', text: 'SEÑAL MODERADA' };
+    if (qualityPercentage >= 25) return { color: 'text-orange-500', text: 'SEÑAL DÉBIL' };
     return { color: 'text-red-500', text: 'SIN SEÑAL' };
   };
 
@@ -51,7 +51,7 @@ const SignalQualityIndicator: React.FC<SignalQualityIndicatorProps> = ({
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Activity className={cn("w-5 h-5 animate-pulse", qualityStatus.color)} />
-              <span className="text-sm font-medium text-gray-200">Intensidad en Tiempo Real</span>
+              <span className="text-sm font-medium text-gray-200">Intensidad de Señal PPG</span>
             </div>
             <span className={cn("font-bold", qualityStatus.color)}>
               {qualityPercentage}%
@@ -63,11 +63,11 @@ const SignalQualityIndicator: React.FC<SignalQualityIndicatorProps> = ({
               value={qualityPercentage} 
               className={cn(
                 "h-2 transition-all duration-150",
-                qualityPercentage >= 80 && "bg-green-500/20",
-                qualityPercentage >= 60 && qualityPercentage < 80 && "bg-blue-500/20",
-                qualityPercentage >= 40 && qualityPercentage < 60 && "bg-yellow-500/20",
-                qualityPercentage >= 20 && qualityPercentage < 40 && "bg-orange-500/20",
-                qualityPercentage < 20 && "bg-red-500/20"
+                qualityPercentage >= 90 && "bg-green-500/20",
+                qualityPercentage >= 75 && qualityPercentage < 90 && "bg-blue-500/20",
+                qualityPercentage >= 50 && qualityPercentage < 75 && "bg-yellow-500/20",
+                qualityPercentage >= 25 && qualityPercentage < 50 && "bg-orange-500/20",
+                qualityPercentage < 25 && "bg-red-500/20"
               )}
             />
           </div>

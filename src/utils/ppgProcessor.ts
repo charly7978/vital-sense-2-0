@@ -201,6 +201,7 @@ export class PPGProcessor {
         confidence: 0,
         readings: [],
         isPeak: false,
+        redValue: red,
         hrvMetrics: {
           sdnn: 0,
           rmssd: 0,
@@ -301,6 +302,7 @@ export class PPGProcessor {
       confidence: spo2Result.confidence,
       readings: this.readings,
       isPeak,
+      redValue: red,
       hrvMetrics: {
         sdnn: hrvAnalysis.sdnn,
         rmssd: hrvAnalysis.rmssd,
