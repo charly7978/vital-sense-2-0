@@ -2,10 +2,10 @@
 export class SignalExtractor {
   // ¡CONFIGURACIÓN FINAL DE DETECCIÓN DE DEDO - NO MODIFICAR SIN AUTORIZACIÓN!
   // Valores optimizados y validados para máxima sensibilidad manteniendo robustez
-  private readonly minRedIntensity = 80;  // Reducido de 140 para mayor sensibilidad
+  private readonly minRedIntensity = 140;  // Sensibilidad óptima ajustada
   private readonly maxRedIntensity = 255;
-  private readonly minValidPixels = 600;   // Reducido de 950 para mayor sensibilidad
-  private readonly redDominanceThreshold = 1.2;  // Reducido de 1.4 para mayor sensibilidad
+  private readonly minValidPixels = 950;   // Umbral de cobertura validado
+  private readonly redDominanceThreshold = 1.4;  // Factor de dominancia rojo calibrado
   private readonly pixelStep = 2;
   
   extractChannels(imageData: ImageData): { 
@@ -69,10 +69,7 @@ export class SignalExtractor {
       estado: fingerPresent ? 'DEDO PRESENTE' : 'NO HAY DEDO',
       redMean: Math.round(redMean),
       pixelesValidos: validPixelCount,
-      cobertura: Math.round(coverage * 100) + '%',
-      umbralRojo: this.minRedIntensity,
-      umbralPixeles: this.minValidPixels,
-      umbralDominanciaRojo: this.redDominanceThreshold
+      cobertura: Math.round(coverage * 100) + '%'
     });
 
     return {

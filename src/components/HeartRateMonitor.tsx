@@ -7,6 +7,7 @@ import BPCalibrationForm from './BPCalibrationForm';
 import VitalSignsDisplay from './vitals/VitalSignsDisplay';
 import SignalQualityIndicator from './vitals/SignalQualityIndicator';
 import MeasurementControls from './vitals/MeasurementControls';
+import SensitivityControls from './SensitivityControls';
 import { PPGProcessor } from '../utils/ppgProcessor';
 import { useVitals } from '@/contexts/VitalsContext';
 
@@ -24,6 +25,8 @@ const HeartRateMonitor: React.FC = () => {
     isStarted,
     measurementProgress,
     measurementQuality,
+    sensitivitySettings,
+    updateSensitivitySettings,
     toggleMeasurement,
     processFrame
   } = useVitals();
@@ -56,6 +59,11 @@ const HeartRateMonitor: React.FC = () => {
             </div>
           )}
         </div>
+
+        <SensitivityControls 
+          settings={sensitivitySettings}
+          onSettingsChange={updateSensitivitySettings}
+        />
       </div>
 
       <div className="space-y-4">
