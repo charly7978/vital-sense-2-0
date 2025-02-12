@@ -1,4 +1,3 @@
-
 import { VitalReading, PPGData, SensitivitySettings, ProcessingSettings } from './types';
 import { BeepPlayer } from './audioUtils';
 import { SignalProcessor } from './signalProcessing';
@@ -36,24 +35,24 @@ export class PPGProcessor {
   private readonly cleanupInterval: number = 2000;
   
   private sensitivitySettings: SensitivitySettings = {
-    signalAmplification: 1.5,
-    noiseReduction: 1.2,
-    peakDetection: 1.3
+    signalAmplification: 2.5,
+    noiseReduction: 1.0,
+    peakDetection: 1.5
   };
   
   private processingSettings: ProcessingSettings = {
     MEASUREMENT_DURATION: 30,
-    MIN_FRAMES_FOR_CALCULATION: 15,
+    MIN_FRAMES_FOR_CALCULATION: 10,
     MIN_PEAKS_FOR_VALID_HR: 2,
-    MIN_PEAK_DISTANCE: 400,
-    MAX_PEAK_DISTANCE: 1200,
-    PEAK_THRESHOLD_FACTOR: 0.4,
-    MIN_RED_VALUE: 15,
-    MIN_RED_DOMINANCE: 1.2,
-    MIN_VALID_PIXELS_RATIO: 0.2,
-    MIN_BRIGHTNESS: 80,
-    MIN_VALID_READINGS: 30,
-    FINGER_DETECTION_DELAY: 500,
+    MIN_PEAK_DISTANCE: 300,
+    MAX_PEAK_DISTANCE: 1500,
+    PEAK_THRESHOLD_FACTOR: 0.35,
+    MIN_RED_VALUE: 10,
+    MIN_RED_DOMINANCE: 1.1,
+    MIN_VALID_PIXELS_RATIO: 0.15,
+    MIN_BRIGHTNESS: 60,
+    MIN_VALID_READINGS: 20,
+    FINGER_DETECTION_DELAY: 300,
     MIN_SPO2: 75
   };
   
