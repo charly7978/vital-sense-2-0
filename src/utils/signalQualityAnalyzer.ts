@@ -1,52 +1,46 @@
 
 export class SignalQualityAnalyzer {
-  private readonly minRedThreshold = 150;
-  private readonly maxRedValue = 255;
-  private readonly minRedGreenRatio = 2.0;
-  private readonly minValidPixels = 3000;
-
   analyzeSignalQuality(signal: number[]): number {
-    // Solo analizamos el último valor para máxima velocidad
-    if (signal.length === 0) return 0;
-    const currentValue = signal[signal.length - 1];
+    if (signal.length < 2) return 0;
     
-    // Validación simple de rango
-    if (currentValue < 0 || currentValue > 5) return 0;
+    const mean = signal.reduce((a, b) => a + b, 0) / signal.length;
+    const variance = signal.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / signal.length;
+    const standardDeviation = Math.sqrt(variance);
     
-    return Math.min(Math.max(currentValue / 2, 0), 1);
+    const noiseLevel = this.calculateNoiseLevel(signal);
+    const snrQuality = Math.min(standardDeviation / mean, 1);
+    const noiseQuality = Math.max(1 - noiseLevel, 0);
+    
+    const quality = (snrQuality + noiseQuality) / 2;
+    return Math.min(Math.max(quality, 0), 1);
   }
 
-  calculateSignalStability(redSignal: number[], greenValue: number, blueValue: number, validPixels: number): number {
-    if (redSignal.length === 0) return 0;
+  calculateSignalStability(redSignal: number[], irSignal: number[]): number {
+    const redVariance = this.calculateVariance(redSignal);
+    const irVariance = this.calculateVariance(irSignal);
     
-    // Obtener el último valor de rojo
-    const redValue = redSignal[redSignal.length - 1];
+    const maxVariance = Math.max(redVariance, irVariance);
+    if (maxVariance === 0) return 1.0;
     
-    // 1. Intensidad del rojo
-    const redIntensity = Math.min(redValue / this.maxRedValue, 1);
-    if (redValue < this.minRedThreshold) return 0;
-    
-    // 2. Ratio rojo/verde (dominancia del rojo)
-    const redGreenRatio = redValue / (greenValue + 1);
-    const ratioScore = redGreenRatio >= this.minRedGreenRatio ? 1 : redGreenRatio / this.minRedGreenRatio;
-    
-    // 3. Cobertura de píxeles válidos
-    const coverageScore = Math.min(validPixels / this.minValidPixels, 1);
-    
-    // Combinar métricas con pesos
-    const stability = (
-      redIntensity * 0.4 +
-      ratioScore * 0.4 +
-      coverageScore * 0.2
-    );
-    
-    console.log('Análisis en tiempo real:', {
-      redValue: Math.round(redValue),
-      redGreenRatio: Math.round(redGreenRatio * 100) / 100,
-      validPixels,
-      stability: Math.round(stability * 100) / 100
-    });
+    const stabilityScore = 1.0 - (Math.min(maxVariance, 1000) / 1000);
+    return Math.max(stabilityScore, 0.1);
+  }
 
-    return Math.min(Math.max(stability, 0), 1);
+  private calculateNoiseLevel(signal: number[]): number {
+    const differences = [];
+    for (let i = 1; i < signal.length; i++) {
+      differences.push(Math.abs(signal[i] - signal[i-1]));
+    }
+    
+    const meanDiff = differences.reduce((a, b) => a + b, 0) / differences.length;
+    const maxSignal = Math.max(...signal) - Math.min(...signal);
+    
+    return meanDiff / maxSignal;
+  }
+
+  private calculateVariance(signal: number[]): number {
+    const mean = signal.reduce((a, b) => a + b, 0) / signal.length;
+    return signal.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / signal.length;
   }
 }
+

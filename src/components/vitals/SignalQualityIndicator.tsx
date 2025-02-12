@@ -8,23 +8,21 @@ interface SignalQualityIndicatorProps {
   isStarted: boolean;
   measurementQuality: number;
   measurementProgress: number;
-  fingerPresent: boolean;
 }
 
 const SignalQualityIndicator: React.FC<SignalQualityIndicatorProps> = ({
   isStarted,
   measurementQuality,
-  measurementProgress,
-  fingerPresent
+  measurementProgress
 }) => {
   if (!isStarted) return null;
 
   const getSignalQualityIndicator = () => {
-    if (!fingerPresent) {
+    if (measurementQuality === 0 || measurementQuality < 0.01) {
       return (
-        <div className="flex items-center space-x-2 text-red-500 animate-pulse">
+        <div className="flex items-center space-x-2 text-gray-400">
           <Hand className="w-6 h-6" />
-          <span>No se detecta dedo - Coloque su dedo sobre la cámara</span>
+          <span>Coloque su dedo sobre la cámara</span>
         </div>
       );
     }
