@@ -15,6 +15,12 @@ export default defineConfig(({ mode }) => ({
     },
     watch: {
       usePolling: true
+    },
+    cors: {
+      origin: "*", // Permite todas las solicitudes CORS
+      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+      credentials: true
     }
   },
   plugins: [
