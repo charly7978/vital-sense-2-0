@@ -8,39 +8,23 @@ interface SignalQualityIndicatorProps {
   isStarted: boolean;
   measurementQuality: number;
   measurementProgress: number;
+  fingerPresent: boolean;
 }
 
 const SignalQualityIndicator: React.FC<SignalQualityIndicatorProps> = ({
   isStarted,
   measurementQuality,
-  measurementProgress
+  measurementProgress,
+  fingerPresent
 }) => {
   if (!isStarted) return null;
 
   const getSignalQualityIndicator = () => {
-    if (measurementQuality === 0 || measurementQuality < 0.01) {
+    if (!fingerPresent) {
       return (
-        <div className="flex items-center space-x-2 text-gray-400">
+        <div className="flex items-center space-x-2 text-red-500 animate-pulse">
           <Hand className="w-6 h-6" />
-          <span>Coloque su dedo sobre la cámara</span>
-        </div>
-      );
-    }
-    
-    if (measurementQuality < 0.25) {
-      return (
-        <div className="flex items-center space-x-2 text-red-500">
-          <SignalLow className="w-6 h-6" />
-          <span>Ajuste la posición del dedo</span>
-        </div>
-      );
-    }
-    
-    if (measurementQuality < 0.8) {
-      return (
-        <div className="flex items-center space-x-2 text-yellow-500">
-          <SignalMedium className="w-6 h-6" />
-          <span>Mantenga el dedo estable</span>
+          <span className="font-semibold">DEDO NO DETECTADO</span>
         </div>
       );
     }
@@ -48,7 +32,7 @@ const SignalQualityIndicator: React.FC<SignalQualityIndicatorProps> = ({
     return (
       <div className="flex items-center space-x-2 text-green-500">
         <SignalHigh className="w-6 h-6" />
-        <span>Señal óptima</span>
+        <span className="font-semibold">DEDO DETECTADO</span>
       </div>
     );
   };
@@ -65,23 +49,24 @@ const SignalQualityIndicator: React.FC<SignalQualityIndicatorProps> = ({
         </div>
       </div>
 
-      <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4">
+      <div className={cn(
+        "bg-black/30 backdrop-blur-sm rounded-xl p-4",
+        fingerPresent ? "border border-green-500/20" : "border border-red-500/20"
+      )}>
         <div className="space-y-4">
           {getSignalQualityIndicator()}
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm text-gray-400">
-              <span>Calidad de la señal</span>
-              <span>{Math.round(measurementQuality * 100)}%</span>
+          {fingerPresent && (
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm text-gray-400">
+                <span>Calidad de la señal</span>
+                <span>{Math.round(measurementQuality * 100)}%</span>
+              </div>
+              <Progress 
+                value={measurementQuality * 100} 
+                className="h-2"
+              />
             </div>
-            <Progress 
-              value={measurementQuality * 100} 
-              className={cn(
-                "h-2",
-                measurementQuality < 0.25 ? "destructive" : 
-                measurementQuality < 0.8 ? "warning" : ""
-              )}
-            />
-          </div>
+          )}
         </div>
       </div>
     </>
