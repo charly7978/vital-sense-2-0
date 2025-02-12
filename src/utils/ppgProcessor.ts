@@ -103,7 +103,6 @@ export class PPGProcessor {
     const now = Date.now();
 
     try {
-      // Control de frecuencia de procesamiento
       if (now - this.lastProcessingTime < this.minProcessingInterval) {
         return null;
       }
@@ -169,8 +168,7 @@ export class PPGProcessor {
       const isPeak = this.peakDetector.isRealPeak(
         normalizedValue, 
         now, 
-        this.signalBuffer,
-        this.sensitivitySettings.peakDetection
+        this.signalBuffer
       );
 
       if (isPeak) {
