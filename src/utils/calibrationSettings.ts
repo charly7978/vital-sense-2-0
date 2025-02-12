@@ -6,7 +6,7 @@ export const calibrationSettings: CalibrationSettings = {
   MIN_RED_THRESHOLD: {
     value: 565,
     min: 120,  // Por debajo habría demasiados falsos positivos
-    max: 220,  // Por encima sería demasiado restrictivo
+    max: 400,  // Por encima sería demasiado restrictivo
     step: 5,   // Ajustes en incrementos de 5 para cambios notables pero no bruscos
     description: "Umbral mínimo de componente roja para detectar dedo. Si lo subes, el sistema será más exigente para detectar un dedo (menos falsos positivos). Si lo bajas, será más sensible pero podría dar falsos positivos."
   },
