@@ -23,9 +23,9 @@ export const useCalibration = () => {
       
       // Cargar perfil activo si existe
       const activeProfileData = data?.find(p => p.is_active);
-      if (activeProfileData) {
+      if (activeProfileData && typeof activeProfileData.settings === 'object') {
         setActiveProfile(activeProfileData.id);
-        applyCalibrationProfile(activeProfileData.settings);
+        applyCalibrationProfile(activeProfileData.settings as Record<string, number>);
       }
     } catch (error) {
       console.error('Error cargando perfiles:', error);
@@ -108,8 +108,10 @@ export const useCalibration = () => {
 
       if (error) throw error;
 
-      setActiveProfile(profileId);
-      applyCalibrationProfile(data.settings);
+      if (data && typeof data.settings === 'object') {
+        setActiveProfile(profileId);
+        applyCalibrationProfile(data.settings as Record<string, number>);
+      }
 
       toast({
         title: "Éxito",
