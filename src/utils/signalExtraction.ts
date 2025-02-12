@@ -1,10 +1,10 @@
 
 export class SignalExtractor {
-  private readonly minRedIntensity = 60;  // Mínimo valor de rojo para considerar que hay piel
-  private readonly maxRedIntensity = 235; // Máximo valor de rojo (evita saturación)
-  private readonly minValidPixels = 800;  // Área mínima que debe cubrir el dedo
-  private readonly redDominanceThreshold = 1.35; // Cuánto debe dominar el rojo sobre otros colores
-  private readonly pixelStep = 2; // Para optimizar el procesamiento
+  private readonly minRedIntensity = 40;  // Reducido para mejor detección
+  private readonly maxRedIntensity = 250; // Aumentado el rango superior
+  private readonly minValidPixels = 400;  // Reducido para ser más sensible
+  private readonly redDominanceThreshold = 1.2; // Reducido para mejor detección
+  private readonly pixelStep = 2;
   private frameCount = 0;
 
   extractChannels(imageData: ImageData): { 
@@ -12,8 +12,8 @@ export class SignalExtractor {
     ir: number; 
     quality: number; 
     perfusionIndex: number;
-    fingerPresent: boolean; // Nuevo campo específico para detección de dedo
-    diagnostics: { // Diagnósticos para debugging
+    fingerPresent: boolean;
+    diagnostics: {
       redMean: number;
       validPixels: number;
       redDominance: number;
@@ -24,14 +24,16 @@ export class SignalExtractor {
     const { width, height, data } = imageData;
     const centerX = Math.floor(width / 2);
     const centerY = Math.floor(height / 2);
-    const regionSize = Math.floor(Math.min(width, height) * 0.25); // Región de interés más precisa
+    const regionSize = Math.floor(Math.min(width, height) * 0.25);
 
     let validPixelCount = 0;
     let totalRedValue = 0;
     let maxRedDominance = 0;
+    let totalGreenValue = 0;
+    let totalBlueValue = 0;
     const totalPixelsInRegion = Math.pow(regionSize * 2, 2);
 
-    // Análisis de la imagen
+    // Análisis más detallado de la imagen
     for (let y = centerY - regionSize; y < centerY + regionSize; y += this.pixelStep) {
       if (y < 0 || y >= height) continue;
       
@@ -43,49 +45,60 @@ export class SignalExtractor {
         const green = data[i + 1];
         const blue = data[i + 2];
         
-        // Calculamos la dominancia del rojo
+        // Cálculo mejorado de dominancia del rojo
         const redOverGreen = red / (green + 1);
         const redOverBlue = red / (blue + 1);
         const redDominance = Math.min(redOverGreen, redOverBlue);
         
         maxRedDominance = Math.max(maxRedDominance, redDominance);
 
-        // Verificación natural de píxel de piel
+        // Verificación más sensible de píxel de piel
         if (red >= this.minRedIntensity && 
             red <= this.maxRedIntensity && 
             redDominance >= this.redDominanceThreshold) {
           validPixelCount++;
           totalRedValue += red;
+          totalGreenValue += green;
+          totalBlueValue += blue;
         }
       }
     }
 
-    // Cálculos de métricas
+    // Cálculos más detallados
     const coverage = validPixelCount / (totalPixelsInRegion / (this.pixelStep * this.pixelStep));
     const redMean = validPixelCount > 0 ? totalRedValue / validPixelCount : 0;
+    const greenMean = validPixelCount > 0 ? totalGreenValue / validPixelCount : 0;
+    const blueMean = validPixelCount > 0 ? totalBlueValue / validPixelCount : 0;
     
-    // Detección natural del dedo
-    const fingerPresent = coverage > 0.3 && // Al menos 30% del área debe ser piel
+    // Detección más sensible del dedo
+    const fingerPresent = coverage > 0.15 && // Reducido a 15% para más sensibilidad
                          validPixelCount >= this.minValidPixels && 
                          redMean >= this.minRedIntensity;
 
-    if (this.frameCount % 30 === 0) {
-      console.log('Diagnóstico detección de dedo:', {
-        cobertura: coverage,
+    // Logging más frecuente y detallado
+    if (this.frameCount % 15 === 0) { // Aumentada la frecuencia de logging
+      console.log('Diagnóstico detallado de detección de dedo:', {
+        cobertura: coverage.toFixed(3),
+        porcentajeCobertura: (coverage * 100).toFixed(1) + '%',
         pixelesValidos: validPixelCount,
         minimoRequerido: this.minValidPixels,
-        promedioRojo: redMean,
+        promedioRojo: redMean.toFixed(1),
+        promedioVerde: greenMean.toFixed(1),
+        promedioAzul: blueMean.toFixed(1),
         minimoRojo: this.minRedIntensity,
-        dominanciaRojo: maxRedDominance,
-        hayDedo: fingerPresent
+        dominanciaRojo: maxRedDominance.toFixed(2),
+        proporcionRV: (redMean / greenMean).toFixed(2),
+        proporcionRA: (redMean / blueMean).toFixed(2),
+        hayDedo: fingerPresent,
+        umbralCobertura: '15%',
+        umbralDominancia: this.redDominanceThreshold
       });
     }
 
-    // Retornamos los valores crudos sin modificarlos basados en la presencia del dedo
     return {
       red: redMean,
-      ir: redMean * 0.5, // Simplificado por ahora, mejoraremos esto después
-      quality: coverage, // La calidad ahora es independiente de la presencia del dedo
+      ir: redMean * 0.5,
+      quality: coverage,
       perfusionIndex: maxRedDominance,
       fingerPresent,
       diagnostics: {
