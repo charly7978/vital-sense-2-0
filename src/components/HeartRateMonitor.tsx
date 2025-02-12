@@ -25,7 +25,6 @@ const HeartRateMonitor: React.FC = () => {
     isStarted,
     measurementProgress,
     measurementQuality,
-    fingerPresent,
     sensitivitySettings,
     updateSensitivitySettings,
     toggleMeasurement,
@@ -73,7 +72,6 @@ const HeartRateMonitor: React.FC = () => {
             isStarted={isStarted}
             measurementQuality={measurementQuality}
             measurementProgress={measurementProgress}
-            fingerPresent={fingerPresent}
           />
         )}
 

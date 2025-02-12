@@ -1,3 +1,4 @@
+
 import { PTTProcessor } from './pttProcessor';
 import { PPGFeatureExtractor } from './ppgFeatureExtractor';
 import { SignalFilter } from './signalFilter';
@@ -80,8 +81,8 @@ export class SignalProcessor {
       confidence *= (perfusionIndex / this.spO2CalibrationCoefficients.perfusionIndexThreshold);
     }
     
-    const signalStability = this.qualityAnalyzer.calculateSignalStability(filteredRed, filteredIr);
-    confidence *= signalStability;
+    const signalQuality = this.qualityAnalyzer.analyzeSignalQuality(filteredRed);
+    confidence *= signalQuality;
     
     spo2 = Math.min(Math.max(spo2, 70), 100);
     confidence = Math.min(Math.max(confidence * 100, 0), 100);
