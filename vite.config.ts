@@ -10,9 +10,9 @@ export default defineConfig(({ mode }) => ({
     host: "0.0.0.0",
     port: 8080,
     hmr: {
-      host: "localhost",
-      protocol: "ws",
-      port: 8080 // Cambiado de clientPort: 443 a port: 8080
+      clientPort: 443,
+      host: '4dadecf1-503f-48ab-8ca5-a4dfbf273434.lovableproject.com',
+      protocol: 'wss'
     },
     watch: {
       usePolling: true
