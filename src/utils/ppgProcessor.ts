@@ -238,19 +238,29 @@ export class PPGProcessor {
       this.signalBuffer.shift();
     }
 
-    const isPeak = this.peakDetector.isRealPeak(normalizedValue, now, this.signalBuffer);
+    // Solo intentamos detectar picos si la calidad de la señal es buena
+    const signalQuality = this.signalProcessor.analyzeSignalQuality(filteredRed);
+    const isPeak = signalQuality >= 0.65 && // Solo si la calidad es BUENA u ÓPTIMA
+                  this.peakDetector.isRealPeak(normalizedValue, now, this.signalBuffer);
 
     if (isPeak) {
       this.peakTimes.push(now);
-      console.log('Peak detected:', { normalizedValue, time: now });
+      console.log('¡LATIDO DETECTADO!', { 
+        valor: normalizedValue, 
+        tiempo: new Date(now).toISOString(),
+        calidadSenal: signalQuality
+      });
       
       if (this.peakTimes.length > 10) {
         this.peakTimes.shift();
       }
       
-      this.beepPlayer.playBeep('heartbeat').catch(err => {
+      // Reproducir beep solo cuando detectamos un latido real y la señal es de buena calidad
+      try {
+        await this.beepPlayer.playBeep('heartbeat');
+      } catch (err) {
         console.error('Error al reproducir beep:', err);
-      });
+      }
     }
 
     // Calcular frecuencia cardíaca usando análisis de frecuencia
