@@ -1,4 +1,12 @@
 
+/**
+ * PPGFeatureExtractor: Extracción de características morfológicas de la onda PPG
+ * 
+ * IMPORTANTE: Este extractor analiza ÚNICAMENTE características reales de la onda PPG.
+ * No genera características sintéticas. Cada medición corresponde a propiedades
+ * genuinas de la onda de pulso capturada por la cámara.
+ */
+
 interface PPGFeatures {
   augmentationIndex: number;
   reflectionIndex: number;

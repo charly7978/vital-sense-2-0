@@ -1,4 +1,3 @@
-
 import { VitalReading, PPGData, SensitivitySettings, ProcessingSettings } from './types';
 import { BeepPlayer } from './audioUtils';
 import { SignalProcessor } from './signalProcessing';
@@ -117,10 +116,7 @@ export class PPGProcessor {
       }
 
       // Filtrar señal
-      const filteredRed = this.signalFilter.lowPassFilter(
-        this.redBuffer, 
-        5 * this.sensitivitySettings.noiseReduction
-      );
+      const filteredRed = this.signalFilter.lowPassFilter(this.redBuffer);
 
       // Normalizar señal
       const normalizedValue = this.signalNormalizer.normalizeSignal(

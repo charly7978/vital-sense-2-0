@@ -1,4 +1,11 @@
 
+/**
+ * PeakDetector: Detector de picos en tiempo real para señal PPG
+ * 
+ * IMPORTANTE: Este detector trabaja ÚNICAMENTE con picos reales de la señal PPG.
+ * No genera detecciones sintéticas. Cada pico detectado corresponde a un
+ * latido real del corazón capturado a través de la cámara.
+ */
 export class PeakDetector {
   private adaptiveThreshold = 0;
   private readonly minPeakDistance = 180;

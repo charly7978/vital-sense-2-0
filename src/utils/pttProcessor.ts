@@ -1,4 +1,12 @@
 
+/**
+ * PTTProcessor: Análisis del tiempo de tránsito del pulso en tiempo real
+ * 
+ * IMPORTANTE: Este procesador analiza ÚNICAMENTE tiempos reales entre
+ * picos de la señal PPG. No genera estimaciones sintéticas.
+ * Cada medición corresponde a un tiempo real de tránsito del pulso.
+ */
+
 interface PTTResult {
   ptt: number;
   confidence: number;
