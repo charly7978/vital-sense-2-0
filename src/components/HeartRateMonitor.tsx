@@ -43,12 +43,17 @@ const HeartRateMonitor: React.FC = () => {
             <CameraView onFrame={processFrame} isActive={isStarted} />
           </div>
           {isStarted && (
-            <div className={`mt-2 p-3 rounded-lg text-center ${
-              fingerPresent 
-                ? "bg-green-500/20 border border-green-500/30" 
-                : "bg-red-500/20 border border-red-500/30"
-            }`}>
-              <p className={`text-lg font-medium ${
+            <div 
+              className={`mt-2 p-3 rounded-lg text-center transition-colors duration-150 ${
+                fingerPresent 
+                  ? "bg-[#0A4119] border border-green-500" 
+                  : "bg-[#3D0F0F] border border-red-500"
+              }`}
+              style={{
+                willChange: 'background-color, border-color'
+              }}
+            >
+              <p className={`text-lg font-semibold ${
                 fingerPresent ? "text-green-400" : "text-red-400"
               }`}>
                 {fingerPresent ? "DEDO DETECTADO" : "COLOQUE EL DEDO EN LA CÁMARA"}
