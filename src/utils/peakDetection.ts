@@ -1,10 +1,10 @@
 
 export class PeakDetector {
   private adaptiveThreshold = 0;
-  private readonly minPeakDistance = 250; // Reducido aún más para mayor sensibilidad
+  private readonly minPeakDistance = 250; // Mantenemos este valor para evitar falsos positivos
   private lastPeakTime = 0;
   private readonly bufferSize = 20;
-  private readonly minAmplitude = 0.08; // Reducido para detectar picos más pequeños
+  private readonly minAmplitude = 0.06; // Reducido aún más para detectar picos más suaves
   private readonly adaptiveRate = 0.15;
   private peakBuffer: number[] = [];
   private timeBuffer: number[] = [];
@@ -32,8 +32,8 @@ export class PeakDetector {
       recentValues.reduce((a, b) => a + Math.pow(b - avgValue, 2), 0) / recentValues.length
     );
 
-    // Umbral adaptativo más sensible
-    this.adaptiveThreshold = avgValue + (stdDev * 0.6); // Reducido de 0.7 a 0.6
+    // Umbral adaptativo aún más sensible pero con protección contra ruido
+    this.adaptiveThreshold = avgValue + (stdDev * 0.5); // Reducido para mayor sensibilidad
 
     const isValidShape = this.validatePeakShape(currentValue, signalBuffer);
     const hasSignificantAmplitude = currentValue > this.adaptiveThreshold && 
@@ -65,10 +65,12 @@ export class PeakDetector {
   }
 
   private isLocalMax(currentValue: number, signalBuffer: number[]): boolean {
-    const window = 3; // Reducido para mayor sensibilidad
+    const window = 3;
     const recent = signalBuffer.slice(-window);
     const localMax = Math.max(...recent);
-    return currentValue >= localMax && currentValue > recent[recent.length - 2];
+    // Añadimos una tolerancia pequeña para detectar picos casi máximos
+    const tolerance = 0.02;
+    return (currentValue >= localMax * (1 - tolerance)) && currentValue > recent[recent.length - 2];
   }
 
   private validatePeakShape(currentValue: number, signalBuffer: number[]): boolean {
@@ -76,12 +78,18 @@ export class PeakDetector {
 
     const samples = [...signalBuffer.slice(-4), currentValue];
     
+    // Análisis más detallado de la forma del pico
     const firstDerivative = samples.slice(1).map((v, i) => v - samples[i]);
-    const isRising = firstDerivative[2] > 0 && firstDerivative[1] > 0;
+    
+    // Verificación más sensible del ascenso
+    const isRising = firstDerivative[2] > 0 || 
+                    (firstDerivative[2] > -0.05 && firstDerivative[1] > 0); // Tolerancia para ascensos suaves
+    
     const isPeaking = firstDerivative[3] < 0;
     
+    // Verificación de simetría más flexible pero aún controlada
     const symmetry = Math.abs(firstDerivative[2]) / Math.abs(firstDerivative[3]);
-    const isSymmetric = symmetry > 0.4 && symmetry < 2.5; // Rango más permisivo
+    const isSymmetric = symmetry > 0.3 && symmetry < 3.0; // Rango más amplio pero con límites
     
     return isRising && isPeaking && isSymmetric;
   }
@@ -105,9 +113,12 @@ export class PeakDetector {
     if (recentIntervals.length === 0) return true;
     
     const avgInterval = recentIntervals.reduce((a, b) => a + b, 0) / recentIntervals.length;
-    const maxVariation = 0.3; // Aumentado de 0.25 a 0.3 para mayor tolerancia
+    const maxVariation = 0.35; // Aumentado ligeramente para permitir más variabilidad natural
     
-    return Math.abs(currentInterval - avgInterval) <= avgInterval * maxVariation;
+    // Verificación adicional para variaciones graduales
+    const isGradualChange = Math.abs(currentInterval - this.timeBuffer[this.timeBuffer.length - 1]) < avgInterval * 0.4;
+    
+    return (Math.abs(currentInterval - avgInterval) <= avgInterval * maxVariation) || isGradualChange;
   }
 
   private updatePeakHistory(peakValue: number, timestamp: number) {
