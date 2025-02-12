@@ -1,15 +1,14 @@
 
 export class SignalQualityAnalyzer {
   analyzeSignalQuality(signal: number[]): number {
-    if (signal.length === 0) return 0;
+    // Si no hay señal, retornamos 0
+    if (!signal || signal.length === 0) return 0;
     
-    // Análisis instantáneo basado en el último valor de la señal
-    const currentValue = signal[signal.length - 1];
+    // Tomamos el último valor de la señal (el más reciente)
+    const latestValue = signal[signal.length - 1];
     
-    // Normalización simple basada en la amplitud instantánea
-    // Valores típicos de PPG están entre 0 y 1000
-    const normalizedQuality = Math.min(Math.max(currentValue / 1000, 0), 1);
-    
-    return normalizedQuality;
+    // Normalizamos el valor al rango 0-1
+    // Los valores típicos de PPG están entre 0-255
+    return Math.min(Math.max(latestValue / 255, 0), 1);
   }
 }

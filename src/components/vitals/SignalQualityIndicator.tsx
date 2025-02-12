@@ -17,14 +17,14 @@ const SignalQualityIndicator: React.FC<SignalQualityIndicatorProps> = ({
 }) => {
   if (!isStarted) return null;
 
-  // Conversión directa a porcentaje
+  // Conversión directa a porcentaje del valor instantáneo
   const qualityPercentage = Math.round(measurementQuality * 100);
 
-  // Estado de calidad instantáneo
+  // Determinación instantánea del estado de la señal
   const getQualityStatus = () => {
-    if (qualityPercentage >= 80) return { color: 'text-green-500', text: 'SEÑAL FUERTE' };
-    if (qualityPercentage >= 60) return { color: 'text-blue-500', text: 'SEÑAL BUENA' };
-    if (qualityPercentage >= 40) return { color: 'text-yellow-500', text: 'SEÑAL MEDIA' };
+    if (qualityPercentage >= 80) return { color: 'text-green-500', text: 'SEÑAL ÓPTIMA' };
+    if (qualityPercentage >= 60) return { color: 'text-blue-500', text: 'SEÑAL FUERTE' };
+    if (qualityPercentage >= 40) return { color: 'text-yellow-500', text: 'SEÑAL MODERADA' };
     if (qualityPercentage >= 20) return { color: 'text-orange-500', text: 'SEÑAL DÉBIL' };
     return { color: 'text-red-500', text: 'SIN SEÑAL' };
   };
@@ -44,14 +44,14 @@ const SignalQualityIndicator: React.FC<SignalQualityIndicatorProps> = ({
       </div>
 
       <div className={cn(
-        "bg-black/30 backdrop-blur-sm rounded-xl p-4 transition-all duration-300",
+        "bg-black/30 backdrop-blur-sm rounded-xl p-4 transition-colors duration-150",
         qualityStatus.color
       )}>
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <Activity className={cn("w-5 h-5", qualityStatus.color)} />
-              <span className="text-sm font-medium text-gray-200">Intensidad de Señal</span>
+              <Activity className={cn("w-5 h-5 animate-pulse", qualityStatus.color)} />
+              <span className="text-sm font-medium text-gray-200">Intensidad en Tiempo Real</span>
             </div>
             <span className={cn("font-bold", qualityStatus.color)}>
               {qualityPercentage}%
@@ -62,7 +62,7 @@ const SignalQualityIndicator: React.FC<SignalQualityIndicatorProps> = ({
             <Progress 
               value={qualityPercentage} 
               className={cn(
-                "h-2",
+                "h-2 transition-all duration-150",
                 qualityPercentage >= 80 && "bg-green-500/20",
                 qualityPercentage >= 60 && qualityPercentage < 80 && "bg-blue-500/20",
                 qualityPercentage >= 40 && qualityPercentage < 60 && "bg-yellow-500/20",
