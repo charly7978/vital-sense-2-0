@@ -1,4 +1,3 @@
-
 import { VitalReading, PPGData, SensitivitySettings, ProcessingSettings } from './types';
 import { BeepPlayer } from './audioUtils';
 import { SignalProcessor } from './signalProcessing';
@@ -208,7 +207,9 @@ export class PPGProcessor {
       
       const hrvAnalysis = this.signalProcessor.analyzeHRV(intervals);
       const spo2Result = this.signalProcessor.calculateSpO2(this.redBuffer, this.irBuffer);
-      const bp = this.signalProcessor.estimateBloodPressure(filteredRed, this.peakTimes);
+      
+      // Esperar la resolución de la promesa de estimateBloodPressure
+      const bp = await this.signalProcessor.estimateBloodPressure(filteredRed, this.peakTimes);
       const validatedVitals = this.validateVitalSigns(calculatedBpm, bp.systolic, bp.diastolic);
 
       return {
@@ -221,7 +222,7 @@ export class PPGProcessor {
         signalQuality: quality,
         confidence: spo2Result.confidence,
         readings: this.readings,
-        isPeak,
+        isPeak: false,
         redValue: red,
         hrvMetrics: {
           sdnn: hrvAnalysis.sdnn,
