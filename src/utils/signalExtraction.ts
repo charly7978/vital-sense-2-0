@@ -1,11 +1,11 @@
 
 export class SignalExtractor {
   private readonly ROI_SIZE = 32;
-  private readonly MIN_RED_THRESHOLD = 135; // Sutilmente aumentado de 130 a 135
+  private readonly MIN_RED_THRESHOLD = 140; // Aumentado de 135 a 140
   private readonly MAX_RED_THRESHOLD = 240;
-  private readonly MIN_VALID_PIXELS = 25; // Sutilmente aumentado de 20 a 25
+  private readonly MIN_VALID_PIXELS = 30; // Aumentado de 25 a 30
   private lastFingerPresent: boolean = false;
-  private readonly STABILITY_THRESHOLD = 4; // Sutilmente aumentado de 3 a 4 frames
+  private readonly STABILITY_THRESHOLD = 5; // Aumentado de 4 a 5 frames
   private stabilityCounter: number = 0;
 
   extractChannels(imageData: ImageData): { 
@@ -38,18 +38,21 @@ export class SignalExtractor {
     }
 
     const redMedian = this.calculateMedian(redValues);
-    const currentFingerPresent = redMedian >= this.MIN_RED_THRESHOLD && validPixelCount >= this.MIN_VALID_PIXELS;
+    // Agregar una condición más estricta para validPixelCount
+    const currentFingerPresent = redMedian >= this.MIN_RED_THRESHOLD && 
+                                validPixelCount >= this.MIN_VALID_PIXELS &&
+                                validPixelCount >= (this.ROI_SIZE * this.ROI_SIZE * 0.3); // Al menos 30% de píxeles válidos
 
     // Lógica de estabilidad
     if (currentFingerPresent === this.lastFingerPresent) {
       this.stabilityCounter = Math.min(this.stabilityCounter + 1, this.STABILITY_THRESHOLD);
     } else {
-      this.stabilityCounter = Math.max(this.stabilityCounter - 1, 0);
+      this.stabilityCounter = 0; // Reset completo al detectar cambio
     }
 
     // Solo cambiamos el estado si hay suficiente estabilidad
     let finalFingerPresent = this.lastFingerPresent;
-    if (this.stabilityCounter >= this.STABILITY_THRESHOLD || this.stabilityCounter === 0) {
+    if (this.stabilityCounter >= this.STABILITY_THRESHOLD) {
       finalFingerPresent = currentFingerPresent;
       this.lastFingerPresent = currentFingerPresent;
     }
@@ -60,7 +63,8 @@ export class SignalExtractor {
       validPixelCount,
       currentDetection: currentFingerPresent,
       stabilityCounter: this.stabilityCounter,
-      finalState: finalFingerPresent
+      finalState: finalFingerPresent,
+      pixelRatio: validPixelCount / (this.ROI_SIZE * this.ROI_SIZE)
     });
 
     return {
