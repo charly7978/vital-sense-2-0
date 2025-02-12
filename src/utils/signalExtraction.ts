@@ -3,7 +3,7 @@ export class SignalExtractor {
   private readonly ROI_SIZE = 32;
   private readonly MIN_RED_THRESHOLD = 140;
   private readonly MAX_RED_THRESHOLD = 240;
-  private readonly MIN_VALID_PIXELS = 37; // Aumentado sutilmente de 35 a 37
+  private readonly MIN_VALID_PIXELS = 39; // Aumentado sutilmente de 37 a 39
   private lastFingerPresent: boolean = false;
   private readonly STABILITY_THRESHOLD = 4;
   private stabilityCounter: number = 0;
