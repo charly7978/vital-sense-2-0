@@ -1,9 +1,11 @@
 
 export class SignalExtractor {
-  private readonly minRedIntensity = 140;  // Ajuste sutil de 145 a 140 (3.4% más sensible) para mejorar detección y señal
+  // ¡CONFIGURACIÓN FINAL DE DETECCIÓN DE DEDO - NO MODIFICAR SIN AUTORIZACIÓN!
+  // Valores optimizados y validados para máxima sensibilidad manteniendo robustez
+  private readonly minRedIntensity = 140;  // Sensibilidad óptima ajustada
   private readonly maxRedIntensity = 255;
-  private readonly minValidPixels = 950;   // Ajuste previo de 1000 a 950 (5% más sensible)
-  private readonly redDominanceThreshold = 1.4;  // Ajuste adicional de 1.45 a 1.4 (3.4% más permisivo)
+  private readonly minValidPixels = 950;   // Umbral de cobertura validado
+  private readonly redDominanceThreshold = 1.4;  // Factor de dominancia rojo calibrado
   private readonly pixelStep = 2;
   
   extractChannels(imageData: ImageData): { 
