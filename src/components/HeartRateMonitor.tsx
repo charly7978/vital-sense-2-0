@@ -8,6 +8,7 @@ import MeasurementControls from './vitals/MeasurementControls';
 import { useVitals } from '@/contexts/VitalsContext';
 
 const HeartRateMonitor: React.FC = () => {
+  const { toast } = useToast();
   const { 
     bpm, 
     spo2, 
@@ -24,8 +25,15 @@ const HeartRateMonitor: React.FC = () => {
 
   // Log del estado en tiempo real para debugging
   useEffect(() => {
-    console.log('Estado UI:', { fingerPresent, isStarted });
-  }, [fingerPresent, isStarted]);
+    console.log('Estado UI:', { 
+      bpm, 
+      spo2, 
+      systolic, 
+      diastolic,
+      fingerPresent, 
+      isStarted 
+    });
+  }, [bpm, spo2, systolic, diastolic, fingerPresent, isStarted]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-5xl mx-auto p-4">
