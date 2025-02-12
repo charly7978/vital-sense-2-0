@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { BeepPlayer } from '../utils/audioUtils';
 import { PPGProcessor } from '../utils/ppgProcessor';
@@ -29,10 +28,10 @@ const beepPlayer = new BeepPlayer();
 const ppgProcessor = new PPGProcessor();
 
 const MEASUREMENT_DURATION = 30; // seconds
-const MIN_QUALITY_THRESHOLD = 0.05; // Reducido drásticamente para ser más sensible
+const MIN_QUALITY_THRESHOLD = 0.08; // Ajustado a un punto medio
 const MIN_READINGS_FOR_BP = 10;
-const NO_FINGER_THRESHOLD = 0.02; // Reducido drásticamente
-const CONSECUTIVE_LOW_QUALITY_LIMIT = 3; // Reducido a solo 3 frames para respuesta más rápida
+const NO_FINGER_THRESHOLD = 0.05; // Ajustado a un punto medio
+const CONSECUTIVE_LOW_QUALITY_LIMIT = 5; // Aumentado para mayor estabilidad
 
 export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [bpm, setBpm] = useState<number>(0);

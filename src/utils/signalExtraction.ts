@@ -1,9 +1,9 @@
 
 export class SignalExtractor {
-  private readonly minRedIntensity = 20;  // Reducido drásticamente
+  private readonly minRedIntensity = 30;  // Aumentado para evitar falsos positivos
   private readonly maxRedIntensity = 255; // Máximo posible
-  private readonly minValidPixels = 100;  // Reducido drásticamente
-  private readonly redDominanceThreshold = 1.05; // Mínima dominancia requerida
+  private readonly minValidPixels = 200;  // Aumentado para requerir más área válida
+  private readonly redDominanceThreshold = 1.15; // Aumentado para requerir más rojo
   private readonly pixelStep = 1; // Analizamos cada pixel
   private frameCount = 0;
 
