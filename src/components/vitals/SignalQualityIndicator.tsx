@@ -18,20 +18,20 @@ const SignalQualityIndicator: React.FC<SignalQualityIndicatorProps> = ({
   if (!isStarted) return null;
 
   const getSignalQualityIndicator = () => {
-    if (measurementQuality === 0) {
+    if (measurementQuality === 0 || measurementQuality < 0.01) {
       return (
-        <div className="flex items-center space-x-2 text-gray-400 animate-pulse">
+        <div className="flex items-center space-x-2 text-gray-400">
           <Hand className="w-6 h-6" />
-          <span>No se detecta el dedo</span>
+          <span>Coloque su dedo sobre la cámara</span>
         </div>
       );
     }
     
-    if (measurementQuality < 0.3) {
+    if (measurementQuality < 0.25) {
       return (
         <div className="flex items-center space-x-2 text-red-500">
           <SignalLow className="w-6 h-6" />
-          <span>Señal débil</span>
+          <span>Ajuste la posición del dedo</span>
         </div>
       );
     }
@@ -40,15 +40,15 @@ const SignalQualityIndicator: React.FC<SignalQualityIndicatorProps> = ({
       return (
         <div className="flex items-center space-x-2 text-yellow-500">
           <SignalMedium className="w-6 h-6" />
-          <span>Señal regular</span>
+          <span>Mantenga el dedo estable</span>
         </div>
       );
     }
     
     return (
       <div className="flex items-center space-x-2 text-green-500">
-        <SignalHigh className="w-6 h-6 animate-pulse" />
-        <span>Señal excelente</span>
+        <SignalHigh className="w-6 h-6" />
+        <span>Señal óptima</span>
       </div>
     );
   };
@@ -77,7 +77,7 @@ const SignalQualityIndicator: React.FC<SignalQualityIndicatorProps> = ({
               value={measurementQuality * 100} 
               className={cn(
                 "h-2",
-                measurementQuality < 0.3 ? "destructive" : 
+                measurementQuality < 0.25 ? "destructive" : 
                 measurementQuality < 0.8 ? "warning" : ""
               )}
             />

@@ -51,10 +51,10 @@ const HeartRateMonitor: React.FC = () => {
 
         <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4">
           <CameraView onFrame={processFrame} isActive={isStarted} />
-          {isStarted && bpm === 0 && (
+          {isStarted && measurementQuality < 0.01 && (
             <div className="mt-2 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
               <p className="text-yellow-300 text-sm">
-                No se detecta el dedo en la cámara. Por favor, coloque su dedo sobre el lente.
+                Coloque su dedo sobre la cámara y manténgalo estable
               </p>
             </div>
           )}
