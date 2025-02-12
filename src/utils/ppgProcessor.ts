@@ -1,4 +1,3 @@
-
 import { VitalReading, PPGData, SensitivitySettings, ProcessingSettings } from './types';
 import { BeepPlayer } from './audioUtils';
 import { SignalProcessor } from './signalProcessing';
@@ -143,29 +142,27 @@ export class PPGProcessor {
       }
       this.lastProcessingTime = now;
 
-      const { red, ir, quality } = this.signalExtractor.extractChannels(imageData);
+      const extractionResult = this.signalExtractor.extractChannels(imageData);
+      const { red, ir, quality, diagnostics } = extractionResult;
+      
+      console.log('Frame procesado:', {
+        timestamp: now,
+        frameInterval: now - this.lastProcessingTime,
+        rawRedValue: red.toFixed(3),
+        signalQuality: (quality * 100).toFixed(1) + '%',
+        pixelesValidos: diagnostics.validPixels,
+        variacionRojo: diagnostics.rawRedValues.length > 0 ? 
+          (Math.max(...diagnostics.rawRedValues) - Math.min(...diagnostics.rawRedValues)).toFixed(3) : 'N/A'
+      });
       
       if (quality < this.qualityThreshold || red < this.processingSettings.MIN_RED_VALUE) {
-        this.cleanupOldData();
-        return {
-          bpm: 0,
-          spo2: 0,
-          systolic: 0,
-          diastolic: 0,
-          hasArrhythmia: false,
-          arrhythmiaType: 'Normal',
-          signalQuality: 0,
-          confidence: 0,
-          readings: [],
-          isPeak: false,
-          redValue: red,
-          hrvMetrics: {
-            sdnn: 0,
-            rmssd: 0,
-            pnn50: 0,
-            lfhf: 0
-          }
-        };
+        console.log('Señal insuficiente:', {
+          calidad: (quality * 100).toFixed(1) + '%',
+          valorRojo: red.toFixed(1),
+          umbralCalidad: (this.qualityThreshold * 100).toFixed(1) + '%',
+          umbralRojo: this.processingSettings.MIN_RED_VALUE
+        });
+        return null;
       }
       
       const amplifiedRed = red * this.sensitivitySettings.signalAmplification;
@@ -223,6 +220,7 @@ export class PPGProcessor {
         readings: this.readings,
         isPeak,
         redValue: red,
+        rawDiagnostics: diagnostics,
         hrvMetrics: {
           sdnn: hrvAnalysis.sdnn,
           rmssd: hrvAnalysis.rmssd,
