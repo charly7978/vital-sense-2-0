@@ -8,7 +8,6 @@ interface SignalQualityIndicatorProps {
   isStarted: boolean;
   measurementQuality: number;
   measurementProgress: number;
-  fingerPresent: boolean;
 }
 
 const SignalQualityIndicator: React.FC<SignalQualityIndicatorProps> = ({
@@ -18,16 +17,16 @@ const SignalQualityIndicator: React.FC<SignalQualityIndicatorProps> = ({
 }) => {
   if (!isStarted) return null;
 
-  // Convertimos la calidad a porcentaje
+  // Conversión directa a porcentaje
   const qualityPercentage = Math.round(measurementQuality * 100);
 
-  // Determinamos el estado de la calidad de señal
+  // Estado de calidad instantáneo
   const getQualityStatus = () => {
-    if (qualityPercentage >= 80) return { color: 'text-green-500', text: 'EXCELENTE' };
-    if (qualityPercentage >= 60) return { color: 'text-blue-500', text: 'BUENA' };
-    if (qualityPercentage >= 40) return { color: 'text-yellow-500', text: 'REGULAR' };
-    if (qualityPercentage >= 20) return { color: 'text-orange-500', text: 'DÉBIL' };
-    return { color: 'text-red-500', text: 'MUY DÉBIL' };
+    if (qualityPercentage >= 80) return { color: 'text-green-500', text: 'SEÑAL FUERTE' };
+    if (qualityPercentage >= 60) return { color: 'text-blue-500', text: 'SEÑAL BUENA' };
+    if (qualityPercentage >= 40) return { color: 'text-yellow-500', text: 'SEÑAL MEDIA' };
+    if (qualityPercentage >= 20) return { color: 'text-orange-500', text: 'SEÑAL DÉBIL' };
+    return { color: 'text-red-500', text: 'SIN SEÑAL' };
   };
 
   const qualityStatus = getQualityStatus();
@@ -52,7 +51,7 @@ const SignalQualityIndicator: React.FC<SignalQualityIndicatorProps> = ({
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Activity className={cn("w-5 h-5", qualityStatus.color)} />
-              <span className="text-sm font-medium text-gray-200">Calidad de Señal</span>
+              <span className="text-sm font-medium text-gray-200">Intensidad de Señal</span>
             </div>
             <span className={cn("font-bold", qualityStatus.color)}>
               {qualityPercentage}%

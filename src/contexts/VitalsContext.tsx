@@ -29,9 +29,7 @@ const beepPlayer = new BeepPlayer();
 const ppgProcessor = new PPGProcessor();
 
 const MEASUREMENT_DURATION = 30;
-const MIN_QUALITY_THRESHOLD = 0.25;
 const MIN_READINGS_FOR_BP = 10;
-const NO_FINGER_THRESHOLD = 0.3;
 
 export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [bpm, setBpm] = useState<number>(0);
@@ -66,6 +64,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setReadings([]);
     setValidReadingsCount(0);
     setFingerPresent(false);
+    setMeasurementQuality(0);
   }, []);
 
   const updateSensitivitySettings = useCallback((newSettings: SensitivitySettings) => {
@@ -80,17 +79,14 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const vitals = await ppgProcessor.processFrame(imageData);
       
-      const isFingerDetected = vitals && vitals.signalQuality >= NO_FINGER_THRESHOLD;
-      setFingerPresent(isFingerDetected);
-
-      if (!isFingerDetected) {
-        setMeasurementQuality(0);
-        return;
+      if (vitals) {
+        setMeasurementQuality(vitals.signalQuality);
       }
 
-      setMeasurementQuality(vitals.signalQuality);
+      const isFingerDetected = vitals?.redValue > 15;
+      setFingerPresent(isFingerDetected);
 
-      if (vitals.signalQuality > MIN_QUALITY_THRESHOLD) {
+      if (vitals && isFingerDetected) {
         setValidReadingsCount(prev => prev + 1);
 
         if (vitals.isPeak) {
@@ -121,14 +117,13 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     } catch (error) {
       console.error('Error processing frame:', error);
-      setFingerPresent(false);
       toast({
         variant: "destructive",
         title: "Error en el procesamiento",
         description: "Error al procesar la imagen de la cámara."
       });
     }
-  }, [isStarted, validReadingsCount, toast, resetMeasurements]);
+  }, [isStarted, validReadingsCount, toast]);
 
   const toggleMeasurement = useCallback(() => {
     setIsStarted(prev => !prev);
