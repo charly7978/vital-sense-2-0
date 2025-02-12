@@ -4,7 +4,7 @@ import { CalibrationSettings } from './types';
 export const calibrationSettings: CalibrationSettings = {
   // Configuraciones de detección de señal
   MIN_RED_THRESHOLD: {
-    value: 265,
+    value: 565,
     min: 120,  // Por debajo habría demasiados falsos positivos
     max: 220,  // Por encima sería demasiado restrictivo
     step: 5,   // Ajustes en incrementos de 5 para cambios notables pero no bruscos
