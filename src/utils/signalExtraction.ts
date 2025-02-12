@@ -2,48 +2,12 @@
 import { supabase } from '@/integrations/supabase/client';
 
 export class SignalExtractor {
-  private calibrationParams: {
-    minRedIntensity: number;
-    maxRedIntensity: number;
-    minValidPixels: number;
-    redDominanceThreshold: number;
-    pixelStep: number;
-    roiScale: number;
-  } = {
-    minRedIntensity: 120,
-    maxRedIntensity: 255,
-    minValidPixels: 100,
-    redDominanceThreshold: 1.2,
-    pixelStep: 4,
-    roiScale: 0.2
-  };
-
-  async loadCalibration() {
-    try {
-      const { data, error } = await supabase
-        .from('ppg_calibration')
-        .select('*')
-        .eq('is_active', true)
-        .single();
-
-      if (error) throw error;
-
-      if (data) {
-        this.calibrationParams = {
-          minRedIntensity: data.min_red_intensity,
-          maxRedIntensity: data.max_red_intensity,
-          minValidPixels: data.min_valid_pixels,
-          redDominanceThreshold: data.red_dominance_threshold,
-          pixelStep: data.pixel_step,
-          roiScale: data.roi_scale
-        };
-        
-        console.log('Parámetros de calibración cargados:', this.calibrationParams);
-      }
-    } catch (error) {
-      console.error('Error al cargar calibración:', error);
-    }
-  }
+  private readonly ROI_SIZE = 64; // Región de interés más pequeña y precisa
+  private readonly MIN_RED_THRESHOLD = 150;
+  private readonly MAX_RED_THRESHOLD = 240;
+  private readonly MIN_VALID_PIXELS = 40;
+  private lastValidReadings: number[] = [];
+  private readonly HISTORY_SIZE = 10;
 
   extractChannels(imageData: ImageData): { 
     red: number; 
@@ -60,92 +24,160 @@ export class SignalExtractor {
   } {
     const { width, height, data } = imageData;
     
-    // 1. Reducir el área de análisis a un área más pequeña en el centro
+    // Centro de la imagen
     const centerX = Math.floor(width / 2);
     const centerY = Math.floor(height / 2);
-    const regionSize = Math.floor(Math.min(width, height) * 0.1); // Reducido a 10% del tamaño
+    const halfROI = Math.floor(this.ROI_SIZE / 2);
 
+    // Arrays para almacenar valores
+    const redValues: number[] = [];
+    const greenValues: number[] = [];
+    const blueValues: number[] = [];
     let validPixelCount = 0;
-    let totalRedValue = 0;
-    let totalGreenValue = 0;
-    let totalBlueValue = 0;
-    let maxRedValue = 0;
-    let minRedValue = 255;
-    let sampledPixels = 0;
-    let redValues: number[] = [];
 
-    // 2. Analizar píxeles con más precisión
-    for (let y = centerY - regionSize; y < centerY + regionSize; y += 2) { // Incremento reducido a 2
-      if (y < 0 || y >= height) continue;
-      
-      for (let x = centerX - regionSize; x < centerX + regionSize; x += 2) {
-        if (x < 0 || x >= width) continue;
-        
-        sampledPixels++;
+    // Análisis de píxeles en la región de interés
+    for (let y = centerY - halfROI; y < centerY + halfROI; y++) {
+      for (let x = centerX - halfROI; x < centerX + halfROI; x++) {
         const i = (y * width + x) * 4;
         const red = data[i];
         const green = data[i + 1];
         const blue = data[i + 2];
 
-        // Actualizar valores min/max
-        maxRedValue = Math.max(maxRedValue, red);
-        minRedValue = Math.min(minRedValue, red);
-        
-        // 3. Mejorar la detección de dominancia de rojo
-        const redDominance = red / (Math.max(green, blue, 1));
-        
-        // 4. Criterios más estrictos para píxeles válidos
-        if (red > 100 && red < 250 && // Evitar saturación
-            redDominance > 1.1 && // Menos restrictivo en dominancia
-            green < red && blue < red) { // Asegurar que rojo es dominante
-          
-          validPixelCount++;
-          totalRedValue += red;
-          totalGreenValue += green;
-          totalBlueValue += blue;
+        // Criterios mejorados para detección de píxeles válidos
+        if (this.isValidPixel(red, green, blue)) {
           redValues.push(red);
+          greenValues.push(green);
+          blueValues.push(blue);
+          validPixelCount++;
         }
       }
     }
 
-    // 5. Calcular estadísticas más robustas
-    const coverage = validPixelCount / sampledPixels;
-    
-    // Calcular la mediana en lugar de la media para el valor de rojo
-    redValues.sort((a, b) => a - b);
-    const redMedian = redValues.length > 0 
-      ? redValues[Math.floor(redValues.length / 2)]
-      : 0;
+    if (validPixelCount < this.MIN_VALID_PIXELS) {
+      console.log('Píxeles válidos insuficientes:', validPixelCount);
+      return this.createEmptyResult();
+    }
 
-    // 6. Criterios más estrictos para detección de dedo
-    const fingerPresent = validPixelCount >= 50 && // Reducido el mínimo de píxeles válidos
-                         coverage >= 0.15 && // Aumentado el requisito de cobertura
-                         redMedian >= 100 && // Usando mediana en lugar de media
-                         (maxRedValue - minRedValue) > 20; // Asegurar variación en valores
+    // Calcular estadísticas robustas
+    const redMedian = this.calculateMedian(redValues);
+    const greenMedian = this.calculateMedian(greenValues);
+    const blueMedian = this.calculateMedian(blueValues);
+    
+    // Calcular índice de perfusión mejorado
+    const perfusionIndex = this.calculatePerfusionIndex(redValues);
+    
+    // Actualizar historial de lecturas válidas
+    if (this.isReadingValid(redMedian, perfusionIndex)) {
+      this.lastValidReadings.push(redMedian);
+      if (this.lastValidReadings.length > this.HISTORY_SIZE) {
+        this.lastValidReadings.shift();
+      }
+    }
+
+    // Calcular calidad de señal
+    const quality = this.calculateSignalQuality(redValues, validPixelCount);
+    
+    // Detección mejorada de presencia de dedo
+    const fingerPresent = this.isFingerPresent(redMedian, quality, perfusionIndex);
 
     // Log detallado para debugging
-    console.log('Análisis de imagen:', {
+    console.log('Análisis de señal:', {
       estado: fingerPresent ? 'DEDO PRESENTE' : 'NO HAY DEDO',
-      redMedian: Math.round(redMedian),
-      minRed: minRedValue,
-      maxRed: maxRedValue,
-      variacionRojo: maxRedValue - minRedValue,
-      pixelesValidos: validPixelCount,
-      pixelesMuestreados: sampledPixels,
-      cobertura: Math.round(coverage * 100) + '%'
+      mediana_rojo: Math.round(redMedian),
+      indice_perfusion: perfusionIndex.toFixed(3),
+      calidad_senal: quality.toFixed(3),
+      pixeles_validos: validPixelCount,
+      ultima_lectura: this.lastValidReadings[this.lastValidReadings.length - 1]
     });
 
     return {
       red: redMedian,
-      ir: totalGreenValue / (validPixelCount || 1),
-      quality: coverage,
-      perfusionIndex: (maxRedValue - minRedValue) / (maxRedValue || 1),
+      ir: greenMedian,
+      quality,
+      perfusionIndex,
       fingerPresent,
       diagnostics: {
         redMean: redMedian,
         validPixels: validPixelCount,
-        redDominance: maxRedValue / (Math.max(totalGreenValue, totalBlueValue, 1) / (validPixelCount || 1)),
-        coverage
+        redDominance: redMedian / (greenMedian || 1),
+        coverage: validPixelCount / (this.ROI_SIZE * this.ROI_SIZE)
+      }
+    };
+  }
+
+  private isValidPixel(red: number, green: number, blue: number): boolean {
+    return (
+      red >= this.MIN_RED_THRESHOLD &&
+      red <= this.MAX_RED_THRESHOLD &&
+      red > green * 1.5 &&
+      red > blue * 1.5 &&
+      green < 200 && blue < 200 // Evitar reflexiones especulares
+    );
+  }
+
+  private calculateMedian(values: number[]): number {
+    if (values.length === 0) return 0;
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 0
+      ? (sorted[mid - 1] + sorted[mid]) / 2
+      : sorted[mid];
+  }
+
+  private calculatePerfusionIndex(values: number[]): number {
+    if (values.length < 2) return 0;
+    const max = Math.max(...values);
+    const min = Math.min(...values);
+    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    return mean > 0 ? (max - min) / mean : 0;
+  }
+
+  private calculateSignalQuality(values: number[], validPixels: number): number {
+    if (values.length < 2) return 0;
+    
+    // Calcular variación de la señal
+    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / values.length;
+    const stdDev = Math.sqrt(variance);
+    
+    // Normalizar calidad entre 0 y 1
+    const pixelQuality = validPixels / (this.ROI_SIZE * this.ROI_SIZE);
+    const variationQuality = Math.min(stdDev / 30, 1); // 30 es un valor típico de variación para PPG
+    
+    return pixelQuality * variationQuality;
+  }
+
+  private isReadingValid(value: number, perfusionIndex: number): boolean {
+    return (
+      value >= this.MIN_RED_THRESHOLD &&
+      value <= this.MAX_RED_THRESHOLD &&
+      perfusionIndex > 0.01 &&
+      perfusionIndex < 0.2
+    );
+  }
+
+  private isFingerPresent(redMedian: number, quality: number, perfusionIndex: number): boolean {
+    return (
+      redMedian >= this.MIN_RED_THRESHOLD &&
+      redMedian <= this.MAX_RED_THRESHOLD &&
+      quality > 0.3 &&
+      perfusionIndex > 0.01 &&
+      this.lastValidReadings.length >= Math.floor(this.HISTORY_SIZE / 2)
+    );
+  }
+
+  private createEmptyResult() {
+    return {
+      red: 0,
+      ir: 0,
+      quality: 0,
+      perfusionIndex: 0,
+      fingerPresent: false,
+      diagnostics: {
+        redMean: 0,
+        validPixels: 0,
+        redDominance: 0,
+        coverage: 0
       }
     };
   }
