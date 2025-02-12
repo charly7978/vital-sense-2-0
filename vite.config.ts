@@ -7,30 +7,14 @@ import { componentTagger } from "lovable-tagger";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
-    host: "0.0.0.0",
+    host: "0.0.0.0", // Permite conexiones desde cualquier IP
     port: 8080,
-    hmr: false, // Deshabilitamos HMR para evitar problemas de conexión
+    hmr: {
+      host: "localhost",
+      protocol: "ws"
+    },
     watch: {
       usePolling: true
-    },
-    cors: {
-      origin: [
-        "https://lovable.dev",
-        "https://gptengineer.app",
-        "http://localhost:3000",
-        "http://localhost:8080",
-        "https://*.lovableproject.com"
-      ],
-      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-      allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-      credentials: true
-    },
-    proxy: {
-      '/gptengineer': {
-        target: 'https://gptengineer.app',
-        changeOrigin: true,
-        secure: false
-      }
     }
   },
   plugins: [

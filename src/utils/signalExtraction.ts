@@ -1,18 +1,12 @@
 
 export class SignalExtractor {
   private readonly ROI_SIZE = 32;
-  private readonly MIN_RED_THRESHOLD = 135;
+  private readonly MIN_RED_THRESHOLD = 140;
   private readonly MAX_RED_THRESHOLD = 240;
-  private readonly MIN_VALID_PIXELS = 25;
+  private readonly MIN_VALID_PIXELS = 30;
   private lastFingerPresent: boolean = false;
-  private readonly STABILITY_THRESHOLD = 4;
+  private readonly STABILITY_THRESHOLD = 3; // Reducido a 3 frames para más rapidez
   private stabilityCounter: number = 0;
-  
-  // Parámetros de histéresis ajustados
-  private readonly HYSTERESIS_HIGH = 145; // Aumentado de 140 a 145 para ser más estrictos en la activación
-  private readonly HYSTERESIS_LOW = 125;  // Reducido de 130 a 125 para ser más tolerantes en mantener la detección
-  private readonly DEBOUNCE_TIME = 750;   // Aumentado de 500 a 750ms para mayor estabilidad
-  private lastStateChangeTime: number = 0;
 
   extractChannels(imageData: ImageData): { 
     red: number;
@@ -30,7 +24,7 @@ export class SignalExtractor {
     const greenValues: number[] = [];
     let validPixelCount = 0;
 
-    // Análisis de píxeles
+    // Análisis directo de píxeles
     for (let y = centerY - halfROI; y < centerY + halfROI; y++) {
       for (let x = centerX - halfROI; x < centerX + halfROI; x++) {
         const i = (y * width + x) * 4;
@@ -44,39 +38,28 @@ export class SignalExtractor {
     }
 
     const redMedian = this.calculateMedian(redValues);
-    const now = Date.now();
-
-    // Implementación de histéresis con debounce mejorada
-    let currentFingerPresent = this.lastFingerPresent;
+    const pixelRatio = validPixelCount / (this.ROI_SIZE * this.ROI_SIZE);
     
-    if (this.lastFingerPresent) {
-      // Si el dedo estaba presente, usar umbral bajo para desactivar
-      if (redMedian < this.HYSTERESIS_LOW && validPixelCount < this.MIN_VALID_PIXELS) {
-        if (now - this.lastStateChangeTime >= this.DEBOUNCE_TIME) {
-          currentFingerPresent = false;
-          this.lastStateChangeTime = now;
-        }
-      }
-    } else {
-      // Si el dedo no estaba presente, usar umbral alto para activar
-      if (redMedian > this.HYSTERESIS_HIGH && validPixelCount >= this.MIN_VALID_PIXELS) {
-        if (now - this.lastStateChangeTime >= this.DEBOUNCE_TIME) {
-          currentFingerPresent = true;
-          this.lastStateChangeTime = now;
-        }
-      }
-    }
+    // Condiciones más inteligentes para la detección
+    const currentFingerPresent = redMedian >= this.MIN_RED_THRESHOLD && 
+                                validPixelCount >= this.MIN_VALID_PIXELS &&
+                                pixelRatio >= 0.3;
 
-    // Lógica de estabilidad adicional
+    // Lógica de estabilidad mejorada
     if (currentFingerPresent === this.lastFingerPresent) {
       this.stabilityCounter = Math.min(this.stabilityCounter + 1, this.STABILITY_THRESHOLD);
+    } else if (currentFingerPresent) {
+      // Si detectamos un dedo, incrementamos más rápido
+      this.stabilityCounter = Math.min(this.stabilityCounter + 1, this.STABILITY_THRESHOLD);
     } else {
+      // Si no detectamos dedo, decrementamos gradualmente
       this.stabilityCounter = Math.max(this.stabilityCounter - 1, 0);
     }
 
-    // Solo cambiamos el estado si hay suficiente estabilidad
+    // Cambio de estado más fluido
     let finalFingerPresent = this.lastFingerPresent;
-    if (this.stabilityCounter >= this.STABILITY_THRESHOLD || this.stabilityCounter === 0) {
+    if (this.stabilityCounter >= this.STABILITY_THRESHOLD || 
+        (currentFingerPresent && redMedian > this.MIN_RED_THRESHOLD * 1.5)) { // Detección inmediata si la señal es muy fuerte
       finalFingerPresent = currentFingerPresent;
       this.lastFingerPresent = currentFingerPresent;
     }
@@ -88,13 +71,13 @@ export class SignalExtractor {
       currentDetection: currentFingerPresent,
       stabilityCounter: this.stabilityCounter,
       finalState: finalFingerPresent,
-      timeSinceLastChange: now - this.lastStateChangeTime
+      pixelRatio
     });
 
     return {
       red: redMedian,
       ir: this.calculateMedian(greenValues),
-      quality: validPixelCount / (this.ROI_SIZE * this.ROI_SIZE),
+      quality: pixelRatio,
       fingerPresent: finalFingerPresent
     };
   }
