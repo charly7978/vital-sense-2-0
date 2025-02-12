@@ -10,36 +10,71 @@
 
 export class SignalFilter {
   private readonly sampleRate: number;
-  private readonly filterWindow = 5; // Ventana pequeña para respuesta rápida
+  private readonly sgWindow = 7; // Ventana de Savitzky-Golay
+  private readonly sgDegree = 2; // Grado del polinomio
+  private readonly sgCoeffs: number[]; // Coeficientes precalculados
 
-  constructor(sampleRate: number = 30) { // 30 fps es típico en cámaras web
+  constructor(sampleRate: number = 30) {
     this.sampleRate = sampleRate;
+    // Coeficientes precalculados para Savitzky-Golay de orden 2, ventana 7
+    this.sgCoeffs = [-0.095238, 0.142857, 0.285714, 0.333333, 0.285714, 0.142857, -0.095238];
   }
 
   /**
-   * Aplica un filtro de media móvil simple pero efectivo
-   * Preserva la forma real de la onda PPG mientras reduce ruido de alta frecuencia
+   * Aplica el filtro Savitzky-Golay para suavizar la señal
+   * mientras preserva las características de los picos
    */
   lowPassFilter(signal: number[]): number[] {
-    if (signal.length < this.filterWindow) return signal;
+    if (signal.length < this.sgWindow) return signal;
 
     const filtered: number[] = [];
+    const halfWindow = Math.floor(this.sgWindow / 2);
     
-    // Media móvil con pesos
+    // Aplicar filtro Savitzky-Golay
     for (let i = 0; i < signal.length; i++) {
       let sum = 0;
-      let weightSum = 0;
       
-      for (let j = Math.max(0, i - this.filterWindow + 1); j <= i; j++) {
-        // Los valores más recientes tienen más peso
-        const weight = (j - (i - this.filterWindow)) / this.filterWindow;
-        sum += signal[j] * weight;
-        weightSum += weight;
+      for (let j = 0; j < this.sgWindow; j++) {
+        const idx = i - halfWindow + j;
+        // Manejo de bordes usando reflexión
+        const value = idx < 0 ? signal[0] :
+                     idx >= signal.length ? signal[signal.length - 1] :
+                     signal[idx];
+        sum += value * this.sgCoeffs[j];
       }
       
-      filtered[i] = sum / weightSum;
+      filtered.push(sum);
+    }
+
+    // Normalización adicional usando ventana móvil
+    const normalizedSignal = this.normalizeSignal(filtered);
+    
+    return normalizedSignal;
+  }
+
+  /**
+   * Normaliza la señal usando una ventana móvil para adaptarse
+   * a cambios en la amplitud de la señal
+   */
+  private normalizeSignal(signal: number[]): number[] {
+    const windowSize = 30; // 1 segundo a 30fps
+    const normalized: number[] = [];
+    
+    for (let i = 0; i < signal.length; i++) {
+      const start = Math.max(0, i - windowSize);
+      const window = signal.slice(start, i + 1);
+      const min = Math.min(...window);
+      const max = Math.max(...window);
+      const range = max - min;
+      
+      if (range === 0) {
+        normalized.push(0);
+      } else {
+        normalized.push((signal[i] - min) / range);
+      }
     }
     
-    return filtered;
+    return normalized;
   }
 }
+
