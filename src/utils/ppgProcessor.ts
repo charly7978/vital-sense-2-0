@@ -15,7 +15,7 @@ export class PPGProcessor {
   private irBuffer: number[] = [];
   private peakTimes: number[] = [];
   private readonly samplingRate = 30;
-  private readonly windowSize = 150;
+  private readonly windowSize = 90; // Reducido para respuesta más rápida
   private readonly signalProcessor: SignalProcessor;
   private readonly signalExtractor: SignalExtractor;
   private readonly peakDetector: PeakDetector;
@@ -24,24 +24,24 @@ export class PPGProcessor {
   private readonly frequencyAnalyzer: SignalFrequencyAnalyzer;
   private beepPlayer: BeepPlayer;
   private signalBuffer: number[] = [];
-  private readonly bufferSize = 90; // Reducido de 150 a 90 para evitar acumulación
-  private readonly qualityThreshold = 0.2;
+  private readonly bufferSize = 60; // Reducido para respuesta más rápida
+  private readonly qualityThreshold = 0.15; // Reducido para mayor sensibilidad
   private mlModel: MLModel;
   private lastProcessingTime: number = 0;
   private readonly minProcessingInterval = 33;
   private lastValidBpm: number = 0;
   private lastValidSpO2: number = 98;
   private noFingerTimer: number | null = null;
-  private readonly RESET_DELAY = 1000; // 1 segundo sin dedo para resetear
+  private readonly RESET_DELAY = 1000;
   
   private sensitivitySettings: SensitivitySettings = {
-    signalAmplification: 1.5,
+    signalAmplification: 2.0, // Aumentado para mayor sensibilidad
     noiseReduction: 1.2,
     peakDetection: 1.3
   };
   
   constructor() {
-    console.log('Inicializando PPGProcessor...');
+    console.log('Inicializando PPGProcessor con nueva configuración...');
     this.beepPlayer = new BeepPlayer();
     this.signalProcessor = new SignalProcessor(this.windowSize);
     this.signalExtractor = new SignalExtractor();
@@ -69,7 +69,13 @@ export class PPGProcessor {
     try {
       const { red, ir, quality, fingerPresent } = this.signalExtractor.extractChannels(imageData);
 
-      // Control de frecuencia de procesamiento
+      console.log('Procesando frame:', {
+        red,
+        quality,
+        fingerPresent,
+        bufferLength: this.redBuffer.length
+      });
+
       if (now - this.lastProcessingTime < this.minProcessingInterval) {
         return {
           bpm: this.lastValidBpm,
@@ -160,6 +166,7 @@ export class PPGProcessor {
       if (isPeak && quality > this.qualityThreshold) {
         this.peakTimes.push(now);
         await this.beepPlayer.playBeep('heartbeat');
+        console.log('Pico detectado - reproduciendo beep');
       }
 
       // Mantener solo picos recientes (últimos 5 segundos)
@@ -179,6 +186,7 @@ export class PPGProcessor {
           this.lastValidBpm = Math.round(
             this.lastValidBpm * 0.7 + calculatedBpm * 0.3
           );
+          console.log('BPM calculado:', this.lastValidBpm);
         }
       }
 
