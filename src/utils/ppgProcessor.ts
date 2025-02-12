@@ -8,7 +8,7 @@ import { SignalNormalizer } from './signalNormalization';
 import { SignalFilter } from './signalFilter';
 import { SignalFrequencyAnalyzer } from './signalFrequencyAnalyzer';
 import { MLModel } from './mlModel';
-import EventEmitter from 'events';
+import { EventEmitter } from './events';
 
 export class PPGProcessor extends EventEmitter {
   private readings: VitalReading[] = [];
@@ -137,7 +137,7 @@ export class PPGProcessor extends EventEmitter {
 
       // Limitar tamaño del buffer antes de agregar nuevos valores
       if (this.redBuffer.length >= this.bufferSize) {
-        this.redBuffer = this.redBuffer.slice(-Math.floor(this.bufferSize * 0.8)); // Mantener solo el 80% más reciente
+        this.redBuffer = this.redBuffer.slice(-Math.floor(this.bufferSize * 0.8));
         this.irBuffer = this.irBuffer.slice(-Math.floor(this.bufferSize * 0.8));
       }
 
