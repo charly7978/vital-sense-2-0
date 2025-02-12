@@ -238,8 +238,10 @@ export class PPGProcessor {
       this.signalBuffer.shift();
     }
 
-    // Solo intentamos detectar picos si la calidad de la señal es buena
+    // Analizar calidad de la señal una sola vez y reutilizar el valor
     const signalQuality = this.signalProcessor.analyzeSignalQuality(filteredRed);
+    
+    // Detectar picos solo si la calidad es buena
     const isPeak = signalQuality >= 0.65 && // Solo si la calidad es BUENA u ÓPTIMA
                   this.peakDetector.isRealPeak(normalizedValue, now, this.signalBuffer);
 
@@ -284,9 +286,6 @@ export class PPGProcessor {
     // Calcular presión arterial usando PTT y características PPG
     const bp = this.signalProcessor.estimateBloodPressure(filteredRed, this.peakTimes);
     
-    // Analizar calidad de la señal
-    const signalQuality = this.signalProcessor.analyzeSignalQuality(filteredRed);
-
     // Validar y ajustar los signos vitales
     const validatedVitals = this.validateVitalSigns(
       calculatedBpm,
