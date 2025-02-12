@@ -1,15 +1,14 @@
-
 export class PeakDetector {
   private adaptiveThreshold = 0;
-  private readonly minPeakDistance = 250; // Ajustado para 60-240 BPM
+  private readonly minPeakDistance = 200; // Reducido de 250
   private lastPeakTime = 0;
-  private readonly bufferSize = 30;
-  private readonly minAmplitude = 0.008; // Reducido para mayor sensibilidad
-  private readonly adaptiveRate = 0.15; // Ajustado para mejor adaptación
+  private readonly bufferSize = 20; // Reducido de 30
+  private readonly minAmplitude = 0.004; // Reducido drásticamente de 0.008
+  private readonly adaptiveRate = 0.25; // Aumentado de 0.15
   private peakBuffer: number[] = [];
   private timeBuffer: number[] = [];
   private frameCount = 0;
-  private readonly maxBPM = 220;
+  private readonly maxBPM = 240; // Aumentado de 220
   private readonly minBPM = 30;
   private lastPeakValues: number[] = [];
   private readonly peakMemory = 5;
@@ -24,7 +23,7 @@ export class PeakDetector {
       return false;
     }
 
-    if (signalBuffer.length < 5) {
+    if (signalBuffer.length < 3) { // Reducido de 5
       return false;
     }
 
@@ -37,14 +36,13 @@ export class PeakDetector {
     const trend = this.calculateTrend(recentValues);
     const detrended = currentValue - trend;
 
-    // Mejorado el cálculo del umbral dinámico
     const dynamicThreshold = this.calculateDynamicThreshold(recentValues, avgValue, stdDev);
     this.adaptiveThreshold = (this.adaptiveThreshold * (1 - this.adaptiveRate)) + 
                             (dynamicThreshold * this.adaptiveRate);
 
-    // Validaciones más precisas
+    // Validaciones más permisivas
     const hasSignificantAmplitude = detrended > this.minAmplitude * stdDev;
-    const isAboveThreshold = currentValue > (this.adaptiveThreshold * 0.85);
+    const isAboveThreshold = currentValue > (this.adaptiveThreshold * 0.7); // Reducido de 0.85
     const isPotentialPeak = this.validatePeakCharacteristics(currentValue, signalBuffer, avgValue, stdDev);
 
     if ((hasSignificantAmplitude || isAboveThreshold) && isPotentialPeak) {

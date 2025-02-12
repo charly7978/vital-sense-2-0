@@ -1,12 +1,11 @@
 
 export class SignalExtractor {
-  // ¡CONFIGURACIÓN FINAL DE DETECCIÓN DE DEDO - NO MODIFICAR SIN AUTORIZACIÓN!
-  // Valores optimizados y validados para máxima sensibilidad manteniendo robustez
-  private readonly minRedIntensity = 120;  // Reducido para mayor sensibilidad
+  // ¡CONFIGURACIÓN MÁXIMA SENSIBILIDAD - AJUSTADA PARA DETECCIÓN AGRESIVA!
+  private readonly minRedIntensity = 80;   // Reducido drásticamente de 120
   private readonly maxRedIntensity = 255;
-  private readonly minValidPixels = 850;   // Reducido para mejor detección
-  private readonly redDominanceThreshold = 1.2;  // Ajustado según investigación
-  private readonly pixelStep = 1; // Reducido para mayor precisión
+  private readonly minValidPixels = 400;   // Reducido drásticamente de 850
+  private readonly redDominanceThreshold = 1.05;  // Reducido de 1.2
+  private readonly pixelStep = 1;
   
   extractChannels(imageData: ImageData): { 
     red: number; 
@@ -24,7 +23,7 @@ export class SignalExtractor {
     const { width, height, data } = imageData;
     const centerX = Math.floor(width / 2);
     const centerY = Math.floor(height / 2);
-    const regionSize = Math.floor(Math.min(width, height) * 0.35); // Aumentado área de detección
+    const regionSize = Math.floor(Math.min(width, height) * 0.45); // Aumentado de 0.35
 
     let validPixelCount = 0;
     let totalRedValue = 0;
@@ -33,7 +32,6 @@ export class SignalExtractor {
     let totalBlueValue = 0;
     const totalPixelsInRegion = Math.pow(regionSize * 2, 2);
 
-    // Análisis mejorado de píxeles con mejor muestreo
     for (let y = centerY - regionSize; y < centerY + regionSize; y += this.pixelStep) {
       if (y < 0 || y >= height) continue;
       
@@ -45,11 +43,10 @@ export class SignalExtractor {
         const green = data[i + 1];
         const blue = data[i + 2];
         
-        // Mejorado el cálculo de dominancia del rojo
-        const redDominance = (red / Math.max(green, blue));
+        const redDominance = (red / Math.max(green, blue, 1));
         maxRedDominance = Math.max(maxRedDominance, redDominance);
 
-        // Validación mejorada del píxel
+        // Validación mucho más permisiva
         if (red >= this.minRedIntensity && 
             red <= this.maxRedIntensity && 
             redDominance >= this.redDominanceThreshold) {
@@ -66,13 +63,12 @@ export class SignalExtractor {
     const greenMean = validPixelCount > 0 ? totalGreenValue / validPixelCount : 0;
     const blueMean = validPixelCount > 0 ? totalBlueValue / validPixelCount : 0;
     
-    // Mejorada la detección del dedo con múltiples factores
-    const perfusionIndex = redMean / Math.max(greenMean, blueMean);
+    // Detección más permisiva
+    const perfusionIndex = redMean / Math.max(greenMean, blueMean, 1);
     const fingerPresent = validPixelCount >= this.minValidPixels && 
                          redMean >= this.minRedIntensity &&
-                         perfusionIndex >= 1.1;
+                         perfusionIndex >= 1.02; // Reducido de 1.1
 
-    // Log detallado para diagnóstico
     console.log('Análisis de señal PPG:', {
       estado: fingerPresent ? 'DEDO PRESENTE' : 'NO HAY DEDO',
       redMean: Math.round(redMean),
@@ -83,9 +79,9 @@ export class SignalExtractor {
     });
 
     return {
-      red: redMean,
-      ir: (greenMean + blueMean) / 2, // Mejorado el cálculo IR
-      quality: coverage * (perfusionIndex / 2), // Mejorado el cálculo de calidad
+      red: redMean * 1.5, // Amplificación adicional
+      ir: (greenMean + blueMean) / 2,
+      quality: Math.min(1, coverage * perfusionIndex * 2), // Aumentado factor de calidad
       perfusionIndex,
       fingerPresent,
       diagnostics: {
