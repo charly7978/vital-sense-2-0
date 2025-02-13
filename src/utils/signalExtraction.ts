@@ -24,6 +24,14 @@ export class SignalExtractor {
   private readonly DETECTION_BUFFER_SIZE = 5;
   private readonly MIN_CONSECUTIVE_DETECTIONS = 3;
 
+  // Mantener último estado válido
+  private lastValidState = {
+    red: 0,
+    ir: 0,
+    quality: 0,
+    fingerPresent: false
+  };
+
   extractChannels(imageData: ImageData): { 
     red: number;
     ir: number;
@@ -32,14 +40,8 @@ export class SignalExtractor {
   } {
     const now = Date.now();
     if (now - this.lastProcessingTime < this.MIN_PROCESSING_INTERVAL) {
-      // Mantener último estado válido para evitar parpadeo
-      const lastState = this.lastDetectionStates[this.lastDetectionStates.length - 1];
-      return { 
-        red: 0, 
-        ir: 0, 
-        quality: 0, 
-        fingerPresent: lastState || false 
-      };
+      // Devolver último estado válido sin cambios
+      return { ...this.lastValidState };
     }
     this.lastProcessingTime = now;
 
@@ -103,6 +105,14 @@ export class SignalExtractor {
     // Calidad basada en estabilidad
     const quality = fingerPresent ? Math.min(1, validPixelsRatio * (consecutiveDetections / this.DETECTION_BUFFER_SIZE)) : 0;
 
+    // Actualizar último estado válido
+    this.lastValidState = {
+      red: fingerPresent ? avgRed : 0,
+      ir: 0,
+      quality,
+      fingerPresent
+    };
+
     // Log detallado
     console.log('Análisis de señal PPG:', {
       estadísticas: {
@@ -125,11 +135,6 @@ export class SignalExtractor {
       }
     });
 
-    return {
-      red: fingerPresent ? avgRed : 0,
-      ir: 0,
-      quality,
-      fingerPresent
-    };
+    return { ...this.lastValidState };
   }
 }
