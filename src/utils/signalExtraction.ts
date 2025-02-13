@@ -1,5 +1,21 @@
 
 export class SignalExtractor {
+  /**
+   * HISTORIAL DE CAMBIOS DETALLADO:
+   * ==============================
+   * 
+   * [2024-03-18] - REVISIÓN 7
+   * OBJETIVO: Documentar los cambios del sistema
+   * CAMBIO: Añadido sistema de documentación para seguimiento de modificaciones
+   * AUTOR: Lovable AI
+   * 
+   * PRÓXIMOS CAMBIOS PENDIENTES:
+   * - Implementación de buffer temporal
+   * - Sistema de histéresis
+   * - Mejora en filtrado de ruido
+   * - Ajuste de ventana de análisis
+   */
+
   private readonly ROI_SIZE = 64;
   private lastProcessingTime = 0;
   private readonly MIN_PROCESSING_INTERVAL = 33;
