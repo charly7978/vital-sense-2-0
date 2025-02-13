@@ -134,6 +134,105 @@ export type Database = {
         }
         Relationships: []
       }
+      calibration_patterns: {
+        Row: {
+          bpm_smoothing: Json
+          buffer_size: Json
+          created_at: string | null
+          description: string | null
+          finger_detection_delay: Json
+          id: string
+          max_peak_distance: Json
+          measurement_duration: Json
+          min_brightness: Json
+          min_frames_calculation: Json
+          min_peak_distance: Json
+          min_peaks_valid_hr: Json
+          min_processing_interval: Json
+          min_red_dominance: Json
+          min_red_threshold: Json
+          min_red_value: Json
+          min_spo2: Json
+          min_valid_pixels_ratio: Json
+          min_valid_readings: Json
+          name: string
+          noise_reduction: Json
+          peak_threshold: Json
+          peak_threshold_factor: Json
+          quality_threshold: Json
+          reset_delay: Json
+          signal_amplification: Json
+          spo2_calibration: Json
+          stability_threshold: Json
+          updated_at: string | null
+          window_size: Json
+        }
+        Insert: {
+          bpm_smoothing?: Json
+          buffer_size?: Json
+          created_at?: string | null
+          description?: string | null
+          finger_detection_delay?: Json
+          id?: string
+          max_peak_distance?: Json
+          measurement_duration?: Json
+          min_brightness?: Json
+          min_frames_calculation?: Json
+          min_peak_distance?: Json
+          min_peaks_valid_hr?: Json
+          min_processing_interval?: Json
+          min_red_dominance?: Json
+          min_red_threshold?: Json
+          min_red_value?: Json
+          min_spo2?: Json
+          min_valid_pixels_ratio?: Json
+          min_valid_readings?: Json
+          name: string
+          noise_reduction?: Json
+          peak_threshold?: Json
+          peak_threshold_factor?: Json
+          quality_threshold?: Json
+          reset_delay?: Json
+          signal_amplification?: Json
+          spo2_calibration?: Json
+          stability_threshold?: Json
+          updated_at?: string | null
+          window_size?: Json
+        }
+        Update: {
+          bpm_smoothing?: Json
+          buffer_size?: Json
+          created_at?: string | null
+          description?: string | null
+          finger_detection_delay?: Json
+          id?: string
+          max_peak_distance?: Json
+          measurement_duration?: Json
+          min_brightness?: Json
+          min_frames_calculation?: Json
+          min_peak_distance?: Json
+          min_peaks_valid_hr?: Json
+          min_processing_interval?: Json
+          min_red_dominance?: Json
+          min_red_threshold?: Json
+          min_red_value?: Json
+          min_spo2?: Json
+          min_valid_pixels_ratio?: Json
+          min_valid_readings?: Json
+          name?: string
+          noise_reduction?: Json
+          peak_threshold?: Json
+          peak_threshold_factor?: Json
+          quality_threshold?: Json
+          reset_delay?: Json
+          signal_amplification?: Json
+          spo2_calibration?: Json
+          stability_threshold?: Json
+          updated_at?: string | null
+          window_size?: Json
+        }
+        Relationships: []
+      }
       calibration_profiles: {
         Row: {
           created_at: string
