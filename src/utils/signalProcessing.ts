@@ -1,3 +1,4 @@
+
 import { PTTProcessor } from './pttProcessor';
 import { PPGFeatureExtractor } from './ppgFeatureExtractor';
 import { SignalFilter } from './signalFilter';
@@ -19,6 +20,7 @@ export class SignalProcessor {
 
   constructor(windowSize: number) {
     this.windowSize = windowSize;
+    console.log('SignalProcessor inicializado con windowSize:', windowSize);
   }
 
   private resetValues() {
@@ -47,6 +49,16 @@ export class SignalProcessor {
       const redWindow = redSignal.slice(-windowSize);
       const irWindow = irSignal.slice(-windowSize);
 
+      // Log valores de señal para diagnóstico
+      console.log('Valores de señal PPG:', {
+        redSignalLength: redSignal.length,
+        redWindow: {
+          min: Math.min(...redWindow),
+          max: Math.max(...redWindow),
+          avg: redWindow.reduce((a, b) => a + b, 0) / redWindow.length
+        }
+      });
+
       const redAC = Math.max(...redWindow) - Math.min(...redWindow);
       const irAC = Math.max(...irWindow) - Math.min(...irWindow);
       const redDC = this.calculateMovingAverage(redWindow, windowSize);
@@ -66,6 +78,14 @@ export class SignalProcessor {
         (redAC / redDC) * (irAC / irDC) * 100,
         100
       );
+
+      // Log resultados del cálculo
+      console.log('Cálculo SpO2:', {
+        R,
+        spo2,
+        confidence,
+        lastValidSpO2: this.lastValidSpO2
+      });
 
       return {
         spo2: this.lastValidSpO2,

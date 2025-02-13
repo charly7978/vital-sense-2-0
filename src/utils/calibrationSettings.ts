@@ -1,4 +1,3 @@
-
 import { CalibrationSettings } from './types';
 import { supabase } from "@/integrations/supabase/client";
 
@@ -39,7 +38,7 @@ export const calibrationSettings: CalibrationSettings = {
 
   // Configuraciones de procesamiento de señal
   BUFFER_SIZE: {
-    value: 60,
+    value: 40, // Reducido de 60 a 40 para respuesta más rápida
     min: 30,
     max: 120,
     step: 5,
@@ -47,7 +46,7 @@ export const calibrationSettings: CalibrationSettings = {
   },
 
   WINDOW_SIZE: {
-    value: 90,
+    value: 60, // Reducido de 90 a 60 para respuesta más rápida
     min: 45,
     max: 180,
     step: 15,

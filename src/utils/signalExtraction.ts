@@ -1,4 +1,3 @@
-
 import { SignalFilter } from './signalFilter';
 
 export class SignalExtractor {
@@ -90,6 +89,14 @@ export class SignalExtractor {
     const validPixelsRatio = validPixels / (this.ROI_SIZE * this.ROI_SIZE);
     const avgRed = validPixels > 0 ? sumRed / validPixels : 0;
 
+    // Log valores sin procesar para diagnóstico
+    console.log('Valores de señal sin procesar:', {
+      avgRed,
+      validPixelsRatio,
+      totalPixels: this.ROI_SIZE * this.ROI_SIZE,
+      validPixels
+    });
+
     // Actualizar buffer y aplicar filtrado
     this.redBuffer.push(avgRed);
     if (this.redBuffer.length > this.BUFFER_SIZE) {
@@ -109,10 +116,10 @@ export class SignalExtractor {
     const q3 = redValues[q3Index] || 0;
     const iqr = q3 - q1;
 
-    // Criterios más robustos para detección
-    const hasEnoughPixels = validPixelsRatio > this.MIN_VALID_PIXELS_RATIO;
-    const hasGoodIntensity = filteredRed > 40 && filteredRed < 250;
-    const hasGoodDistribution = iqr < 100;
+    // Criterios más permisivos para detección
+    const hasEnoughPixels = validPixelsRatio > this.MIN_VALID_PIXELS_RATIO * 0.8; // 20% más permisivo
+    const hasGoodIntensity = filteredRed > 30 && filteredRed < 250; // Rango más amplio
+    const hasGoodDistribution = iqr < 120; // 20% más permisivo
 
     // Detección inicial
     const currentDetection = hasEnoughPixels && hasGoodIntensity && hasGoodDistribution;
@@ -123,23 +130,15 @@ export class SignalExtractor {
       this.lastDetectionStates.shift();
     }
 
-    // Solo cambiamos estado si hay suficientes detecciones consecutivas
+    // Reducir el número de detecciones consecutivas necesarias
     const consecutiveDetections = this.lastDetectionStates.filter(x => x).length;
-    const fingerPresent = consecutiveDetections >= this.MIN_CONSECUTIVE_DETECTIONS;
+    const fingerPresent = consecutiveDetections >= Math.floor(this.MIN_CONSECUTIVE_DETECTIONS * 0.7);
 
     // Calidad basada en estabilidad y señal filtrada
     const quality = fingerPresent ? 
       Math.min(1, validPixelsRatio * (consecutiveDetections / this.DETECTION_BUFFER_SIZE)) : 0;
 
-    // Actualizar último estado válido
-    this.lastValidState = {
-      red: fingerPresent ? filteredRed : 0,
-      ir: 0,
-      quality,
-      fingerPresent
-    };
-
-    // Log detallado
+    // Log detallado después del procesamiento
     console.log('Análisis de señal PPG:', {
       estadísticas: {
         promedioOriginal: avgRed,
@@ -161,6 +160,14 @@ export class SignalExtractor {
         calidadSeñal: quality
       }
     });
+
+    // Actualizar último estado válido
+    this.lastValidState = {
+      red: fingerPresent ? filteredRed : 0,
+      ir: 0,
+      quality,
+      fingerPresent
+    };
 
     return { ...this.lastValidState };
   }
