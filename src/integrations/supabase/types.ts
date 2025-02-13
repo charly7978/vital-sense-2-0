@@ -412,12 +412,24 @@ export type Database = {
         Row: {
           buffer_size: number
           created_at: string
+          finger_detection_delay: number
           id: string
           max_bpm: number
+          max_peak_distance: number
+          measurement_duration: number
           min_amplitude: number
           min_bpm: number
+          min_brightness: number
           min_distance: number
+          min_frames_for_calculation: number
+          min_peaks_for_valid_hr: number
+          min_red_dominance: number
+          min_red_value: number
+          min_spo2: number
+          min_valid_pixels_ratio: number
+          min_valid_readings: number
           peak_memory: number
+          peak_threshold_factor: number
           profile_id: string | null
           threshold: number
           updated_at: string
@@ -425,12 +437,24 @@ export type Database = {
         Insert: {
           buffer_size?: number
           created_at?: string
+          finger_detection_delay?: number
           id?: string
           max_bpm?: number
+          max_peak_distance?: number
+          measurement_duration?: number
           min_amplitude?: number
           min_bpm?: number
+          min_brightness?: number
           min_distance?: number
+          min_frames_for_calculation?: number
+          min_peaks_for_valid_hr?: number
+          min_red_dominance?: number
+          min_red_value?: number
+          min_spo2?: number
+          min_valid_pixels_ratio?: number
+          min_valid_readings?: number
           peak_memory?: number
+          peak_threshold_factor?: number
           profile_id?: string | null
           threshold?: number
           updated_at?: string
@@ -438,12 +462,24 @@ export type Database = {
         Update: {
           buffer_size?: number
           created_at?: string
+          finger_detection_delay?: number
           id?: string
           max_bpm?: number
+          max_peak_distance?: number
+          measurement_duration?: number
           min_amplitude?: number
           min_bpm?: number
+          min_brightness?: number
           min_distance?: number
+          min_frames_for_calculation?: number
+          min_peaks_for_valid_hr?: number
+          min_red_dominance?: number
+          min_red_value?: number
+          min_spo2?: number
+          min_valid_pixels_ratio?: number
+          min_valid_readings?: number
           peak_memory?: number
+          peak_threshold_factor?: number
           profile_id?: string | null
           threshold?: number
           updated_at?: string
