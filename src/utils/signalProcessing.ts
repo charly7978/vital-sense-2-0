@@ -50,14 +50,10 @@ export class SignalProcessor {
       const irWindow = irSignal.slice(-windowSize);
 
       // Log valores de señal para diagnóstico
-      console.log('Valores de señal PPG:', {
-        redSignalLength: redSignal.length,
-        redWindow: {
-          min: Math.min(...redWindow),
-          max: Math.max(...redWindow),
-          avg: redWindow.reduce((a, b) => a + b, 0) / redWindow.length
-        }
-      });
+      console.log('🔴 Red Value:', Math.max(...redWindow));
+      console.log('📶 Signal Range:', Math.max(...redWindow) - Math.min(...redWindow));
+      console.log('🔆 Bright Pixels:', redWindow.filter(v => v > 50).length / redWindow.length * 100);
+      console.log('📊 Señal PPG procesada:', redWindow);
 
       const redAC = Math.max(...redWindow) - Math.min(...redWindow);
       const irAC = Math.max(...irWindow) - Math.min(...irWindow);
@@ -79,20 +75,27 @@ export class SignalProcessor {
         100
       );
 
-      // Log resultados del cálculo
-      console.log('Cálculo SpO2:', {
+      // Log resultados detallados
+      console.log('⚡ Análisis SpO2:', {
+        redAC,
+        irAC,
+        redDC,
+        irDC,
         R,
         spo2,
-        confidence,
-        lastValidSpO2: this.lastValidSpO2
+        confidence
       });
+
+      if (confidence > 50) {
+        console.log('✅ Medición SpO2 válida:', this.lastValidSpO2);
+      }
 
       return {
         spo2: this.lastValidSpO2,
         confidence: Math.max(0, Math.min(confidence, 100))
       };
     } catch (error) {
-      console.error('Error calculando SpO2:', error);
+      console.error('❌ Error calculando SpO2:', error);
       return { spo2: this.lastValidSpO2, confidence: 0 };
     }
   }
