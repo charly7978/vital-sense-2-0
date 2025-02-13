@@ -24,20 +24,6 @@ export class PeakDetector {
   private readonly peakMemory = 5;
   private readonly minPeakProminence = 0.05;
 
-  // Nuevos parámetros
-  private readonly MEASUREMENT_DURATION = 30000;
-  private readonly MIN_FRAMES_FOR_CALCULATION = 30;
-  private readonly MIN_PEAKS_FOR_VALID_HR = 5;
-  private readonly MAX_PEAK_DISTANCE = 2000;
-  private readonly PEAK_THRESHOLD_FACTOR = 0.5;
-  private readonly MIN_RED_VALUE = 150;
-  private readonly MIN_RED_DOMINANCE = 1.5;
-  private readonly MIN_VALID_PIXELS_RATIO = 0.3;
-  private readonly MIN_BRIGHTNESS = 50;
-  private readonly MIN_VALID_READINGS = 10;
-  private readonly FINGER_DETECTION_DELAY = 1000;
-  private readonly MIN_SPO2 = 80;
-
   constructor() {
     this.loadConfiguration();
   }
@@ -59,22 +45,10 @@ export class PeakDetector {
           minAmplitude: settings.min_amplitude,
           maxBPM: settings.max_bpm,
           minBPM: settings.min_bpm,
-          peakMemory: settings.peak_memory,
-          MEASUREMENT_DURATION: settings.measurement_duration,
-          MIN_FRAMES_FOR_CALCULATION: settings.min_frames_for_calculation,
-          MIN_PEAKS_FOR_VALID_HR: settings.min_peaks_for_valid_hr,
-          MAX_PEAK_DISTANCE: settings.max_peak_distance,
-          PEAK_THRESHOLD_FACTOR: settings.peak_threshold_factor,
-          MIN_RED_VALUE: settings.min_red_value,
-          MIN_RED_DOMINANCE: settings.min_red_dominance,
-          MIN_VALID_PIXELS_RATIO: settings.min_valid_pixels_ratio,
-          MIN_BRIGHTNESS: settings.min_brightness,
-          MIN_VALID_READINGS: settings.min_valid_readings,
-          FINGER_DETECTION_DELAY: settings.finger_detection_delay,
-          MIN_SPO2: settings.min_spo2
+          peakMemory: settings.peak_memory
         });
 
-        console.log('Configuración completa de detección de picos cargada:', settings);
+        console.log('Configuración de detección de picos cargada:', settings);
       }
     } catch (error) {
       console.error('Error cargando configuración de picos:', error);
@@ -113,7 +87,7 @@ export class PeakDetector {
       // Calcular umbral adaptativo con más tolerancia
       if (this.peakBuffer.length > 0) {
         const avgPeak = this.peakBuffer.reduce((a, b) => a + b, 0) / this.peakBuffer.length;
-        this.adaptiveThreshold = avgPeak * this.PEAK_THRESHOLD_FACTOR;
+        this.adaptiveThreshold = avgPeak * 0.5; // Reducido para ser más sensible
       } else {
         this.adaptiveThreshold = Math.max(current * 0.3, this.minAmplitude);
       }

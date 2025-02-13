@@ -2,7 +2,6 @@
 import React from 'react';
 import HeartRateMonitor from '@/components/HeartRateMonitor';
 import { VitalsProvider } from '@/contexts/VitalsContext';
-import { PeakDetectionSettingsPanel } from '@/components/PeakDetectionSettingsPanel';
 
 const Index = () => {
   return (
@@ -17,16 +16,10 @@ const Index = () => {
           </p>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-black/20 backdrop-blur-lg rounded-2xl shadow-xl p-4">
-            <VitalsProvider>
-              <HeartRateMonitor />
-            </VitalsProvider>
-          </div>
-
-          <div className="space-y-6">
-            <PeakDetectionSettingsPanel />
-          </div>
+        <div className="bg-black/20 backdrop-blur-lg rounded-2xl shadow-xl p-4 w-full max-w-6xl mx-auto">
+          <VitalsProvider>
+            <HeartRateMonitor />
+          </VitalsProvider>
         </div>
       </div>
     </div>

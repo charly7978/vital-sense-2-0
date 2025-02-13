@@ -1,3 +1,4 @@
+
 export interface VitalReading {
   [key: string]: number;
   timestamp: number;
