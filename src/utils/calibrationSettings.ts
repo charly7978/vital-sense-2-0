@@ -234,7 +234,16 @@ export const loadCalibrationSettings = async () => {
         if (typeof value === 'object' && value !== null && 'value' in value) {
           const settingKey = key.toUpperCase();
           if (settingKey in calibrationSettings) {
-            calibrationSettings[settingKey as keyof CalibrationSettings].value = value.value;
+            // Asegurarnos de que el valor sea numérico
+            const numericValue = typeof value.value === 'string' ? 
+              parseFloat(value.value) : 
+              Number(value.value);
+              
+            if (!isNaN(numericValue)) {
+              calibrationSettings[settingKey as keyof CalibrationSettings].value = numericValue;
+            } else {
+              console.warn(`Valor inválido para ${key}:`, value.value);
+            }
           }
         }
       });
