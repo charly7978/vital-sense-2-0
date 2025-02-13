@@ -1,16 +1,19 @@
 
 export class SignalExtractor {
   private readonly ROI_SIZE = 48;
-  private readonly MIN_RED_THRESHOLD = 135; // Aumentado para evitar falsos positivos
+  private readonly MIN_RED_THRESHOLD = 135;
   private readonly MAX_RED_THRESHOLD = 255;
-  private readonly MIN_VALID_PIXELS = 30; // Aumentado para requerir más área de dedo
+  private readonly MIN_VALID_PIXELS = 30;
   private lastFingerPresent: boolean = false;
-  private readonly STABILITY_THRESHOLD = 4; // Aumentado para mayor estabilidad
+  private readonly STABILITY_THRESHOLD = 8; // Aumentado para requerir más frames consecutivos
+  private readonly STABILITY_RESET_THRESHOLD = 4; // Nuevo: umbral para resetear la estabilidad
   private stabilityCounter: number = 0;
   private lastProcessingTime: number = 0;
   private readonly MIN_PROCESSING_INTERVAL = 33;
-  private readonly MIN_RED_DOMINANCE = 1.3; // Nuevo: asegura que el canal rojo sea dominante
-  private readonly MIN_SIGNAL_QUALITY = 0.4; // Nuevo: umbral mínimo de calidad
+  private readonly MIN_RED_DOMINANCE = 1.3;
+  private readonly MIN_SIGNAL_QUALITY = 0.4;
+  private readonly MIN_VALID_PIXEL_RATIO = 0.4; // Reducido para ser menos estricto
+  private consecutiveNegatives: number = 0; // Nuevo: contador para detecciones negativas consecutivas
 
   extractChannels(imageData: ImageData): { 
     red: number;
@@ -78,25 +81,28 @@ export class SignalExtractor {
       const redMedian = this.calculateMedian(redValues);
       const redRange = maxRed - minRed;
       const validPixelRatio = validPixelCount / totalPixels;
-      
-      // Lógica mejorada de detección de dedo
       const quality = this.calculateSignalQuality(redValues, validPixelCount, totalPixels, redRange);
       
+      // Lógica mejorada de detección de dedo con histéresis
       const currentFingerPresent = (
         redMedian >= this.MIN_RED_THRESHOLD && 
-        validPixelRatio >= 0.6 && // Al menos 60% de píxeles válidos
-        redRange >= 20 && // Asegurar variación significativa
-        quality >= this.MIN_SIGNAL_QUALITY // Calidad mínima requerida
+        validPixelRatio >= this.MIN_VALID_PIXEL_RATIO &&
+        redRange >= 20 &&
+        quality >= this.MIN_SIGNAL_QUALITY
       );
 
-      // Lógica de estabilidad más estricta
-      if (currentFingerPresent === this.lastFingerPresent) {
+      // Nueva lógica de estabilidad con histéresis
+      if (currentFingerPresent) {
+        this.consecutiveNegatives = 0;
         this.stabilityCounter = Math.min(this.stabilityCounter + 1, this.STABILITY_THRESHOLD);
       } else {
-        this.stabilityCounter = 0; // Reset completo al detectar cambio
+        this.consecutiveNegatives++;
+        if (this.consecutiveNegatives >= this.STABILITY_RESET_THRESHOLD) {
+          this.stabilityCounter = Math.max(0, this.stabilityCounter - 2); // Reducción gradual
+        }
       }
 
-      const finalFingerPresent = this.stabilityCounter >= this.STABILITY_THRESHOLD;
+      const finalFingerPresent = this.stabilityCounter >= this.STABILITY_THRESHOLD * 0.75; // Histéresis
       this.lastFingerPresent = finalFingerPresent;
 
       // Log detallado para debugging
@@ -109,6 +115,7 @@ export class SignalExtractor {
         quality: quality.toFixed(2),
         currentDetection: currentFingerPresent,
         stabilityCounter: this.stabilityCounter,
+        consecutiveNegatives: this.consecutiveNegatives,
         finalState: finalFingerPresent,
         maxRed,
         minRed
