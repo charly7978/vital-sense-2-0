@@ -408,6 +408,56 @@ export type Database = {
         }
         Relationships: []
       }
+      peak_detection_settings: {
+        Row: {
+          buffer_size: number
+          created_at: string
+          id: string
+          max_bpm: number
+          min_amplitude: number
+          min_bpm: number
+          min_distance: number
+          peak_memory: number
+          profile_id: string | null
+          threshold: number
+          updated_at: string
+        }
+        Insert: {
+          buffer_size?: number
+          created_at?: string
+          id?: string
+          max_bpm?: number
+          min_amplitude?: number
+          min_bpm?: number
+          min_distance?: number
+          peak_memory?: number
+          profile_id?: string | null
+          threshold?: number
+          updated_at?: string
+        }
+        Update: {
+          buffer_size?: number
+          created_at?: string
+          id?: string
+          max_bpm?: number
+          min_amplitude?: number
+          min_bpm?: number
+          min_distance?: number
+          peak_memory?: number
+          profile_id?: string | null
+          threshold?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "peak_detection_settings_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "calibration_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       performance_metrics: {
         Row: {
           cpu_usage_percent: number | null

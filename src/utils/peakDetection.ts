@@ -1,4 +1,6 @@
 
+import { supabase } from "@/integrations/supabase/client";
+
 /**
  * PeakDetector: Detector de picos en tiempo real para señal PPG
  * 
@@ -8,10 +10,10 @@
  */
 export class PeakDetector {
   private adaptiveThreshold = 0;
-  private readonly minPeakDistance = 200; // Reducido para ser más sensible
+  private readonly minPeakDistance = 200;
   private lastPeakTime = 0;
   private readonly bufferSize = 15;
-  private readonly minAmplitude = 0.003; // Reducido para detectar picos más pequeños
+  private readonly minAmplitude = 0.003;
   private readonly adaptiveRate = 0.35;
   private peakBuffer: number[] = [];
   private timeBuffer: number[] = [];
@@ -20,7 +22,38 @@ export class PeakDetector {
   private readonly minBPM = 40;
   private lastPeakValues: number[] = [];
   private readonly peakMemory = 5;
-  private readonly minPeakProminence = 0.05; // Reducido para mayor sensibilidad
+  private readonly minPeakProminence = 0.05;
+
+  constructor() {
+    this.loadConfiguration();
+  }
+
+  private async loadConfiguration() {
+    try {
+      const { data: settings, error } = await supabase
+        .from('peak_detection_settings')
+        .select('*')
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (settings) {
+        Object.assign(this, {
+          minPeakDistance: settings.min_distance,
+          bufferSize: settings.buffer_size,
+          minAmplitude: settings.min_amplitude,
+          maxBPM: settings.max_bpm,
+          minBPM: settings.min_bpm,
+          peakMemory: settings.peak_memory
+        });
+
+        console.log('Configuración de detección de picos cargada:', settings);
+      }
+    } catch (error) {
+      console.error('Error cargando configuración de picos:', error);
+    }
+  }
 
   detectPeak(signal: number[], peakThreshold: number = 1.0): boolean {
     if (signal.length < 5) return false;
