@@ -25,34 +25,26 @@ const HeartRateMonitor: React.FC = () => {
     processFrame
   } = useVitals();
 
-  // Capturar los valores del sensor de los logs
+  // Capturar los valores del sensor
   useEffect(() => {
-    const processFrameWithSensor = (imageData: ImageData) => {
-      const result = processFrame(imageData);
-      // Actualizar datos del sensor desde los logs
-      const logs = console.logs;
-      if (logs && logs.length > 0) {
-        const lastLog = logs[logs.length - 1];
-        if (lastLog && lastLog.includes('Detección de dedo')) {
-          try {
-            const data = JSON.parse(lastLog.split('Detección de dedo:')[1]);
-            setSensorData({
-              redValue: data.redMedian || 0,
-              signalRange: data.redRange || 0,
-              brightPixels: data.totalBrightPixels || 0
-            });
-          } catch (e) {
-            console.error('Error parsing sensor data:', e);
-          }
-        }
+    const originalLog = console.log;
+    console.log = (...args) => {
+      originalLog(...args);
+      if (typeof args[0] === 'string' && args[0] === 'Detección de dedo:' && args[1]) {
+        const data = args[1];
+        setSensorData({
+          redValue: data.redMedian || 0,
+          signalRange: data.redRange || 0,
+          brightPixels: data.totalBrightPixels || 0
+        });
       }
-      return result;
     };
 
     return () => {
+      console.log = originalLog;
       setSensorData({ redValue: 0, signalRange: 0, brightPixels: 0 });
     };
-  }, [processFrame]);
+  }, []);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-5xl mx-auto p-4">

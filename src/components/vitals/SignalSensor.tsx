@@ -2,6 +2,7 @@
 import React from 'react';
 import { Signal } from 'lucide-react';
 import { cn } from "@/lib/utils";
+import { Progress } from "@/components/ui/progress";
 
 interface SignalSensorProps {
   redValue: number;
@@ -16,14 +17,38 @@ const SignalSensor: React.FC<SignalSensorProps> = ({
   brightPixels,
   isActive
 }) => {
-  // Calcula la intensidad de la señal basada en los valores
-  const getSignalStrength = () => {
-    if (!isActive) return 0;
-    const normalizedStrength = Math.min(100, Math.max(0, (redValue / 255) * 100));
-    return Math.round(normalizedStrength);
+  const getSignalQuality = () => {
+    if (!isActive) return { quality: 0, text: "SIN SEÑAL", color: "text-red-500" };
+    
+    const quality = Math.min(100, Math.max(0, (redValue / 255) * 100));
+    
+    if (quality >= 75) return { 
+      quality, 
+      text: "SEÑAL EXCELENTE", 
+      color: "text-green-500",
+      progressColor: "bg-green-500"
+    };
+    if (quality >= 50) return { 
+      quality, 
+      text: "SEÑAL BUENA", 
+      color: "text-blue-500",
+      progressColor: "bg-blue-500"
+    };
+    if (quality >= 25) return { 
+      quality, 
+      text: "SEÑAL DÉBIL", 
+      color: "text-yellow-500",
+      progressColor: "bg-yellow-500"
+    };
+    return { 
+      quality, 
+      text: "SEÑAL MUY DÉBIL", 
+      color: "text-red-500",
+      progressColor: "bg-red-500"
+    };
   };
 
-  const signalStrength = getSignalStrength();
+  const signalStatus = getSignalQuality();
 
   return (
     <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4">
@@ -32,28 +57,26 @@ const SignalSensor: React.FC<SignalSensorProps> = ({
           <div className="flex items-center space-x-2">
             <Signal className={cn(
               "w-5 h-5",
-              isActive ? "text-green-500" : "text-red-500",
+              signalStatus.color,
               isActive && "animate-pulse"
             )} />
-            <span className="text-sm font-medium text-gray-200">Sensor PPG</span>
+            <span className="text-sm font-medium text-gray-200">Calidad de Señal</span>
           </div>
-          <span className={cn(
-            "font-bold",
-            isActive ? "text-green-500" : "text-red-500"
-          )}>
-            {signalStrength}%
+          <span className={cn("font-bold", signalStatus.color)}>
+            {Math.round(signalStatus.quality)}%
           </span>
         </div>
 
-        <div className="space-y-2">
-          <div className="grid grid-cols-2 gap-2 text-xs text-gray-400">
-            <div>Valor Rojo: <span className="text-white">{Math.round(redValue)}</span></div>
-            <div>Rango: <span className="text-white">{Math.round(signalRange)}</span></div>
-            <div>Píxeles Activos: <span className="text-white">{brightPixels}</span></div>
-            <div>Estado: <span className={isActive ? "text-green-500" : "text-red-500"}>
-              {isActive ? "ACTIVO" : "INACTIVO"}
-            </span></div>
-          </div>
+        <Progress 
+          value={signalStatus.quality} 
+          className="h-2"
+          indicatorClassName={cn(signalStatus.progressColor)}
+        />
+
+        <div className="text-center">
+          <span className={cn("font-semibold text-sm", signalStatus.color)}>
+            {signalStatus.text}
+          </span>
         </div>
       </div>
     </div>
