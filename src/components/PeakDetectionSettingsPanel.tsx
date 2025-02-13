@@ -26,11 +26,11 @@ export const PeakDetectionSettingsPanel = () => {
 
   const loadSettings = async () => {
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('peak_detection_settings')
         .select('*')
-        .limit(1)
-        .single();
+        .maybeSingle(); // Cambiado de .single() a .maybeSingle()
 
       if (error) throw error;
 
@@ -47,6 +47,12 @@ export const PeakDetectionSettingsPanel = () => {
         );
 
         setSettings(settingsArray);
+      } else {
+        // Si no hay datos, mostrar mensaje informativo
+        toast({
+          title: "Sin configuración",
+          description: "No se encontró configuración de detección de picos. Se usarán valores por defecto.",
+        });
       }
     } catch (error) {
       console.error('Error cargando configuración:', error);
@@ -68,7 +74,7 @@ export const PeakDetectionSettingsPanel = () => {
       const { error } = await supabase
         .from('peak_detection_settings')
         .update({ [id]: numValue })
-        .eq('id', 1);
+        .eq('id', 1); // Asumimos que solo hay una fila de configuración
 
       if (error) throw error;
 
@@ -111,7 +117,8 @@ export const PeakDetectionSettingsPanel = () => {
       min_brightness: 'Brillo mínimo requerido',
       min_valid_readings: 'Lecturas mínimas válidas',
       finger_detection_delay: 'Retraso detección dedo (ms)',
-      min_spo2: 'SpO2 mínimo permitido'
+      min_spo2: 'SpO2 mínimo permitido',
+      threshold: 'Umbral general de detección'
     };
     return descriptions[key] || 'Sin descripción disponible';
   };
