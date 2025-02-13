@@ -1,19 +1,5 @@
 
 export class SignalExtractor {
-  /**
-   * HISTORIAL DE CAMBIOS DETALLADO:
-   * ==============================
-   * 
-   * [2024-03-18] - REVISIÓN 7
-   * OBJETIVO: Eliminar la inestabilidad del sistema
-   * 
-   * CAMBIOS CRÍTICOS:
-   * 1. Implementación de buffer temporal para suavizar detección
-   * 2. Sistema de histéresis para evitar falsos cambios
-   * 3. Ventana de análisis más grande (64x64)
-   * 4. Filtrado de ruido mejorado
-   */
-
   private readonly ROI_SIZE = 64;
   private lastProcessingTime = 0;
   private readonly MIN_PROCESSING_INTERVAL = 33;
