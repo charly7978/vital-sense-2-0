@@ -1,44 +1,22 @@
+
 import { SignalFilter } from './signalFilter';
 
 export class SignalExtractor {
-  /**
-   * HISTORIAL DE CAMBIOS DETALLADO:
-   * ==============================
-   * 
-   * [2024-03-18] - REVISIÓN 8
-   * OBJETIVO: Mejorar el filtrado de ruido
-   * CAMBIO: Integración con SignalFilter para mejor procesamiento de señal
-   * AUTOR: Lovable AI
-   * 
-   * [2024-03-18] - REVISIÓN 7
-   * OBJETIVO: Documentar los cambios del sistema
-   * CAMBIO: Añadido sistema de documentación para seguimiento de modificaciones
-   * AUTOR: Lovable AI
-   * 
-   * PRÓXIMOS CAMBIOS PENDIENTES:
-   * - Implementación de buffer temporal
-   * - Sistema de histéresis
-   * - Ajuste de ventana de análisis
-   */
-
   private readonly ROI_SIZE = 64;
   private lastProcessingTime = 0;
   private readonly MIN_PROCESSING_INTERVAL = 33;
   private readonly MIN_VALID_PIXELS_RATIO = 0.6;
   private readonly signalFilter: SignalFilter;
-  
-  // Buffer para estabilidad y filtrado
   private redBuffer: number[] = [];
-  private readonly BUFFER_SIZE = 30; // 1 segundo a 30fps
+  private readonly BUFFER_SIZE = 30;
   private lastDetectionStates: boolean[] = [];
   private readonly DETECTION_BUFFER_SIZE = 5;
   private readonly MIN_CONSECUTIVE_DETECTIONS = 3;
 
   constructor() {
-    this.signalFilter = new SignalFilter(30); // 30fps
+    this.signalFilter = new SignalFilter(30);
   }
 
-  // Mantener último estado válido
   private lastValidState = {
     red: 0,
     ir: 0,
@@ -67,14 +45,13 @@ export class SignalExtractor {
     let sumRed = 0;
     let redValues: number[] = [];
 
-    // Análisis de ROI
+    // Análisis detallado de ROI
     for (let y = centerY - halfROI; y < centerY + halfROI; y++) {
       for (let x = centerX - halfROI; x < centerX + halfROI; x++) {
         if (y >= 0 && y < height && x >= 0 && x < width) {
           const i = (y * width + x) * 4;
           if (i >= 0 && i < data.length - 3) {
             const red = data[i];
-            // Filtrado inicial más permisivo
             if (red > 30 && red < 250) {
               redValues.push(red);
               sumRed += red;
@@ -85,16 +62,19 @@ export class SignalExtractor {
       }
     }
 
-    // Análisis estadístico robusto
     const validPixelsRatio = validPixels / (this.ROI_SIZE * this.ROI_SIZE);
     const avgRed = validPixels > 0 ? sumRed / validPixels : 0;
 
-    // Log valores sin procesar para diagnóstico
-    console.log('Valores de señal sin procesar:', {
-      avgRed,
-      validPixelsRatio,
-      totalPixels: this.ROI_SIZE * this.ROI_SIZE,
-      validPixels
+    // Log detallado de la señal raw
+    console.log('📷 Diagnóstico de captura:', {
+      intensidadRojaPromedio: avgRed,
+      pixelesValidos: validPixelsRatio * 100 + '%',
+      histograma: this.calcularHistograma(redValues),
+      dimensionesROI: {
+        ancho: this.ROI_SIZE,
+        alto: this.ROI_SIZE,
+        centro: { x: centerX, y: centerY }
+      }
     });
 
     // Actualizar buffer y aplicar filtrado
@@ -103,12 +83,11 @@ export class SignalExtractor {
       this.redBuffer.shift();
     }
     
-    // Aplicar filtrado avanzado solo si hay suficientes muestras
     const filteredRed = this.redBuffer.length >= this.BUFFER_SIZE 
       ? this.signalFilter.lowPassFilter(this.redBuffer)[this.redBuffer.length - 1]
       : avgRed;
 
-    // Análisis de distribución con señal filtrada
+    // Análisis estadístico robusto
     redValues.sort((a, b) => a - b);
     const q1Index = Math.floor(redValues.length * 0.25);
     const q3Index = Math.floor(redValues.length * 0.75);
@@ -116,52 +95,44 @@ export class SignalExtractor {
     const q3 = redValues[q3Index] || 0;
     const iqr = q3 - q1;
 
-    // Criterios más permisivos para detección
-    const hasEnoughPixels = validPixelsRatio > this.MIN_VALID_PIXELS_RATIO * 0.8; // 20% más permisivo
-    const hasGoodIntensity = filteredRed > 30 && filteredRed < 250; // Rango más amplio
-    const hasGoodDistribution = iqr < 120; // 20% más permisivo
+    // Criterios más detallados para detección
+    const hasEnoughPixels = validPixelsRatio > this.MIN_VALID_PIXELS_RATIO * 0.8;
+    const hasGoodIntensity = filteredRed > 30 && filteredRed < 250;
+    const hasGoodDistribution = iqr < 120;
 
-    // Detección inicial
     const currentDetection = hasEnoughPixels && hasGoodIntensity && hasGoodDistribution;
 
-    // Sistema de histéresis para estabilidad
     this.lastDetectionStates.push(currentDetection);
     if (this.lastDetectionStates.length > this.DETECTION_BUFFER_SIZE) {
       this.lastDetectionStates.shift();
     }
 
-    // Reducir el número de detecciones consecutivas necesarias
     const consecutiveDetections = this.lastDetectionStates.filter(x => x).length;
     const fingerPresent = consecutiveDetections >= Math.floor(this.MIN_CONSECUTIVE_DETECTIONS * 0.7);
 
-    // Calidad basada en estabilidad y señal filtrada
     const quality = fingerPresent ? 
       Math.min(1, validPixelsRatio * (consecutiveDetections / this.DETECTION_BUFFER_SIZE)) : 0;
 
-    // Log detallado después del procesamiento
-    console.log('Análisis de señal PPG:', {
-      estadísticas: {
-        promedioOriginal: avgRed,
-        promedioFiltrado: filteredRed,
-        pixelesValidos: validPixelsRatio,
-        q1,
-        q3,
-        iqr,
+    // Log detallado de análisis
+    console.log('🔍 Análisis de señal:', {
+      señalRaw: {
+        promedio: avgRed,
+        filtrada: filteredRed,
+        rangoDinamico: iqr
+      },
+      deteccion: {
+        pixelesValidos: hasEnoughPixels,
+        intensidadCorrecta: hasGoodIntensity,
+        distribucionCorrecta: hasGoodDistribution,
+        deteccionActual: currentDetection,
         deteccionesConsecutivas: consecutiveDetections
       },
-      criterios: {
-        suficientesPixeles: hasEnoughPixels,
-        intensidadBuena: hasGoodIntensity,
-        distribucionBuena: hasGoodDistribution
-      },
       resultado: {
-        deteccionActual: currentDetection,
         dedoPresente: fingerPresent,
-        calidadSeñal: quality
+        calidadSeñal: quality * 100 + '%'
       }
     });
 
-    // Actualizar último estado válido
     this.lastValidState = {
       red: fingerPresent ? filteredRed : 0,
       ir: 0,
@@ -170,5 +141,22 @@ export class SignalExtractor {
     };
 
     return { ...this.lastValidState };
+  }
+
+  private calcularHistograma(valores: number[]): { [key: string]: number } {
+    const histograma: { [key: string]: number } = {};
+    const rangos = ['0-50', '51-100', '101-150', '151-200', '201-255'];
+    
+    rangos.forEach(rango => histograma[rango] = 0);
+    
+    valores.forEach(valor => {
+      if (valor <= 50) histograma['0-50']++;
+      else if (valor <= 100) histograma['51-100']++;
+      else if (valor <= 150) histograma['101-150']++;
+      else if (valor <= 200) histograma['151-200']++;
+      else histograma['201-255']++;
+    });
+    
+    return histograma;
   }
 }
