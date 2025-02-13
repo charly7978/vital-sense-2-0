@@ -1,4 +1,3 @@
-
 import { PTTProcessor } from './pttProcessor';
 import { PPGFeatureExtractor } from './ppgFeatureExtractor';
 import { SignalFilter } from './signalFilter';
@@ -60,7 +59,12 @@ export class SignalProcessor {
       const redDC = this.calculateMovingAverage(redWindow, windowSize);
       const irDC = this.calculateMovingAverage(irWindow, windowSize);
 
-      const R = (redAC * irDC) / (irAC * redDC);
+      // Evitar divisiones por cero
+      const safeIrAC = Math.max(irAC, 0.001);
+      const safeIrDC = Math.max(irDC, 0.001);
+      const safeRedDC = Math.max(redDC, 0.001);
+
+      const R = (redAC * safeIrDC) / (safeIrAC * safeRedDC);
       
       let spo2 = 110 - 25 * R;
       
@@ -71,16 +75,16 @@ export class SignalProcessor {
       }
 
       const confidence = Math.min(
-        (redAC / redDC) * (irAC / irDC) * 100,
+        (redAC / safeRedDC) * (safeIrAC / safeIrDC) * 100,
         100
       );
 
       // Log resultados detallados
       console.log('⚡ Análisis SpO2:', {
         redAC,
-        irAC,
-        redDC,
-        irDC,
+        irAC: safeIrAC,
+        redDC: safeRedDC,
+        irDC: safeIrDC,
         R,
         spo2,
         confidence
@@ -264,7 +268,7 @@ export class SignalProcessor {
         diastolic: Math.round(this.lastValidPressure.diastolic * 0.8 + diastolic * 0.2)
       };
 
-      console.log('Estimación BP:', {
+      console.log('📊 Calculando presión arterial:', {
         systolic: this.lastValidPressure.systolic,
         diastolic: this.lastValidPressure.diastolic,
         avgPTT,
