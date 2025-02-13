@@ -6,18 +6,28 @@ export class SignalExtractor {
    * 
    * [2024-03-18] - REVISIÓN 1
    * Estado inicial: Detección inestable y falsos positivos
+   * Problema específico: La señal se perdía en medio de la medición
    * Cambio realizado: Simplificación completa del algoritmo
    * Resultado: No mejoró, seguía inestable
+   * Aprendizaje: La simplificación por sí sola no resuelve el problema
    * 
    * [2024-03-18] - REVISIÓN 2
    * Problema: No se detectaba ningún píxel (valores en 0)
+   * Causa probable: Umbral demasiado alto
    * Cambio realizado: Reducción de MIN_RED_THRESHOLD a 100
    * Resultado: La detección empeoró
+   * Aprendizaje: Bajar el umbral no mejoró la detección
    * 
    * [2024-03-18] - REVISIÓN 3
+   * PROBLEMA ACTUAL:
+   * - La detección es peor que nunca
+   * - Los valores están constantemente en 0
+   * - El sistema es inestable
+   * 
    * PRÓXIMO CAMBIO A PROBAR:
    * - Solo modificaremos MIN_RED_THRESHOLD
    * - Mantendremos el resto igual para aislar el efecto
+   * - Necesitamos entender por qué empeora al bajar el umbral
    */
 
   private readonly ROI_SIZE = 64; 
