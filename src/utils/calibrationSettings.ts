@@ -1,11 +1,12 @@
+
 import { CalibrationSettings } from './types';
 
 export const calibrationSettings: CalibrationSettings = {
   // Configuraciones de detección de señal
   MIN_RED_THRESHOLD: {
-    value: 800,
-    min: 450,  // Por debajo habría demasiados falsos positivos
-    max: 500,  // Por encima sería demasiado restrictivo
+    value: 135,
+    min: 100,  // Por debajo habría demasiados falsos positivos
+    max: 200,  // Por encima sería demasiado restrictivo
     step: 5,   // Ajustes en incrementos de 5 para cambios notables pero no bruscos
     description: "Umbral mínimo de componente roja para detectar dedo. Si lo subes, el sistema será más exigente para detectar un dedo (menos falsos positivos). Si lo bajas, será más sensible pero podría dar falsos positivos."
   },
@@ -27,17 +28,9 @@ export const calibrationSettings: CalibrationSettings = {
     description: "Umbral para detectar picos. Si lo subes, detectará menos picos pero más seguros. Si lo bajas, detectará más picos pero algunos podrían ser falsos."
   },
 
-  MIN_PEAK_DISTANCE: {
-    value: 250,
-    min: 150,  // Mínimo valor seguro para captar incluso taquicardias
-    max: 500,  // Máximo valor seguro para no perder bradicardias
-    step: 10,  // Ajustes en pasos de 10ms para cambios significativos
-    description: "Distancia mínima entre picos en ms. Si lo subes, evitas dobles detecciones pero podrías perder latidos rápidos. Si lo bajas, captas latidos más rápidos pero arriesgas dobles detecciones."
-  },
-
   // Configuraciones de procesamiento de señal
   BUFFER_SIZE: {
-    value: 40,
+    value: 60,
     min: 30,   // Mínimo necesario para análisis válido
     max: 120,  // Máximo práctico antes de que la latencia sea problemática
     step: 5,   // Ajustes en grupos de 5 frames
@@ -63,7 +56,7 @@ export const calibrationSettings: CalibrationSettings = {
 
   // Configuraciones de filtrado
   NOISE_REDUCTION: {
-    value: 2.9,
+    value: 1.2,
     min: 0.5,  // Mínimo filtrado útil
     max: 2.0,  // Máximo antes de perder demasiada información
     step: 0.1, // Ajustes finos
@@ -72,7 +65,7 @@ export const calibrationSettings: CalibrationSettings = {
 
   // Configuraciones de BPM
   BPM_SMOOTHING: {
-    value: 1.1,
+    value: 0.7,
     min: 0.3,  // Mínimo para mantener algo de estabilidad
     max: 0.9,  // Máximo antes de volverse demasiado lento
     step: 0.05, // Ajustes finos
@@ -140,7 +133,7 @@ export const calibrationSettings: CalibrationSettings = {
     description: "Picos mínimos necesarios para calcular ritmo cardíaco válido. Si lo subes, el HR será más preciso pero tardará más en mostrarse. Si lo bajas, verás el HR más rápido pero podría ser menos preciso."
   },
 
-  MIN_PEAK_DISTANCE: {
+  PEAK_DISTANCE_MIN: {  // Renombrado para evitar duplicación
     value: 200,
     min: 150,  // Mínimo para evitar dobles detecciones
     max: 400,  // Máximo para no perder picos reales
@@ -148,7 +141,7 @@ export const calibrationSettings: CalibrationSettings = {
     description: "Distancia mínima entre picos en ms. Si lo subes, evitas falsos positivos pero podrías perder latidos rápidos. Si lo bajas, detectas latidos más rápidos pero arriesgas detectar rebotes."
   },
 
-  MAX_PEAK_DISTANCE: {
+  PEAK_DISTANCE_MAX: {
     value: 2000,
     min: 1000, // Mínimo para bradicardias moderadas
     max: 3000, // Máximo absoluto para cualquier ritmo viable
