@@ -1,22 +1,23 @@
 
 export class SignalExtractor {
-  private readonly ROI_SIZE = 48;
-  // Aumentamos el umbral mínimo para asegurar que realmente hay un dedo
-  private readonly MIN_RED_THRESHOLD = 130; 
-  private readonly MAX_RED_THRESHOLD = 255;
-  private lastFingerPresent: boolean = false;
-  private lastProcessingTime: number = 0;
-  private readonly MIN_PROCESSING_INTERVAL = 33;
-
   /**
    * HISTORIAL DE CAMBIOS:
    * 
-   * [2024-03-18] - Problema: Falsos positivos en detección de dedo
-   * Cambios realizados:
-   * 1. Aumentado MIN_RED_THRESHOLD a 130
-   * 2. Implementada lógica más estricta para detección de dedo
-   * 3. Añadido sistema de logs detallados para debugging
+   * [2024-03-18] - REINICIO COMPLETO
+   * - Problema: Inestabilidad en la detección y falsos positivos
+   * - Solución: Reimplementación completa con lógica simplificada
+   * - Enfoque: Solo detectar presencia de dedo de forma confiable
+   * 
+   * PRINCIPIO DE FUNCIONAMIENTO:
+   * 1. Analiza solo el centro de la imagen (ROI pequeña)
+   * 2. Un dedo presente bloqueará la luz, resultando en una imagen más oscura
+   * 3. Detectamos esto midiendo la cantidad de píxeles rojos brillantes
    */
+
+  private readonly ROI_SIZE = 32; // Región más pequeña para mayor estabilidad
+  private readonly MIN_RED_THRESHOLD = 150; // Umbral más estricto
+  private lastProcessingTime = 0;
+  private readonly MIN_PROCESSING_INTERVAL = 100; // Aumentado para mayor estabilidad
 
   extractChannels(imageData: ImageData): { 
     red: number;
@@ -30,87 +31,58 @@ export class SignalExtractor {
         red: 0,
         ir: 0,
         quality: 0,
-        fingerPresent: this.lastFingerPresent
+        fingerPresent: false
       };
     }
     this.lastProcessingTime = now;
 
-    const { width, height, data } = imageData;
-    
-    const centerX = Math.floor(width / 2);
-    const centerY = Math.floor(height / 2);
-    const halfROI = Math.floor(this.ROI_SIZE / 2);
-
-    const redValues: number[] = [];
-    const greenValues: number[] = [];
-    let maxRed = 0;
-    let minRed = 255;
-    let totalBrightPixels = 0;
-    let validPixelsCount = 0;
-
     try {
-      // Análisis de píxeles en la región de interés
+      const { width, height, data } = imageData;
+      
+      // Solo analizamos el centro exacto de la imagen
+      const centerX = Math.floor(width / 2);
+      const centerY = Math.floor(height / 2);
+      const halfROI = Math.floor(this.ROI_SIZE / 2);
+
+      let totalRedValue = 0;
+      let pixelCount = 0;
+
+      // Análisis simple del centro de la imagen
       for (let y = centerY - halfROI; y < centerY + halfROI; y++) {
         for (let x = centerX - halfROI; x < centerX + halfROI; x++) {
           if (y >= 0 && y < height && x >= 0 && x < width) {
             const i = (y * width + x) * 4;
             if (i >= 0 && i < data.length - 3) {
               const red = data[i];
-              const green = data[i + 1];
-              const blue = data[i + 2];
-              
-              // Solo consideramos píxeles donde el rojo es dominante
-              if (red > green && red > blue) {
-                redValues.push(red);
-                greenValues.push(green);
-                
-                maxRed = Math.max(maxRed, red);
-                minRed = Math.min(minRed, red);
-
-                if (red > this.MIN_RED_THRESHOLD) {
-                  totalBrightPixels++;
-                }
-                validPixelsCount++;
+              if (red > this.MIN_RED_THRESHOLD) {
+                totalRedValue += red;
+                pixelCount++;
               }
             }
           }
         }
       }
 
-      const redMedian = this.calculateMedian(redValues);
-      const redRange = maxRed - minRed;
-      const brightPixelRatio = totalBrightPixels / (validPixelsCount || 1);
+      // Cálculo simple: si hay suficientes píxeles rojos brillantes, hay un dedo
+      const averageRed = pixelCount > 0 ? totalRedValue / pixelCount : 0;
+      const fingerPresent = pixelCount > (this.ROI_SIZE * this.ROI_SIZE * 0.4);
 
-      // Criterios más estrictos para detección de dedo
-      const fingerPresent = (
-        redMedian > this.MIN_RED_THRESHOLD && 
-        redRange > 30 &&
-        brightPixelRatio > 0.6 &&
-        validPixelsCount > (this.ROI_SIZE * this.ROI_SIZE * 0.3)
-      );
-
-      this.lastFingerPresent = fingerPresent;
-
-      // Log detallado para debugging
-      console.log('Detección de dedo:', {
-        redMedian,
-        redRange,
-        totalBrightPixels,
-        validPixelsCount,
-        brightPixelRatio,
-        fingerPresent,
-        maxRed,
-        minRed
+      // Log simplificado para debugging
+      console.log('Detección básica:', {
+        averageRed,
+        pixelCount,
+        threshold: this.ROI_SIZE * this.ROI_SIZE * 0.4,
+        fingerPresent
       });
 
       return {
-        red: fingerPresent ? redMedian : 0,
-        ir: fingerPresent ? this.calculateMedian(greenValues) : 0,
-        quality: fingerPresent ? redRange / 255 : 0,
+        red: fingerPresent ? averageRed : 0,
+        ir: 0, // No usamos IR por ahora
+        quality: fingerPresent ? pixelCount / (this.ROI_SIZE * this.ROI_SIZE) : 0,
         fingerPresent
       };
     } catch (error) {
-      console.error('Error en extracción de señal:', error);
+      console.error('Error en detección:', error);
       return {
         red: 0,
         ir: 0,
@@ -118,14 +90,5 @@ export class SignalExtractor {
         fingerPresent: false
       };
     }
-  }
-
-  private calculateMedian(values: number[]): number {
-    if (values.length === 0) return 0;
-    const sorted = [...values].sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 === 0
-      ? (sorted[mid - 1] + sorted[mid]) / 2
-      : sorted[mid];
   }
 }
