@@ -30,7 +30,7 @@ export const PeakDetectionSettingsPanel = () => {
       const { data, error } = await supabase
         .from('peak_detection_settings')
         .select('*')
-        .maybeSingle(); // Cambiado de .single() a .maybeSingle()
+        .maybeSingle();
 
       if (error) throw error;
 
@@ -43,12 +43,12 @@ export const PeakDetectionSettingsPanel = () => {
         })).filter(setting => 
           setting.id !== 'id' && 
           setting.id !== 'created_at' && 
-          setting.id !== 'updated_at'
+          setting.id !== 'updated_at' &&
+          setting.id !== 'profile_id'
         );
 
         setSettings(settingsArray);
       } else {
-        // Si no hay datos, mostrar mensaje informativo
         toast({
           title: "Sin configuración",
           description: "No se encontró configuración de detección de picos. Se usarán valores por defecto.",
@@ -74,7 +74,7 @@ export const PeakDetectionSettingsPanel = () => {
       const { error } = await supabase
         .from('peak_detection_settings')
         .update({ [id]: numValue })
-        .eq('id', 1); // Asumimos que solo hay una fila de configuración
+        .eq('id', '1'); // Cambiado a string '1' para corregir el error de tipos
 
       if (error) throw error;
 
