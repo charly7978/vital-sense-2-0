@@ -1,23 +1,27 @@
 
 export class SignalExtractor {
   /**
-   * HISTORIAL DE CAMBIOS:
+   * HISTORIAL DE CAMBIOS DETALLADO:
+   * ==============================
    * 
-   * [2024-03-18] - REINICIO COMPLETO
-   * - Problema: Inestabilidad en la detección y falsos positivos
-   * - Solución: Reimplementación completa con lógica simplificada
-   * - Enfoque: Solo detectar presencia de dedo de forma confiable
+   * [2024-03-18] - REVISIÓN 1
+   * Estado inicial: Detección inestable y falsos positivos
+   * Cambio realizado: Simplificación completa del algoritmo
+   * Resultado: No mejoró, seguía inestable
    * 
-   * [2024-03-18] - AJUSTE DE UMBRALES
-   * - Problema: No se detecta ningún píxel (todos los valores en 0)
-   * - Cambios: 
-   *   1. Reducido MIN_RED_THRESHOLD de 150 a 100
-   *   2. Aumentado ROI_SIZE de 32 a 64
-   *   3. Añadido logging de valores raw para mejor diagnóstico
+   * [2024-03-18] - REVISIÓN 2
+   * Problema: No se detectaba ningún píxel (valores en 0)
+   * Cambio realizado: Reducción de MIN_RED_THRESHOLD a 100
+   * Resultado: La detección empeoró
+   * 
+   * [2024-03-18] - REVISIÓN 3
+   * PRÓXIMO CAMBIO A PROBAR:
+   * - Solo modificaremos MIN_RED_THRESHOLD
+   * - Mantendremos el resto igual para aislar el efecto
    */
 
-  private readonly ROI_SIZE = 64; // Aumentado para capturar más área
-  private readonly MIN_RED_THRESHOLD = 100; // Reducido para detectar más píxeles
+  private readonly ROI_SIZE = 64; 
+  private readonly MIN_RED_THRESHOLD = 100;
   private lastProcessingTime = 0;
   private readonly MIN_PROCESSING_INTERVAL = 100;
 
