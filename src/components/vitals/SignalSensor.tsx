@@ -69,8 +69,7 @@ const SignalSensor: React.FC<SignalSensorProps> = ({
 
         <Progress 
           value={signalStatus.quality} 
-          className="h-2"
-          indicatorClassName={cn(signalStatus.progressColor)}
+          className={cn("h-2", signalStatus.progressColor)}
         />
 
         <div className="text-center">
