@@ -74,7 +74,7 @@ export const PeakDetectionSettingsPanel = () => {
       const { error } = await supabase
         .from('peak_detection_settings')
         .update({ [id]: numValue })
-        .eq('id', '1'); // Cambiado a string '1' para corregir el error de tipos
+        .eq('id', '1');
 
       if (error) throw error;
 
@@ -148,16 +148,14 @@ export const PeakDetectionSettingsPanel = () => {
               {setting.name}
               <span className="block text-sm text-gray-400">{setting.description}</span>
             </Label>
-            <div className="flex gap-2">
-              <Input
-                id={setting.id}
-                type="number"
-                value={setting.value}
-                onChange={(e) => handleSettingChange(setting.id, e.target.value)}
-                className="bg-black/10"
-                step="any"
-              />
-            </div>
+            <Input
+              id={setting.id}
+              type="number"
+              value={setting.value}
+              onChange={(e) => handleSettingChange(setting.id, e.target.value)}
+              className="bg-black/10"
+              step="any"
+            />
           </div>
         ))}
       </div>
