@@ -25,16 +25,39 @@ const HeartRateMonitor: React.FC = () => {
     processFrame
   } = useVitals();
 
+  // Log para diagnóstico de VitalsContext
+  useEffect(() => {
+    console.log('Estado de VitalsContext:', {
+      bpm,
+      spo2,
+      systolic,
+      diastolic,
+      isStarted,
+      fingerPresent,
+      readingsLength: readings.length
+    });
+  }, [bpm, spo2, systolic, diastolic, isStarted, fingerPresent, readings]);
+
+  // Log para diagnóstico de procesamiento de frames
+  useEffect(() => {
+    console.log('Estado del sensor:', {
+      redValue: sensorData.redValue,
+      signalRange: sensorData.signalRange,
+      brightPixels: sensorData.brightPixels,
+      fingerPresent
+    });
+  }, [sensorData, fingerPresent]);
+
   useEffect(() => {
     const originalLog = console.log;
     console.log = (...args) => {
       originalLog(...args);
-      if (typeof args[0] === 'string' && args[0] === 'Detección de dedo:' && args[1]) {
+      if (typeof args[0] === 'string' && args[0] === 'Análisis de señal PPG:' && args[1]) {
         const data = args[1];
         setSensorData({
-          redValue: data.redMedian || 0,
-          signalRange: data.redRange || 0,
-          brightPixels: data.totalBrightPixels || 0
+          redValue: data.estadísticas.promedioFiltrado || 0,
+          signalRange: data.estadísticas.iqr || 0,
+          brightPixels: data.estadísticas.pixelesValidos * 100 || 0
         });
       }
     };
@@ -44,6 +67,17 @@ const HeartRateMonitor: React.FC = () => {
       setSensorData({ redValue: 0, signalRange: 0, brightPixels: 0 });
     };
   }, []);
+
+  // Notificar al usuario cuando la cámara está activa pero no se detecta el dedo
+  useEffect(() => {
+    if (isStarted && !fingerPresent) {
+      toast({
+        title: "No se detecta el dedo",
+        description: "Por favor, coloque su dedo frente a la cámara para comenzar la medición.",
+        duration: 3000,
+      });
+    }
+  }, [isStarted, fingerPresent, toast]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 p-2">

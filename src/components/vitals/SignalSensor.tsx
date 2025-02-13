@@ -18,13 +18,23 @@ const SignalSensor: React.FC<SignalSensorProps> = ({
   isActive
 }) => {
   const getSignalQuality = () => {
-    if (!isActive) return { quality: 0, text: "SIN SEÑAL", color: "text-red-500" };
+    if (!isActive) return { 
+      quality: 0, 
+      text: "COLOQUE SU DEDO EN LA CÁMARA", 
+      color: "text-red-500",
+      progressColor: "bg-red-500/20"
+    };
     
-    const quality = Math.min(100, Math.max(0, (redValue / 255) * 100));
+    // Calidad basada en múltiples factores
+    const quality = Math.min(100, Math.max(0, (
+      (redValue / 255) * 50 +  // Intensidad de la señal
+      (1 - signalRange / 100) * 25 +  // Estabilidad de la señal
+      (brightPixels / 100) * 25  // Cobertura del sensor
+    )));
     
     if (quality >= 75) return { 
       quality, 
-      text: "SEÑAL EXCELENTE", 
+      text: "SEÑAL ÓPTIMA", 
       color: "text-green-500",
       progressColor: "bg-green-500"
     };
@@ -76,6 +86,21 @@ const SignalSensor: React.FC<SignalSensorProps> = ({
           <span className={cn("font-semibold text-sm", signalStatus.color)}>
             {signalStatus.text}
           </span>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 text-xs text-gray-400">
+          <div className="text-center">
+            <div className="font-semibold">Intensidad</div>
+            <div>{Math.round((redValue / 255) * 100)}%</div>
+          </div>
+          <div className="text-center">
+            <div className="font-semibold">Estabilidad</div>
+            <div>{Math.round(100 - signalRange)}%</div>
+          </div>
+          <div className="text-center">
+            <div className="font-semibold">Cobertura</div>
+            <div>{Math.round(brightPixels)}%</div>
+          </div>
         </div>
       </div>
     </div>
