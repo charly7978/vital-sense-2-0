@@ -215,6 +215,53 @@ export type Database = {
         }
         Relationships: []
       }
+      calibration_settings: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          key: string
+          max_value: number
+          min_value: number
+          profile_id: string | null
+          step: number
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          key: string
+          max_value: number
+          min_value: number
+          profile_id?: string | null
+          step: number
+          updated_at?: string
+          value: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          key?: string
+          max_value?: number
+          min_value?: number
+          profile_id?: string | null
+          step?: number
+          updated_at?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calibration_settings_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "calibration_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       measurement_history: {
         Row: {
           arrhythmia_analysis: Json | null
