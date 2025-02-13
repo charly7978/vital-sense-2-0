@@ -1,7 +1,7 @@
 
 export class SignalExtractor {
   private readonly ROI_SIZE = 48;
-  private readonly MIN_RED_THRESHOLD = 80; // Reducido para mayor sensibilidad
+  private readonly MIN_RED_THRESHOLD = 60; // Reducido aún más para Android
   private readonly MAX_RED_THRESHOLD = 255;
   private lastFingerPresent: boolean = false;
   private lastProcessingTime: number = 0;
@@ -52,7 +52,7 @@ export class SignalExtractor {
               maxRed = Math.max(maxRed, red);
               minRed = Math.min(minRed, red);
 
-              // Contar píxeles brillantes
+              // Contar píxeles brillantes con umbral más bajo
               if (red > this.MIN_RED_THRESHOLD) {
                 totalBrightPixels++;
               }
@@ -64,16 +64,16 @@ export class SignalExtractor {
       const redMedian = this.calculateMedian(redValues);
       const redRange = maxRed - minRed;
 
-      // Lógica simplificada de detección basada en mediana y rango
+      // Lógica simplificada con umbrales más bajos para Android
       const fingerPresent = (
         redMedian > this.MIN_RED_THRESHOLD && 
-        redRange > 30 && // Asegurar variación significativa
-        totalBrightPixels > 100 // Asegurar área mínima de detección
+        redRange > 20 && // Reducido para mayor sensibilidad
+        totalBrightPixels > 50 // Reducido para mayor sensibilidad
       );
 
       this.lastFingerPresent = fingerPresent;
 
-      // Log simple y directo de valores críticos
+      // Log detallado para el sensor
       console.log('Detección de dedo:', {
         redMedian,
         redRange,
