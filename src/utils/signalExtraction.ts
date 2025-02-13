@@ -24,14 +24,14 @@ export class SignalExtractor {
    * - Los valores están constantemente en 0
    * - El sistema es inestable
    * 
-   * PRÓXIMO CAMBIO A PROBAR:
-   * - Solo modificaremos MIN_RED_THRESHOLD
-   * - Mantendremos el resto igual para aislar el efecto
-   * - Necesitamos entender por qué empeora al bajar el umbral
+   * [2024-03-18] - REVISIÓN 4
+   * Problema identificado: Umbral (409.6) muy por encima del valor promedio de rojo (167)
+   * Cambio a realizar: Reducir MIN_RED_THRESHOLD a 50
+   * Hipótesis: Con un umbral más bajo deberíamos detectar más píxeles válidos
    */
 
   private readonly ROI_SIZE = 64; 
-  private readonly MIN_RED_THRESHOLD = 100;
+  private readonly MIN_RED_THRESHOLD = 50; // Reducido de 100 a 50
   private lastProcessingTime = 0;
   private readonly MIN_PROCESSING_INTERVAL = 100;
 
