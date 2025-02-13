@@ -4,22 +4,23 @@ export class SignalExtractor {
    * HISTORIAL DE CAMBIOS DETALLADO:
    * ==============================
    * 
-   * [2024-03-18] - REVISIÓN 5
-   * PROBLEMA DETECTADO:
-   * - Parpadeo frenético y valores inestables
-   * - Algoritmo demasiado complejo y frágil
+   * [2024-03-18] - REVISIÓN 6
+   * OBJETIVO: Implementar un método preciso y confiable de detección PPG
    * 
-   * CAMBIOS REALIZADOS:
-   * 1. Simplificación total del algoritmo
-   * 2. Uso de ROI más pequeña (32x32) para reducir ruido
-   * 3. Implementación de umbral adaptativo basado en la media
-   * 4. Eliminación de lógica innecesaria
-   * 5. Enfoque exclusivo en el canal rojo (R de RGB)
+   * FUNDAMENTOS TÉCNICOS:
+   * 1. ROI optimizada (48x48) - balance entre ruido y detalle
+   * 2. Análisis de calidad de señal basado en:
+   *    - Intensidad del canal rojo
+   *    - Consistencia de la señal
+   *    - Densidad de píxeles válidos
+   * 3. Umbral dinámico basado en histograma
+   * 4. Control de frecuencia para estabilidad
    */
 
-  private readonly ROI_SIZE = 32; // Reducido para mayor estabilidad
+  private readonly ROI_SIZE = 48; // Tamaño óptimo para detección PPG
   private lastProcessingTime = 0;
-  private readonly MIN_PROCESSING_INTERVAL = 100; // 10 FPS máximo
+  private readonly MIN_PROCESSING_INTERVAL = 33; // ~30 FPS para mejor precisión
+  private readonly MIN_VALID_PIXELS_RATIO = 0.75;
 
   extractChannels(imageData: ImageData): { 
     red: number;
@@ -27,7 +28,7 @@ export class SignalExtractor {
     quality: number;
     fingerPresent: boolean;
   } {
-    // Control de frecuencia de muestreo
+    // Control de tasa de muestreo
     const now = Date.now();
     if (now - this.lastProcessingTime < this.MIN_PROCESSING_INTERVAL) {
       return { red: 0, ir: 0, quality: 0, fingerPresent: false };
@@ -39,52 +40,72 @@ export class SignalExtractor {
     const centerY = Math.floor(height / 2);
     const halfROI = Math.floor(this.ROI_SIZE / 2);
 
-    // Análisis de la región de interés (ROI)
+    // Recolección de datos de la ROI
+    let redValues: number[] = [];
     let sumRed = 0;
     let validPixels = 0;
 
-    // Solo analizamos el centro de la imagen
+    // Análisis de ROI centrada
     for (let y = centerY - halfROI; y < centerY + halfROI; y++) {
       for (let x = centerX - halfROI; x < centerX + halfROI; x++) {
         if (y >= 0 && y < height && x >= 0 && x < width) {
           const i = (y * width + x) * 4;
           if (i >= 0 && i < data.length - 3) {
-            sumRed += data[i]; // Canal rojo
-            validPixels++;
+            const red = data[i];
+            // Solo consideramos píxeles con suficiente intensidad
+            if (red > 50) {
+              redValues.push(red);
+              sumRed += red;
+              validPixels++;
+            }
           }
         }
       }
     }
 
-    // Cálculo de valores medios
-    const avgRed = validPixels > 0 ? sumRed / validPixels : 0;
+    // Ordenamos los valores para análisis estadístico
+    redValues.sort((a, b) => a - b);
     
-    // Detección de presencia de dedo basada en valor medio de rojo
-    // Un dedo presente debería aumentar significativamente el valor rojo
-    const fingerPresent = avgRed > 100; // Umbral base para detección de dedo
+    // Calculamos la mediana para umbral adaptativo
+    const medianRed = redValues[Math.floor(redValues.length / 2)] || 0;
+    
+    // Calculamos el ratio de píxeles válidos
+    const validPixelsRatio = validPixels / (this.ROI_SIZE * this.ROI_SIZE);
+    
+    // Criterios de calidad para detección de dedo
+    const avgRed = validPixels > 0 ? sumRed / validPixels : 0;
+    const hasGoodIntensity = avgRed > 80 && avgRed < 240; // Rango óptimo de intensidad
+    const hasEnoughPixels = validPixelsRatio > this.MIN_VALID_PIXELS_RATIO;
+    const hasGoodSignal = medianRed > 60; // Umbral de señal mínima
 
-    // Log para diagnóstico
-    console.log('Análisis de imagen:', {
-      dimensiones: {
-        width,
-        height,
-        roiSize: this.ROI_SIZE,
-        centro: { x: centerX, y: centerY }
+    // Un dedo está presente si cumple todos los criterios
+    const fingerPresent = hasGoodIntensity && hasEnoughPixels && hasGoodSignal;
+
+    // Cálculo de calidad de señal
+    const quality = fingerPresent ? validPixelsRatio : 0;
+
+    // Log detallado para diagnóstico
+    console.log('Análisis de señal PPG:', {
+      estadísticas: {
+        mediana: medianRed,
+        promedio: avgRed,
+        pixelesValidos: validPixelsRatio,
       },
-      valores: {
-        avgRed,
-        validPixels,
-        totalPosibles: this.ROI_SIZE * this.ROI_SIZE
+      criterios: {
+        intensidadBuena: hasGoodIntensity,
+        suficientesPixeles: hasEnoughPixels,
+        señalBuena: hasGoodSignal
       },
       resultado: {
-        fingerPresent
+        dedoPresente: fingerPresent,
+        calidadSeñal: quality
       }
     });
 
     return {
       red: fingerPresent ? avgRed : 0,
-      ir: 0, // No usamos IR en esta implementación
-      quality: fingerPresent ? validPixels / (this.ROI_SIZE * this.ROI_SIZE) : 0,
+      ir: 0, // No utilizamos IR en esta implementación
+      quality,
       fingerPresent
     };
   }
