@@ -136,6 +136,7 @@ export type Database = {
       }
       calibration_patterns: {
         Row: {
+          affects: Json | null
           bpm_smoothing: Json
           buffer_size: Json
           created_at: string | null
@@ -168,6 +169,7 @@ export type Database = {
           window_size: Json
         }
         Insert: {
+          affects?: Json | null
           bpm_smoothing?: Json
           buffer_size?: Json
           created_at?: string | null
@@ -200,6 +202,7 @@ export type Database = {
           window_size?: Json
         }
         Update: {
+          affects?: Json | null
           bpm_smoothing?: Json
           buffer_size?: Json
           created_at?: string | null

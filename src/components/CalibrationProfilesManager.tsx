@@ -39,7 +39,20 @@ export const CalibrationProfilesManager = () => {
                 {setting.key}
               </Label>
               <p className="text-sm text-gray-500">{setting.description}</p>
-              <div className="flex items-center gap-2">
+              
+              {/* Mostrar componentes afectados si existen */}
+              {'affects' in setting && Array.isArray(setting.affects) && setting.affects.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-sm font-medium text-gray-600">Afecta a:</p>
+                  <ul className="text-sm text-gray-500 list-disc pl-4">
+                    {setting.affects.map((affect: string, index: number) => (
+                      <li key={index}>{affect}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              <div className="flex items-center gap-2 mt-2">
                 <Slider
                   id={setting.key}
                   min={setting.min}
