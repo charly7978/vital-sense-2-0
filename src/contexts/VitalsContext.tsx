@@ -1,8 +1,9 @@
 
-import React, { createContext, useContext, useState, useRef } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import { BeepPlayer } from '../utils/audioUtils';
 import { PPGProcessor } from '../utils/ppgProcessor';
-import { VitalReading, PPGData } from '../utils/types';
+import { SignalExtractor } from '../utils/signalExtraction';
+import { VitalReading } from '../utils/types';
 
 interface VitalsContextType {
   bpm: number;
@@ -20,8 +21,9 @@ interface VitalsContextType {
 
 const VitalsContext = createContext<VitalsContextType | undefined>(undefined);
 
-const beepPlayer = new BeepPlayer();
+const signalExtractor = new SignalExtractor();
 const ppgProcessor = new PPGProcessor();
+const beepPlayer = new BeepPlayer();
 
 export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [bpm, setBPM] = useState(0);
@@ -33,7 +35,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [readings, setReadings] = useState<VitalReading[]>([]);
   const [isStarted, setIsStarted] = useState(false);
   const [fingerPresent, setFingerPresent] = useState(false);
-  const [signalQuality, setSignalQuality] = useState(0);
 
   const toggleMeasurement = () => {
     setIsStarted(!isStarted);
@@ -43,6 +44,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setSPO2(0);
       setSystolic(0);
       setDiastolic(0);
+      ppgProcessor.reset();
     }
   };
 
@@ -50,31 +52,34 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!isStarted) return;
 
     const timestamp = Date.now();
-    const redValue = imageData.data[0];
+    const { red, ir, quality, fingerPresent: isFingerDetected } = signalExtractor.extractSignal(imageData);
     
-    // Calcular calidad de señal basado en el valor rojo
-    const quality = Math.max(0, Math.min(1, (redValue / 255) * 0.8));
-    setSignalQuality(quality);
-    
-    // Actualizar detección de dedo
-    const isFingerDetected = redValue > 100;
     setFingerPresent(isFingerDetected);
 
-    const newReading: VitalReading = {
-      timestamp,
-      value: Math.random() * 0.02 + 0.98,
-      redValue
-    };
+    if (isFingerDetected) {
+      const newReading: VitalReading = {
+        timestamp,
+        value: red / 255,
+        redValue: red
+      };
 
-    // Procesar señal con calidad
-    const newBPM = ppgProcessor.processSignal([newReading.value], timestamp, quality);
-    setBPM(Math.round(newBPM));
+      const newBPM = ppgProcessor.processSignal([newReading.value], timestamp, quality);
+      setBPM(Math.round(newBPM));
 
-    // Actualizar lecturas manteniendo solo las últimas 100
-    setReadings(prev => [...prev, newReading].slice(-100));
+      setReadings(prev => [...prev, newReading].slice(-100));
 
-    if (newBPM > 0 && isFingerDetected) {
-      beepPlayer.playBeep();
+      if (newBPM > 0) {
+        beepPlayer.playBeep();
+      }
+
+      // Cálculo de SpO2 (simplificado)
+      const redAC = Math.max(...readings.slice(-10).map(r => r.value)) - 
+                   Math.min(...readings.slice(-10).map(r => r.value));
+      const irAC = redAC * 0.98; // Simulación de IR
+      const spO2 = Math.round(110 - 25 * (redAC / irAC));
+      if (spO2 >= 80 && spO2 <= 100) {
+        setSPO2(spO2);
+      }
     }
   };
 

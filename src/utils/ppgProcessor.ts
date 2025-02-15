@@ -6,64 +6,61 @@ export class PPGProcessor {
   private peakDetector = new PeakDetector();
   private signalFilter = new SignalFilter();
   private bpmHistory: number[] = [];
-  private readonly historySize = 10;
+  private readonly MAX_HISTORY = 10;
   private lastBPM = 0;
   private lastValidTimestamp = 0;
-  private readonly MIN_QUALITY_THRESHOLD = 0.3;
+  private readonly MIN_QUALITY = 0.3;
+  private readonly BPM_RANGE = { min: 40, max: 200 };
 
   processSignal(signal: number[], timestamp: number, quality: number): number {
-    if (signal.length === 0 || quality < this.MIN_QUALITY_THRESHOLD) {
-      console.log('❌ Señal insuficiente:', {
-        longitudSeñal: signal.length,
-        calidad: quality,
-        umbralMinimo: this.MIN_QUALITY_THRESHOLD
+    if (!this.isValidSignal(signal, quality)) {
+      console.log('⚠️ Señal inválida:', { 
+        longitud: signal.length, 
+        calidad: quality 
       });
       return this.lastBPM;
     }
 
-    // Filtrar señal
     const filteredSignal = this.signalFilter.filterSignal(signal);
-    
-    console.log('🔍 Señal procesada:', {
-      señalOriginal: signal,
-      señalFiltrada: filteredSignal,
-      calidad: quality,
-      timestamp: timestamp
-    });
+    const peakDetected = this.peakDetector.detectPeak(filteredSignal, timestamp);
 
-    // Detectar picos
-    const detected = this.peakDetector.detectPeak(filteredSignal, timestamp);
-    
-    if (detected) {
-      const timeSinceLastPeak = timestamp - this.lastValidTimestamp;
-      const instantBPM = 60000 / timeSinceLastPeak;
+    if (peakDetected) {
+      const instantBPM = this.calculateInstantBPM(timestamp);
       
-      console.log('💓 Pico detectado:', {
-        tiempoDesdeUltimoPico: timeSinceLastPeak,
-        bpmInstantaneo: instantBPM
-      });
-
-      if (instantBPM >= 40 && instantBPM <= 200) {
-        this.bpmHistory.push(instantBPM);
-        if (this.bpmHistory.length > this.historySize) {
-          this.bpmHistory.shift();
-        }
-
-        // Calcular BPM promedio con pesos
-        const weightedBPM = this.calculateWeightedBPM();
-        this.lastBPM = Math.round(weightedBPM);
+      if (this.isValidBPM(instantBPM)) {
+        this.updateBPMHistory(instantBPM);
+        this.lastBPM = Math.round(this.calculateWeightedBPM());
         this.lastValidTimestamp = timestamp;
 
-        console.log('✅ BPM actualizado:', {
-          bpmPromedio: this.lastBPM,
+        console.log('💓 BPM actualizado:', {
+          instantaneo: instantBPM,
+          promedio: this.lastBPM,
           historial: this.bpmHistory
         });
-      } else {
-        console.log('⚠️ BPM fuera de rango:', instantBPM);
       }
     }
 
     return this.lastBPM;
+  }
+
+  private isValidSignal(signal: number[], quality: number): boolean {
+    return signal.length > 0 && quality >= this.MIN_QUALITY;
+  }
+
+  private calculateInstantBPM(timestamp: number): number {
+    const interval = timestamp - this.lastValidTimestamp;
+    return 60000 / interval;
+  }
+
+  private isValidBPM(bpm: number): boolean {
+    return bpm >= this.BPM_RANGE.min && bpm <= this.BPM_RANGE.max;
+  }
+
+  private updateBPMHistory(bpm: number): void {
+    this.bpmHistory.push(bpm);
+    if (this.bpmHistory.length > this.MAX_HISTORY) {
+      this.bpmHistory.shift();
+    }
   }
 
   private calculateWeightedBPM(): number {
@@ -71,13 +68,21 @@ export class PPGProcessor {
 
     let weightedSum = 0;
     let weightSum = 0;
-    
+
     this.bpmHistory.forEach((bpm, index) => {
-      const weight = Math.pow(1.2, index); // Dar más peso a las mediciones más recientes
+      const weight = Math.pow(1.2, index);
       weightedSum += bpm * weight;
       weightSum += weight;
     });
 
     return weightedSum / weightSum;
+  }
+
+  reset(): void {
+    this.bpmHistory = [];
+    this.lastBPM = 0;
+    this.lastValidTimestamp = 0;
+    this.signalFilter.reset();
+    this.peakDetector.reset();
   }
 }
