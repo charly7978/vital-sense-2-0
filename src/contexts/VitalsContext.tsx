@@ -2,9 +2,11 @@
 import React, { createContext, useContext, useState, useRef } from 'react';
 import { BeepPlayer } from '../utils/audioUtils';
 import { PPGProcessor } from '../utils/ppgProcessor';
+import { VitalReading } from '../utils/types';
 
 interface VitalsContextType {
   bpm: number;
+  readings: VitalReading[];
   startMeasurement: () => void;
   stopMeasurement: () => void;
 }
@@ -16,16 +18,19 @@ const ppgProcessor = new PPGProcessor();
 
 export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [bpm, setBPM] = useState(0);
+  const [readings, setReadings] = useState<VitalReading[]>([]);
   const processingRef = useRef<boolean>(false);
 
   const startMeasurement = () => {
     processingRef.current = true;
+    setReadings([]); // Reset readings when starting new measurement
     processSignal();
   };
 
   const stopMeasurement = () => {
     processingRef.current = false;
     setBPM(0);
+    setReadings([]); // Clear readings when stopping
   };
 
   const processSignal = () => {
@@ -38,6 +43,12 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const newBPM = ppgProcessor.processSignal([newSignal], timestamp);
     setBPM(newBPM);
 
+    // Agregar nueva lectura al array de readings
+    setReadings(prev => [...prev, {
+      timestamp: Date.now(),
+      value: newSignal
+    }].slice(-100)); // Mantener solo las últimas 100 lecturas
+
     if (newBPM > 0) {
       beepPlayer.playBeep();
     }
@@ -46,7 +57,12 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   return (
-    <VitalsContext.Provider value={{ bpm, startMeasurement, stopMeasurement }}>
+    <VitalsContext.Provider value={{ 
+      bpm, 
+      readings, // Incluir readings en el value del context
+      startMeasurement, 
+      stopMeasurement 
+    }}>
       {children}
     </VitalsContext.Provider>
   );
