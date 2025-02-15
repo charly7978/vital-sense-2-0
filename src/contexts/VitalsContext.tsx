@@ -2,18 +2,20 @@
 import React, { createContext, useContext, useState, useRef } from 'react';
 import { BeepPlayer } from '../utils/audioUtils';
 import { PPGProcessor } from '../utils/ppgProcessor';
-
-interface VitalReading {
-  timestamp: number;
-  value: number;
-}
+import { VitalReading, PPGData } from '../utils/types';
 
 interface VitalsContextType {
   bpm: number;
+  spo2: number;
+  systolic: number;
+  diastolic: number;
+  hasArrhythmia: boolean;
+  arrhythmiaType: string;
   readings: VitalReading[];
-  isMeasuring: boolean;
-  startMeasurement: () => void;
-  stopMeasurement: () => void;
+  isStarted: boolean;
+  fingerPresent: boolean;
+  toggleMeasurement: () => void;
+  processFrame: (imageData: ImageData) => void;
 }
 
 const VitalsContext = createContext<VitalsContextType | undefined>(undefined);
@@ -23,44 +25,67 @@ const ppgProcessor = new PPGProcessor();
 
 export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [bpm, setBPM] = useState(0);
+  const [spo2, setSPO2] = useState(0);
+  const [systolic, setSystolic] = useState(0);
+  const [diastolic, setDiastolic] = useState(0);
+  const [hasArrhythmia, setHasArrhythmia] = useState(false);
+  const [arrhythmiaType, setArrhythmiaType] = useState('');
   const [readings, setReadings] = useState<VitalReading[]>([]);
-  const [isMeasuring, setIsMeasuring] = useState(false);
-  const processingRef = useRef<boolean>(false);
+  const [isStarted, setIsStarted] = useState(false);
+  const [fingerPresent, setFingerPresent] = useState(false);
 
-  const startMeasurement = () => {
-    if (isMeasuring) return; // Evitar múltiples inicios
-    setIsMeasuring(true);
-    processingRef.current = true;
-    processSignal();
+  const toggleMeasurement = () => {
+    setIsStarted(!isStarted);
+    if (!isStarted) {
+      setReadings([]);
+      setBPM(0);
+      setSPO2(0);
+      setSystolic(0);
+      setDiastolic(0);
+    }
   };
 
-  const stopMeasurement = () => {
-    setIsMeasuring(false);
-    processingRef.current = false;
-    setBPM(0);
-    setReadings([]);
-  };
+  const processFrame = (imageData: ImageData) => {
+    if (!isStarted) return;
 
-  const processSignal = () => {
-    if (!processingRef.current) return;
+    // Simulación temporal de datos PPG
+    const timestamp = Date.now();
+    const newReading: VitalReading = {
+      timestamp,
+      value: Math.random() * 0.02 + 0.98,
+      redValue: imageData.data[0]
+    };
 
-    const newSignal = Math.random() * 0.02 + 0.98; // Simulación de señal estable
-    const timestamp = performance.now();
+    // Procesar señal y actualizar valores
+    const newBPM = ppgProcessor.processSignal([newReading.value], timestamp);
+    setBPM(Math.round(newBPM));
 
-    const newBPM = ppgProcessor.processSignal([newSignal], timestamp);
-    setBPM(newBPM);
+    // Actualizar lecturas manteniendo solo las últimas 100
+    setReadings(prev => [...prev, newReading].slice(-100));
 
-    setReadings((prev) => [...prev, { timestamp, value: newSignal }]);
+    // Detectar presencia del dedo basado en el valor rojo
+    const isFingerDetected = imageData.data[0] > 100;
+    setFingerPresent(isFingerDetected);
 
-    if (newBPM > 0) {
+    if (newBPM > 0 && isFingerDetected) {
       beepPlayer.playBeep();
     }
-
-    setTimeout(processSignal, 1000 / 30);
   };
 
   return (
-    <VitalsContext.Provider value={{ bpm, readings, isMeasuring, startMeasurement, stopMeasurement }}>
+    <VitalsContext.Provider value={{
+      bpm,
+      spo2,
+      systolic,
+      diastolic,
+      hasArrhythmia,
+      arrhythmiaType,
+      readings,
+      isStarted,
+      fingerPresent,
+      toggleMeasurement,
+      processFrame
+    }}>
       {children}
     </VitalsContext.Provider>
   );
