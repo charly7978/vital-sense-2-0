@@ -2,7 +2,11 @@
 import React, { createContext, useContext, useState, useRef } from 'react';
 import { BeepPlayer } from '../utils/audioUtils';
 import { PPGProcessor } from '../utils/ppgProcessor';
-import { VitalReading } from '../utils/types';
+
+interface VitalReading {
+  timestamp: number;
+  value: number;
+}
 
 interface VitalsContextType {
   bpm: number;
@@ -18,36 +22,30 @@ const ppgProcessor = new PPGProcessor();
 
 export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [bpm, setBPM] = useState(0);
-  const [readings, setReadings] = useState<VitalReading[]>([]);
+  const [readings, setReadings] = useState<VitalReading[]>([]); // Asegurar que `readings` es un array vacío por defecto
   const processingRef = useRef<boolean>(false);
 
   const startMeasurement = () => {
     processingRef.current = true;
-    setReadings([]); // Reset readings when starting new measurement
     processSignal();
   };
 
   const stopMeasurement = () => {
     processingRef.current = false;
     setBPM(0);
-    setReadings([]); // Clear readings when stopping
+    setReadings([]); // Asegurar que `readings` se reinicie correctamente
   };
 
   const processSignal = () => {
     if (!processingRef.current) return;
 
-    // Simulación de un nuevo valor de señal (esto debe venir del sensor real)
     const newSignal = Math.random() * 0.02 + 0.98; // Simulación de señal estable
     const timestamp = performance.now();
 
     const newBPM = ppgProcessor.processSignal([newSignal], timestamp);
     setBPM(newBPM);
 
-    // Agregar nueva lectura al array de readings
-    setReadings(prev => [...prev, {
-      timestamp: Date.now(),
-      value: newSignal
-    }].slice(-100)); // Mantener solo las últimas 100 lecturas
+    setReadings((prev) => [...prev, { timestamp, value: newSignal }]);
 
     if (newBPM > 0) {
       beepPlayer.playBeep();
@@ -57,12 +55,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   return (
-    <VitalsContext.Provider value={{ 
-      bpm, 
-      readings, // Incluir readings en el value del context
-      startMeasurement, 
-      stopMeasurement 
-    }}>
+    <VitalsContext.Provider value={{ bpm, readings, startMeasurement, stopMeasurement }}>
       {children}
     </VitalsContext.Provider>
   );
