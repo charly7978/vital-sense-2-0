@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Signal } from 'lucide-react';
 import { cn } from "@/lib/utils";
@@ -11,16 +12,15 @@ interface SignalSensorProps {
 }
 
 const SignalSensor: React.FC<SignalSensorProps> = ({
-  redValue,
-  signalRange,
-  brightPixels,
-  isActive
+  redValue = 0,  
+  signalRange = 0,
+  brightPixels = 0,
+  isActive = false
 }) => {
   const [filteredSignal, setFilteredSignal] = useState(0);
 
-  // Filtro de señal (media móvil)
   useEffect(() => {
-    const bufferSize = 10;
+    const bufferSize = 15; // Aumentamos la cantidad de muestras para mejorar estabilidad
     let buffer: number[] = [];
 
     const updateSignal = () => {
@@ -33,21 +33,21 @@ const SignalSensor: React.FC<SignalSensorProps> = ({
   }, [redValue]);
 
   const getSignalQuality = () => {
-    if (!isActive) return { 
+    if (!isActive || filteredSignal < 50) return { 
       quality: 0, 
       text: "COLOQUE SU DEDO EN LA CÁMARA", 
       color: "text-red-500",
       progressColor: "bg-red-500/20"
     };
 
-    // Nueva lógica de calidad de señal con filtrado
+    // Usamos una validación más estricta para evitar falsos positivos
     const quality = Math.min(100, Math.max(0, (
       (filteredSignal / 255) * 50 +  
       (1 - signalRange / 100) * 25 +  
       (brightPixels / 100) * 25  
     )));
 
-    if (quality >= 75) return { 
+    if (quality >= 80) return { 
       quality, 
       text: "SEÑAL ÓPTIMA", 
       color: "text-green-500",
