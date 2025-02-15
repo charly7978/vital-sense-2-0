@@ -27,8 +27,8 @@ export class PPGProcessor {
     console.log('🔍 Señal procesada:', {
       señalOriginal: signal,
       señalFiltrada: filteredSignal,
-      calidad,
-      timestamp
+      calidad: quality,
+      timestamp: timestamp
     });
 
     // Detectar picos

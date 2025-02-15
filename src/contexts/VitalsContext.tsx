@@ -33,6 +33,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [readings, setReadings] = useState<VitalReading[]>([]);
   const [isStarted, setIsStarted] = useState(false);
   const [fingerPresent, setFingerPresent] = useState(false);
+  const [signalQuality, setSignalQuality] = useState(0);
 
   const toggleMeasurement = () => {
     setIsStarted(!isStarted);
@@ -48,24 +49,29 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const processFrame = (imageData: ImageData) => {
     if (!isStarted) return;
 
-    // Simulación temporal de datos PPG
     const timestamp = Date.now();
+    const redValue = imageData.data[0];
+    
+    // Calcular calidad de señal basado en el valor rojo
+    const quality = Math.max(0, Math.min(1, (redValue / 255) * 0.8));
+    setSignalQuality(quality);
+    
+    // Actualizar detección de dedo
+    const isFingerDetected = redValue > 100;
+    setFingerPresent(isFingerDetected);
+
     const newReading: VitalReading = {
       timestamp,
       value: Math.random() * 0.02 + 0.98,
-      redValue: imageData.data[0]
+      redValue
     };
 
-    // Procesar señal y actualizar valores
-    const newBPM = ppgProcessor.processSignal([newReading.value], timestamp);
+    // Procesar señal con calidad
+    const newBPM = ppgProcessor.processSignal([newReading.value], timestamp, quality);
     setBPM(Math.round(newBPM));
 
     // Actualizar lecturas manteniendo solo las últimas 100
     setReadings(prev => [...prev, newReading].slice(-100));
-
-    // Detectar presencia del dedo basado en el valor rojo
-    const isFingerDetected = imageData.data[0] > 100;
-    setFingerPresent(isFingerDetected);
 
     if (newBPM > 0 && isFingerDetected) {
       beepPlayer.playBeep();
