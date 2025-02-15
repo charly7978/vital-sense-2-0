@@ -17,24 +17,16 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   const { toast } = useToast();
   const [videoInitialized, setVideoInitialized] = useState(false);
   const isMobile = useIsMobile();
-  const isAndroid = /android/i.test(navigator.userAgent);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [flashEnabled, setFlashEnabled] = useState(false);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
 
   const getDeviceConstraints = () => {
-    const constraints: MediaTrackConstraints = {
+    return {
       width: { ideal: 1280 },
       height: { ideal: 720 },
       facingMode: isMobile ? "environment" : "user"
     };
-
-    if (isAndroid) {
-      constraints.advanced = [{ torch: true }];
-    }
-
-    return constraints;
   };
 
   const handleCameraError = (error: any) => {
@@ -57,40 +49,6 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
     });
   };
 
-  const enableFlash = async () => {
-    if (!mediaStreamRef.current || !isAndroid) return;
-
-    try {
-      const track = mediaStreamRef.current.getVideoTracks()[0];
-      await track.applyConstraints({
-        advanced: [{ torch: true }]
-      });
-      setFlashEnabled(true);
-      console.log('Linterna activada');
-    } catch (error) {
-      console.warn('No se pudo activar la linterna:', error);
-      toast({
-        title: "Aviso",
-        description: "Asegúrate de tener buena iluminación para la medición"
-      });
-    }
-  };
-
-  const disableFlash = async () => {
-    if (!mediaStreamRef.current || !isAndroid) return;
-
-    try {
-      const track = mediaStreamRef.current.getVideoTracks()[0];
-      await track.applyConstraints({
-        advanced: [{ torch: false }]
-      });
-      setFlashEnabled(false);
-      console.log('Linterna desactivada');
-    } catch (error) {
-      console.warn('Error al desactivar la linterna:', error);
-    }
-  };
-
   const processFrame = () => {
     if (!isActive || !webcamRef.current?.video || !canvasRef.current || !cameraReady) {
       animationFrameRef.current = requestAnimationFrame(processFrame);
@@ -106,7 +64,6 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
       return;
     }
 
-    // Ajustar dimensiones del canvas si es necesario
     if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
@@ -127,9 +84,8 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   const setupCamera = async () => {
     try {
       if (isActive && !mediaStreamRef.current) {
-        const constraints = getDeviceConstraints();
         const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: constraints,
+          video: getDeviceConstraints(),
           audio: false 
         });
 
@@ -140,10 +96,6 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
           setCameraReady(true);
         }
 
-        if (isAndroid) {
-          await enableFlash();
-        }
-
         setCameraError(null);
         processFrame();
       }
@@ -152,11 +104,8 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
     }
   };
 
-  const cleanupCamera = async () => {
+  const cleanupCamera = () => {
     if (mediaStreamRef.current) {
-      if (isAndroid && flashEnabled) {
-        await disableFlash();
-      }
       mediaStreamRef.current.getTracks().forEach(track => track.stop());
       mediaStreamRef.current = null;
     }
