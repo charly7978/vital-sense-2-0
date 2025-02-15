@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Signal } from 'lucide-react';
+import { Signal, Fingerprint } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 
@@ -20,17 +20,27 @@ const SignalSensor: React.FC<SignalSensorProps> = ({
   const [filteredSignal, setFilteredSignal] = useState(0);
 
   useEffect(() => {
-    const bufferSize = 15; // Aumentamos la cantidad de muestras para mejorar estabilidad
+    const bufferSize = 15;
     let buffer: number[] = [];
 
     const updateSignal = () => {
       buffer.push(redValue);
       if (buffer.length > bufferSize) buffer.shift();
-      setFilteredSignal(buffer.reduce((a, b) => a + b, 0) / buffer.length);
+      const newFilteredSignal = buffer.reduce((a, b) => a + b, 0) / buffer.length;
+      setFilteredSignal(newFilteredSignal);
+      
+      console.log('📊 Análisis de señal PPG:', {
+        señalRaw: redValue,
+        señalFiltrada: newFilteredSignal,
+        rangoSeñal: signalRange,
+        pixelesValidos: brightPixels,
+        dedoDetectado: isActive,
+        calidadSeñal: getSignalQuality().quality
+      });
     };
 
     updateSignal();
-  }, [redValue]);
+  }, [redValue, signalRange, brightPixels, isActive]);
 
   const getSignalQuality = () => {
     if (!isActive || filteredSignal < 50) return { 
@@ -40,7 +50,6 @@ const SignalSensor: React.FC<SignalSensorProps> = ({
       progressColor: "bg-red-500/20"
     };
 
-    // Usamos una validación más estricta para evitar falsos positivos
     const quality = Math.min(100, Math.max(0, (
       (filteredSignal / 255) * 50 +  
       (1 - signalRange / 100) * 25 +  
@@ -72,7 +81,15 @@ const SignalSensor: React.FC<SignalSensorProps> = ({
 
   return (
     <div className="flex flex-col items-center space-y-2">
-      <Signal className={cn("w-6 h-6", color)} />
+      <div className="flex items-center space-x-2">
+        <Signal className={cn("w-6 h-6", color)} />
+        <Fingerprint 
+          className={cn(
+            "w-6 h-6 transition-all duration-300",
+            isActive ? "text-green-500 scale-110" : "text-red-500 scale-90 opacity-50"
+          )}
+        />
+      </div>
       <span className={cn("text-sm font-medium", color)}>{text}</span>
       <Progress value={quality} className={cn("w-full h-2", progressColor)} />
     </div>
