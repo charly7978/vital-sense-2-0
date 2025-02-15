@@ -5,17 +5,17 @@ import { Button } from "@/components/ui/button";
 import { useVitals } from "@/contexts/VitalsContext";
 
 const MeasurementControls: React.FC = () => {
-  const { isMeasuring, startMeasurement, stopMeasurement } = useVitals();
+  const { isStarted, toggleMeasurement } = useVitals();
 
   return (
     <div className="w-full flex items-center justify-center">
       <Button
-        onClick={isMeasuring ? stopMeasurement : startMeasurement}
+        onClick={toggleMeasurement}
         size="lg"
-        variant={isMeasuring ? "destructive" : "default"}
+        variant={isStarted ? "destructive" : "default"}
         className="w-full md:w-auto min-w-[200px] text-lg gap-2"
       >
-        {isMeasuring ? (
+        {isStarted ? (
           <>
             <StopCircle className="w-5 h-5" />
             Detener Medición

@@ -21,11 +21,9 @@ const HeartRateMonitor: React.FC = () => {
     readings,
     isStarted,
     fingerPresent,
-    toggleMeasurement,
     processFrame
   } = useVitals();
 
-  // Log para diagnóstico de VitalsContext
   useEffect(() => {
     console.log('Estado de VitalsContext:', {
       bpm,
@@ -38,7 +36,6 @@ const HeartRateMonitor: React.FC = () => {
     });
   }, [bpm, spo2, systolic, diastolic, isStarted, fingerPresent, readings]);
 
-  // Log para diagnóstico de procesamiento de frames
   useEffect(() => {
     console.log('Estado del sensor:', {
       redValue: sensorData.redValue,
@@ -68,7 +65,6 @@ const HeartRateMonitor: React.FC = () => {
     };
   }, []);
 
-  // Notificar al usuario cuando la cámara está activa pero no se detecta el dedo
   useEffect(() => {
     if (isStarted && !fingerPresent) {
       toast({
@@ -115,10 +111,7 @@ const HeartRateMonitor: React.FC = () => {
           <VitalChart data={readings} color="#ea384c" />
         </div>
 
-        <MeasurementControls
-          isStarted={isStarted}
-          onToggleMeasurement={toggleMeasurement}
-        />
+        <MeasurementControls />
       </div>
     </div>
   );
