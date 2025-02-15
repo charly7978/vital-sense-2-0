@@ -1,4 +1,3 @@
-
 import { VitalReading, PPGData, SensitivitySettings, ProcessingSettings } from './types';
 import { BeepPlayer } from './audioUtils';
 import { SignalProcessor } from './signalProcessing';
@@ -15,7 +14,7 @@ export class PPGProcessor {
   private irBuffer: number[] = [];
   private peakTimes: number[] = [];
   private readonly samplingRate = 30;
-  private readonly windowSize = 90; // Reducido para respuesta más rápida
+  private readonly windowSize = 150;
   private readonly signalProcessor: SignalProcessor;
   private readonly signalExtractor: SignalExtractor;
   private readonly peakDetector: PeakDetector;
@@ -24,24 +23,24 @@ export class PPGProcessor {
   private readonly frequencyAnalyzer: SignalFrequencyAnalyzer;
   private beepPlayer: BeepPlayer;
   private signalBuffer: number[] = [];
-  private readonly bufferSize = 60; // Reducido para respuesta más rápida
-  private readonly qualityThreshold = 0.15; // Reducido para mayor sensibilidad
+  private readonly bufferSize = 90;
+  private readonly qualityThreshold = 0.2;
   private mlModel: MLModel;
   private lastProcessingTime: number = 0;
   private readonly minProcessingInterval = 33;
   private lastValidBpm: number = 0;
   private lastValidSpO2: number = 98;
   private noFingerTimer: number | null = null;
-  private readonly RESET_DELAY = 1000;
+  private readonly RESET_DELAY = 1000; // 1 segundo sin dedo para resetear
   
   private sensitivitySettings: SensitivitySettings = {
-    signalAmplification: 2.0, // Aumentado para mayor sensibilidad
+    signalAmplification: 1.5,
     noiseReduction: 1.2,
     peakDetection: 1.3
   };
   
   constructor() {
-    console.log('Inicializando PPGProcessor con nueva configuración...');
+    console.log('Inicializando PPGProcessor...');
     this.beepPlayer = new BeepPlayer();
     this.signalProcessor = new SignalProcessor(this.windowSize);
     this.signalExtractor = new SignalExtractor();
@@ -67,40 +66,13 @@ export class PPGProcessor {
     const now = Date.now();
     
     try {
-      const { red, ir, quality, fingerPresent } = this.signalExtractor.extractChannels(imageData);
-
-      console.log('Procesando frame:', {
-        red,
-        quality,
-        fingerPresent,
-        bufferLength: this.redBuffer.length
-      });
-
       if (now - this.lastProcessingTime < this.minProcessingInterval) {
-        return {
-          bpm: this.lastValidBpm,
-          spo2: this.lastValidSpO2,
-          systolic: 0,
-          diastolic: 0,
-          hasArrhythmia: false,
-          arrhythmiaType: 'Normal',
-          signalQuality: quality,
-          confidence: 0,
-          readings: this.readings,
-          isPeak: false,
-          redValue: red,
-          fingerPresent: fingerPresent,
-          hrvMetrics: {
-            sdnn: 0,
-            rmssd: 0,
-            pnn50: 0,
-            lfhf: 0
-          }
-        };
+        return null;
       }
-      
       this.lastProcessingTime = now;
 
+      const { red, ir, quality, fingerPresent } = this.signalExtractor.extractChannels(imageData);
+      
       if (!fingerPresent) {
         if (this.noFingerTimer === null) {
           this.noFingerTimer = now;
@@ -114,12 +86,11 @@ export class PPGProcessor {
           diastolic: 0,
           hasArrhythmia: false,
           arrhythmiaType: 'Normal',
-          signalQuality: quality,
+          signalQuality: 0,
           confidence: 0,
-          readings: [],
+          readings: this.readings,
           isPeak: false,
           redValue: red,
-          fingerPresent: fingerPresent,
           hrvMetrics: {
             sdnn: 0,
             rmssd: 0,
@@ -131,18 +102,18 @@ export class PPGProcessor {
 
       this.noFingerTimer = null;
 
-      // Limitar tamaño del buffer antes de agregar nuevos valores
-      if (this.redBuffer.length >= this.bufferSize) {
-        this.redBuffer = this.redBuffer.slice(-Math.floor(this.bufferSize * 0.8));
-        this.irBuffer = this.irBuffer.slice(-Math.floor(this.bufferSize * 0.8));
-      }
-
       // Amplificar y almacenar señales
       const amplifiedRed = red * this.sensitivitySettings.signalAmplification;
       const amplifiedIr = ir * this.sensitivitySettings.signalAmplification;
       
       this.redBuffer.push(amplifiedRed);
       this.irBuffer.push(amplifiedIr);
+      
+      // Mantener tamaño de buffer
+      if (this.redBuffer.length > this.bufferSize) {
+        this.redBuffer = this.redBuffer.slice(-this.bufferSize);
+        this.irBuffer = this.irBuffer.slice(-this.bufferSize);
+      }
 
       // Filtrar señal
       const filteredRed = this.signalFilter.lowPassFilter(this.redBuffer);
@@ -152,9 +123,10 @@ export class PPGProcessor {
         filteredRed[filteredRed.length - 1]
       );
       
+      // Agregar a lecturas
       this.readings.push({ timestamp: now, value: normalizedValue });
       if (this.readings.length > this.bufferSize) {
-        this.readings = this.readings.slice(-Math.floor(this.bufferSize * 0.8));
+        this.readings = this.readings.slice(-this.bufferSize);
       }
       
       // Detectar picos con señal filtrada
@@ -166,40 +138,47 @@ export class PPGProcessor {
       if (isPeak && quality > this.qualityThreshold) {
         this.peakTimes.push(now);
         await this.beepPlayer.playBeep('heartbeat');
-        console.log('Pico detectado - reproduciendo beep');
       }
 
-      // Mantener solo picos recientes (últimos 5 segundos)
-      const recentPeakTimes = this.peakTimes.filter(t => now - t < 5000);
-      this.peakTimes = recentPeakTimes;
+      // Mantener solo los últimos picos relevantes
+      const recentPeaks = this.peakTimes.filter(t => now - t < 5000);
+      this.peakTimes = recentPeaks;
 
-      // Calcular BPM basado en intervalos entre picos
-      if (recentPeakTimes.length >= 2) {
-        const intervals = [];
-        for (let i = 1; i < recentPeakTimes.length; i++) {
-          intervals.push(recentPeakTimes[i] - recentPeakTimes[i-1]);
-        }
-        const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-        const calculatedBpm = Math.round(60000 / avgInterval);
-        
-        if (calculatedBpm >= 40 && calculatedBpm <= 200) {
-          this.lastValidBpm = Math.round(
-            this.lastValidBpm * 0.7 + calculatedBpm * 0.3
-          );
-          console.log('BPM calculado:', this.lastValidBpm);
-        }
+      if (this.redBuffer.length < this.bufferSize) {
+        console.log('Buffer insuficiente:', this.redBuffer.length);
+        return null;
+      }
+
+      // Análisis de frecuencia y cálculo de BPM
+      const { frequencies, magnitudes } = this.frequencyAnalyzer.performFFT(filteredRed);
+      const dominantFreqIndex = magnitudes.indexOf(Math.max(...magnitudes));
+      const dominantFreq = frequencies[dominantFreqIndex];
+      let calculatedBpm = Math.round(dominantFreq * 60);
+      
+      // Validar BPM
+      if (calculatedBpm >= 40 && calculatedBpm <= 200) {
+        this.lastValidBpm = Math.round(this.lastValidBpm * 0.7 + calculatedBpm * 0.3);
       }
 
       // Calcular SpO2
       const spo2Result = this.signalProcessor.calculateSpO2(this.redBuffer, this.irBuffer);
-      if (spo2Result.spo2 >= 80 && spo2Result.spo2 <= 100 && quality > this.qualityThreshold) {
-        this.lastValidSpO2 = Math.round(
-          this.lastValidSpO2 * 0.7 + spo2Result.spo2 * 0.3
-        );
+      if (spo2Result.spo2 >= 80 && spo2Result.spo2 <= 100) {
+        this.lastValidSpO2 = Math.round(this.lastValidSpO2 * 0.7 + spo2Result.spo2 * 0.3);
       }
 
+      // Análisis de ritmo cardíaco
       const hrvAnalysis = this.signalProcessor.analyzeHRV(this.peakTimes);
+      
+      // Calcular presión arterial
       const bp = await this.signalProcessor.estimateBloodPressure(filteredRed, this.peakTimes);
+
+      console.log('Procesamiento:', {
+        bpm: this.lastValidBpm,
+        spo2: this.lastValidSpO2,
+        quality,
+        bufferSize: this.redBuffer.length,
+        peakCount: this.peakTimes.length
+      });
 
       return {
         bpm: this.lastValidBpm,
@@ -213,7 +192,6 @@ export class PPGProcessor {
         readings: this.readings,
         isPeak,
         redValue: red,
-        fingerPresent: fingerPresent,
         hrvMetrics: {
           sdnn: hrvAnalysis.sdnn,
           rmssd: hrvAnalysis.rmssd,

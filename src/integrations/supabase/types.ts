@@ -134,45 +134,6 @@ export type Database = {
         }
         Relationships: []
       }
-      calibration_profiles: {
-        Row: {
-          created_at: string
-          description: string | null
-          device_info: Json | null
-          environment_conditions: Json | null
-          id: string
-          is_active: boolean | null
-          name: string
-          notes: string | null
-          settings: Json
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          device_info?: Json | null
-          environment_conditions?: Json | null
-          id?: string
-          is_active?: boolean | null
-          name: string
-          notes?: string | null
-          settings: Json
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          device_info?: Json | null
-          environment_conditions?: Json | null
-          id?: string
-          is_active?: boolean | null
-          name?: string
-          notes?: string | null
-          settings?: Json
-          updated_at?: string
-        }
-        Relationships: []
-      }
       calibration_reference_data: {
         Row: {
           calibration_accuracy: number | null
@@ -214,53 +175,6 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
-      }
-      calibration_settings: {
-        Row: {
-          created_at: string
-          description: string | null
-          id: string
-          key: string
-          max_value: number
-          min_value: number
-          profile_id: string | null
-          step: number
-          updated_at: string
-          value: number
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          key: string
-          max_value: number
-          min_value: number
-          profile_id?: string | null
-          step: number
-          updated_at?: string
-          value: number
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          key?: string
-          max_value?: number
-          min_value?: number
-          profile_id?: string | null
-          step?: number
-          updated_at?: string
-          value?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "calibration_settings_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: false
-            referencedRelation: "calibration_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       measurement_history: {
         Row: {
@@ -407,92 +321,6 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
-      }
-      peak_detection_settings: {
-        Row: {
-          buffer_size: number
-          created_at: string
-          finger_detection_delay: number
-          id: string
-          max_bpm: number
-          max_peak_distance: number
-          measurement_duration: number
-          min_amplitude: number
-          min_bpm: number
-          min_brightness: number
-          min_distance: number
-          min_frames_for_calculation: number
-          min_peaks_for_valid_hr: number
-          min_red_dominance: number
-          min_red_value: number
-          min_spo2: number
-          min_valid_pixels_ratio: number
-          min_valid_readings: number
-          peak_memory: number
-          peak_threshold_factor: number
-          profile_id: string | null
-          threshold: number
-          updated_at: string
-        }
-        Insert: {
-          buffer_size?: number
-          created_at?: string
-          finger_detection_delay?: number
-          id?: string
-          max_bpm?: number
-          max_peak_distance?: number
-          measurement_duration?: number
-          min_amplitude?: number
-          min_bpm?: number
-          min_brightness?: number
-          min_distance?: number
-          min_frames_for_calculation?: number
-          min_peaks_for_valid_hr?: number
-          min_red_dominance?: number
-          min_red_value?: number
-          min_spo2?: number
-          min_valid_pixels_ratio?: number
-          min_valid_readings?: number
-          peak_memory?: number
-          peak_threshold_factor?: number
-          profile_id?: string | null
-          threshold?: number
-          updated_at?: string
-        }
-        Update: {
-          buffer_size?: number
-          created_at?: string
-          finger_detection_delay?: number
-          id?: string
-          max_bpm?: number
-          max_peak_distance?: number
-          measurement_duration?: number
-          min_amplitude?: number
-          min_bpm?: number
-          min_brightness?: number
-          min_distance?: number
-          min_frames_for_calculation?: number
-          min_peaks_for_valid_hr?: number
-          min_red_dominance?: number
-          min_red_value?: number
-          min_spo2?: number
-          min_valid_pixels_ratio?: number
-          min_valid_readings?: number
-          peak_memory?: number
-          peak_threshold_factor?: number
-          profile_id?: string | null
-          threshold?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "peak_detection_settings_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: false
-            referencedRelation: "calibration_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       performance_metrics: {
         Row: {
