@@ -19,7 +19,6 @@ export class SignalProcessor {
 
   constructor(windowSize: number) {
     this.windowSize = windowSize;
-    console.log('SignalProcessor inicializado con windowSize:', windowSize);
   }
 
   private resetValues() {
@@ -48,23 +47,12 @@ export class SignalProcessor {
       const redWindow = redSignal.slice(-windowSize);
       const irWindow = irSignal.slice(-windowSize);
 
-      // Log valores de señal para diagnóstico
-      console.log('🔴 Red Value:', Math.max(...redWindow));
-      console.log('📶 Signal Range:', Math.max(...redWindow) - Math.min(...redWindow));
-      console.log('🔆 Bright Pixels:', redWindow.filter(v => v > 50).length / redWindow.length * 100);
-      console.log('📊 Señal PPG procesada:', redWindow);
-
       const redAC = Math.max(...redWindow) - Math.min(...redWindow);
       const irAC = Math.max(...irWindow) - Math.min(...irWindow);
       const redDC = this.calculateMovingAverage(redWindow, windowSize);
       const irDC = this.calculateMovingAverage(irWindow, windowSize);
 
-      // Evitar divisiones por cero
-      const safeIrAC = Math.max(irAC, 0.001);
-      const safeIrDC = Math.max(irDC, 0.001);
-      const safeRedDC = Math.max(redDC, 0.001);
-
-      const R = (redAC * safeIrDC) / (safeIrAC * safeRedDC);
+      const R = (redAC * irDC) / (irAC * redDC);
       
       let spo2 = 110 - 25 * R;
       
@@ -75,31 +63,16 @@ export class SignalProcessor {
       }
 
       const confidence = Math.min(
-        (redAC / safeRedDC) * (safeIrAC / safeIrDC) * 100,
+        (redAC / redDC) * (irAC / irDC) * 100,
         100
       );
-
-      // Log resultados detallados
-      console.log('⚡ Análisis SpO2:', {
-        redAC,
-        irAC: safeIrAC,
-        redDC: safeRedDC,
-        irDC: safeIrDC,
-        R,
-        spo2,
-        confidence
-      });
-
-      if (confidence > 50) {
-        console.log('✅ Medición SpO2 válida:', this.lastValidSpO2);
-      }
 
       return {
         spo2: this.lastValidSpO2,
         confidence: Math.max(0, Math.min(confidence, 100))
       };
     } catch (error) {
-      console.error('❌ Error calculando SpO2:', error);
+      console.error('Error calculando SpO2:', error);
       return { spo2: this.lastValidSpO2, confidence: 0 };
     }
   }
@@ -268,7 +241,7 @@ export class SignalProcessor {
         diastolic: Math.round(this.lastValidPressure.diastolic * 0.8 + diastolic * 0.2)
       };
 
-      console.log('📊 Calculando presión arterial:', {
+      console.log('Estimación BP:', {
         systolic: this.lastValidPressure.systolic,
         diastolic: this.lastValidPressure.diastolic,
         avgPTT,

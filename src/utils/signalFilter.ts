@@ -1,66 +1,80 @@
 
+/**
+ * SignalFilter: Filtrado de señal PPG en tiempo real
+ * 
+ * IMPORTANTE: Este filtro procesa ÚNICAMENTE datos reales de la cámara.
+ * No genera datos sintéticos ni simula señales. Cada valor filtrado
+ * corresponde a una medición real procesada para reducir el ruido
+ * mientras preserva las características genuinas de la onda de pulso.
+ */
+
 export class SignalFilter {
-  private readonly MA_WINDOW_SIZE = 5;
-  private readonly EXP_ALPHA = 0.3;
-  private readonly DERIVATE_THRESHOLD = 0.05;
-  private lastFilteredValue = 0;
+  private readonly sampleRate: number;
+  private readonly sgWindow = 7; // Ventana de Savitzky-Golay
+  private readonly sgDegree = 2; // Grado del polinomio
+  private readonly sgCoeffs: number[]; // Coeficientes precalculados
 
-  filterSignal(signal: number[]): number[] {
-    if (signal.length === 0) return [];
-
-    // Paso 1: Media móvil
-    const maFiltered = this.movingAverage(signal);
-    
-    // Paso 2: Filtro exponencial
-    const expFiltered = this.exponentialFilter(maFiltered);
-    
-    // Paso 3: Eliminación de tendencia
-    const detrended = this.detrendSignal(expFiltered);
-
-    console.log('🔧 Filtrado:', {
-      original: signal,
-      mediaMovil: maFiltered,
-      exponencial: expFiltered,
-      sinTendencia: detrended
-    });
-
-    return detrended;
+  constructor(sampleRate: number = 30) {
+    this.sampleRate = sampleRate;
+    // Coeficientes precalculados para Savitzky-Golay de orden 2, ventana 7
+    this.sgCoeffs = [-0.095238, 0.142857, 0.285714, 0.333333, 0.285714, 0.142857, -0.095238];
   }
 
-  private movingAverage(signal: number[]): number[] {
-    const result: number[] = [];
+  /**
+   * Aplica el filtro Savitzky-Golay para suavizar la señal
+   * mientras preserva las características de los picos
+   */
+  lowPassFilter(signal: number[]): number[] {
+    if (signal.length < this.sgWindow) return signal;
+
+    const filtered: number[] = [];
+    const halfWindow = Math.floor(this.sgWindow / 2);
+    
+    // Aplicar filtro Savitzky-Golay
     for (let i = 0; i < signal.length; i++) {
-      const start = Math.max(0, i - this.MA_WINDOW_SIZE + 1);
-      const window = signal.slice(start, i + 1);
-      result.push(window.reduce((a, b) => a + b, 0) / window.length);
+      let sum = 0;
+      
+      for (let j = 0; j < this.sgWindow; j++) {
+        const idx = i - halfWindow + j;
+        // Manejo de bordes usando reflexión
+        const value = idx < 0 ? signal[0] :
+                     idx >= signal.length ? signal[signal.length - 1] :
+                     signal[idx];
+        sum += value * this.sgCoeffs[j];
+      }
+      
+      filtered.push(sum);
     }
-    return result;
-  }
 
-  private exponentialFilter(signal: number[]): number[] {
-    return signal.map(value => {
-      this.lastFilteredValue = this.EXP_ALPHA * value + 
-                              (1 - this.EXP_ALPHA) * this.lastFilteredValue;
-      return this.lastFilteredValue;
-    });
-  }
-
-  private detrendSignal(signal: number[]): number[] {
-    if (signal.length < 2) return signal;
+    // Normalización adicional usando ventana móvil
+    const normalizedSignal = this.normalizeSignal(filtered);
     
-    const result: number[] = [signal[0]];
-    for (let i = 1; i < signal.length; i++) {
-      const diff = signal[i] - signal[i-1];
-      if (Math.abs(diff) < this.DERIVATE_THRESHOLD) {
-        result.push(result[i-1]);
+    return normalizedSignal;
+  }
+
+  /**
+   * Normaliza la señal usando una ventana móvil para adaptarse
+   * a cambios en la amplitud de la señal
+   */
+  private normalizeSignal(signal: number[]): number[] {
+    const windowSize = 30; // 1 segundo a 30fps
+    const normalized: number[] = [];
+    
+    for (let i = 0; i < signal.length; i++) {
+      const start = Math.max(0, i - windowSize);
+      const window = signal.slice(start, i + 1);
+      const min = Math.min(...window);
+      const max = Math.max(...window);
+      const range = max - min;
+      
+      if (range === 0) {
+        normalized.push(0);
       } else {
-        result.push(signal[i]);
+        normalized.push((signal[i] - min) / range);
       }
     }
-    return result;
-  }
-
-  reset(): void {
-    this.lastFilteredValue = 0;
+    
+    return normalized;
   }
 }
+

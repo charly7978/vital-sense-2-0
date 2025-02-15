@@ -10,33 +10,42 @@ interface CameraViewProps {
   isActive: boolean;
 }
 
+// Extendemos la interfaz MediaTrackConstraintSet para incluir torch
+declare global {
+  interface MediaTrackConstraintSet {
+    torch?: boolean;
+  }
+}
+
 const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   const webcamRef = useRef<Webcam>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationFrameRef = useRef<number>();
+  const animationFrameRef = useRef<number | null>(null);
   const { toast } = useToast();
   const [videoInitialized, setVideoInitialized] = useState(false);
   const isMobile = useIsMobile();
+  const isAndroid = /android/i.test(navigator.userAgent);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-  const [cameraReady, setCameraReady] = useState(false);
 
   const getDeviceConstraints = () => {
-    return {
+    const constraints: MediaTrackConstraints = {
       width: { ideal: 1280 },
       height: { ideal: 720 },
-      facingMode: isMobile ? "environment" : "user"
+      facingMode: isAndroid ? "environment" : "user",
+      advanced: isAndroid ? [{ torch: true }] : undefined
     };
+
+    return constraints;
   };
 
   const handleCameraError = (error: any) => {
     console.error('Error de cámara:', error);
     let errorMessage = "Error al acceder a la cámara";
-
+    
     if (error.name === 'NotAllowedError') {
-      errorMessage = "Por favor, permite el acceso a la cámara";
+      errorMessage = "Por favor, permite el acceso a la cámara para continuar";
     } else if (error.name === 'NotFoundError') {
-      errorMessage = "No se encontró ninguna cámara";
+      errorMessage = "No se encontró ninguna cámara disponible";
     } else if (error.name === 'NotReadableError') {
       errorMessage = "La cámara está siendo usada por otra aplicación";
     }
@@ -50,8 +59,10 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   };
 
   const processFrame = () => {
-    if (!isActive || !webcamRef.current?.video || !canvasRef.current || !cameraReady) {
-      animationFrameRef.current = requestAnimationFrame(processFrame);
+    if (!isActive || !webcamRef.current?.video || !canvasRef.current) {
+      if (isActive) {
+        animationFrameRef.current = requestAnimationFrame(processFrame);
+      }
       return;
     }
 
@@ -59,7 +70,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
     const canvas = canvasRef.current;
     const context = canvas.getContext('2d');
 
-    if (!context || video.readyState !== video.HAVE_ENOUGH_DATA) {
+    if (!context || video.readyState !== video.HAVE_ENOUGH_DATA || !video.videoWidth || !video.videoHeight) {
       animationFrameRef.current = requestAnimationFrame(processFrame);
       return;
     }
@@ -71,59 +82,103 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
     }
 
     try {
-      context.drawImage(video, 0, 0);
-      const frameData = context.getImageData(0, 0, canvas.width, canvas.height);
-      onFrame(frameData);
-    } catch (error) {
-      console.error('Error procesando frame:', error);
-    }
-
-    animationFrameRef.current = requestAnimationFrame(processFrame);
-  };
-
-  const setupCamera = async () => {
-    try {
-      if (isActive && !mediaStreamRef.current) {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: getDeviceConstraints(),
-          audio: false 
-        });
-
-        mediaStreamRef.current = stream;
-
-        if (webcamRef.current && webcamRef.current.video) {
-          webcamRef.current.video.srcObject = stream;
-          setCameraReady(true);
-        }
-
-        setCameraError(null);
-        processFrame();
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      if (canvas.width > 0 && canvas.height > 0) {
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+        onFrame(imageData);
       }
     } catch (error) {
-      handleCameraError(error);
+      console.error('Error processing video frame:', error);
+      toast({
+        variant: "destructive",
+        title: "Error en el procesamiento",
+        description: "Error al procesar la imagen de la cámara."
+      });
     }
-  };
 
-  const cleanupCamera = () => {
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach(track => track.stop());
-      mediaStreamRef.current = null;
+    if (isActive) {
+      animationFrameRef.current = requestAnimationFrame(processFrame);
     }
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-    }
-    setCameraReady(false);
   };
 
   useEffect(() => {
-    if (isActive) {
-      setupCamera();
-    } else {
-      cleanupCamera();
-    }
+    let mediaStream: MediaStream | null = null;
+
+    const setupCamera = async () => {
+      try {
+        if (isActive) {
+          const constraints = getDeviceConstraints();
+          mediaStream = await navigator.mediaDevices.getUserMedia({ 
+            video: constraints,
+            audio: false 
+          });
+
+          if (webcamRef.current) {
+            webcamRef.current.video!.srcObject = mediaStream;
+          }
+
+          // Configurar la linterna para Android
+          if (isAndroid) {
+            const track = mediaStream.getVideoTracks()[0];
+            
+            try {
+              await track.applyConstraints({
+                advanced: [{ torch: true }]
+              });
+              console.log('Linterna activada exitosamente');
+            } catch (torchError) {
+              console.warn('No se pudo activar la linterna:', torchError);
+              toast({
+                title: "Aviso",
+                description: "Por favor, asegúrate de tener buena iluminación para la medición."
+              });
+            }
+          }
+          
+          setCameraError(null);
+          setVideoInitialized(false);
+          processFrame();
+        } else {
+          // Desactivar la linterna y detener la transmisión
+          if (mediaStream) {
+            const track = mediaStream.getVideoTracks()[0];
+            if (isAndroid) {
+              try {
+                await track.applyConstraints({
+                  advanced: [{ torch: false }]
+                });
+              } catch (error) {
+                console.warn('Error al desactivar la linterna:', error);
+              }
+            }
+            mediaStream.getTracks().forEach(track => track.stop());
+          }
+          if (animationFrameRef.current) {
+            cancelAnimationFrame(animationFrameRef.current);
+            animationFrameRef.current = null;
+          }
+        }
+      } catch (error) {
+        handleCameraError(error);
+      }
+    };
+
+    setupCamera();
 
     return () => {
-      cleanupCamera();
+      if (mediaStream) {
+        const track = mediaStream.getVideoTracks()[0];
+        if (isAndroid) {
+          track.applyConstraints({
+            advanced: [{ torch: false }]
+          }).catch(console.warn);
+        }
+        mediaStream.getTracks().forEach(track => track.stop());
+      }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
     };
   }, [isActive]);
 
@@ -146,6 +201,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
             ref={webcamRef}
             className="w-full h-full object-cover"
             videoConstraints={getDeviceConstraints()}
+            forceScreenshotSourceSize
             onUserMediaError={handleCameraError}
           />
         )}

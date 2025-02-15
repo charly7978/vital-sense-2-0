@@ -1,10 +1,9 @@
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 import { BeepPlayer } from '../utils/audioUtils';
 import { PPGProcessor } from '../utils/ppgProcessor';
-import { SignalExtractor } from '../utils/signalExtraction';
-import { VitalReading } from '../utils/types';
 import { useToast } from "@/hooks/use-toast";
+import type { VitalReading, SensitivitySettings } from '../utils/types';
 
 interface VitalsContextType {
   bpm: number;
@@ -14,113 +13,107 @@ interface VitalsContextType {
   hasArrhythmia: boolean;
   arrhythmiaType: string;
   readings: VitalReading[];
+  isProcessing: boolean;
   isStarted: boolean;
+  measurementProgress: number;
+  measurementQuality: number;
   fingerPresent: boolean;
+  sensitivitySettings: SensitivitySettings;
   toggleMeasurement: () => void;
   processFrame: (imageData: ImageData) => void;
+  updateSensitivitySettings: (settings: SensitivitySettings) => void;
 }
 
 const VitalsContext = createContext<VitalsContextType | undefined>(undefined);
 
-const signalExtractor = new SignalExtractor();
-const ppgProcessor = new PPGProcessor();
 const beepPlayer = new BeepPlayer();
+const ppgProcessor = new PPGProcessor();
 
 export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { toast } = useToast();
-  const [bpm, setBPM] = useState(0);
-  const [spo2, setSPO2] = useState(0);
-  const [systolic, setSystolic] = useState(0);
-  const [diastolic, setDiastolic] = useState(0);
-  const [hasArrhythmia, setHasArrhythmia] = useState(false);
-  const [arrhythmiaType, setArrhythmiaType] = useState('');
+  const [bpm, setBpm] = useState<number>(0);
+  const [spo2, setSpo2] = useState<number>(0);
+  const [systolic, setSystolic] = useState<number>(0);
+  const [diastolic, setDiastolic] = useState<number>(0);
+  const [hasArrhythmia, setHasArrhythmia] = useState<boolean>(false);
+  const [arrhythmiaType, setArrhythmiaType] = useState<string>('Normal');
   const [readings, setReadings] = useState<VitalReading[]>([]);
-  const [isStarted, setIsStarted] = useState(false);
-  const [fingerPresent, setFingerPresent] = useState(false);
-  const [lastProcessingTime, setLastProcessingTime] = useState(0);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [isStarted, setIsStarted] = useState<boolean>(false);
+  const [measurementProgress, setMeasurementProgress] = useState(0);
+  const [measurementQuality, setMeasurementQuality] = useState(0);
+  const [fingerPresent, setFingerPresent] = useState<boolean>(false);
+  const [sensitivitySettings, setSensitivitySettings] = useState<SensitivitySettings>({
+    signalAmplification: 2.0,
+    noiseReduction: 1.0,
+    peakDetection: 1.1
+  });
 
-  useEffect(() => {
-    if (isStarted && !fingerPresent) {
-      toast({
-        title: "Dedo no detectado",
-        description: "Por favor, coloque su dedo frente a la cámara",
-        duration: 3000,
-      });
-    }
-  }, [isStarted, fingerPresent, toast]);
+  const updateSensitivitySettings = useCallback((settings: SensitivitySettings) => {
+    setSensitivitySettings(settings);
+  }, []);
 
-  const toggleMeasurement = () => {
-    setIsStarted(!isStarted);
-    if (!isStarted) {
-      console.log('🟢 Iniciando medición');
-      setReadings([]);
-      setBPM(0);
-      setSPO2(0);
-      setSystolic(0);
-      setDiastolic(0);
-      ppgProcessor.reset();
-    } else {
-      console.log('🔴 Deteniendo medición');
-    }
-  };
-
-  const processFrame = (imageData: ImageData) => {
+  const processFrame = useCallback(async (imageData: ImageData) => {
     if (!isStarted) return;
 
-    const now = Date.now();
-    if (now - lastProcessingTime < 33) return; // Limitar a ~30fps
-    setLastProcessingTime(now);
-
-    console.log('🎥 Procesando frame:', {
-      timestamp: now,
-      dimensiones: `${imageData.width}x${imageData.height}`,
-      datos: imageData.data.length
-    });
-
-    const { red, ir, quality, fingerPresent: isFingerDetected } = signalExtractor.extractSignal(imageData);
-    
-    setFingerPresent(isFingerDetected);
-
-    if (isFingerDetected && quality > 0.3) {
-      const newReading: VitalReading = {
-        timestamp: now,
-        value: red / 255,
-        redValue: red
-      };
-
-      console.log('📊 Nueva lectura:', {
-        valor: newReading.value,
-        rojo: red,
-        calidad: quality
-      });
-
-      const newBPM = ppgProcessor.processSignal([newReading.value], now, quality);
+    try {
+      const vitals = await ppgProcessor.processFrame(imageData);
       
-      if (newBPM > 0) {
-        setBPM(Math.round(newBPM));
-        beepPlayer.playBeep();
-
-        // Actualizar SpO2
-        if (readings.length >= 10) {
-          const redAC = Math.max(...readings.slice(-10).map(r => r.value)) - 
-                       Math.min(...readings.slice(-10).map(r => r.value));
-          const irAC = redAC * 0.98;
-          const spO2 = Math.round(110 - 25 * (redAC / irAC));
-          
-          if (spO2 >= 80 && spO2 <= 100) {
-            setSPO2(spO2);
+      if (vitals) {
+        setFingerPresent(vitals.fingerPresent);
+        
+        if (vitals.fingerPresent) {
+          setReadings(vitals.readings);
+          if (vitals.isPeak) {
+            beepPlayer.playBeep('heartbeat');
           }
+          if (vitals.bpm > 0) setBpm(vitals.bpm);
+          if (vitals.spo2 >= 80 && vitals.spo2 <= 100) setSpo2(vitals.spo2);
+          if (vitals.systolic > 0 && vitals.diastolic > 0) {
+            setSystolic(vitals.systolic);
+            setDiastolic(vitals.diastolic);
+          }
+          setHasArrhythmia(vitals.hasArrhythmia);
+          setArrhythmiaType(vitals.arrhythmiaType);
+        } else {
+          setReadings([]);
+          setBpm(0);
+          setSpo2(0);
+          setSystolic(0);
+          setDiastolic(0);
+          setHasArrhythmia(false);
+          setArrhythmiaType('Normal');
         }
       }
-
-      setReadings(prev => [...prev, newReading].slice(-100));
-    } else {
-      console.log('⚠️ Señal no válida:', {
-        dedoDetectado: isFingerDetected,
-        calidad: quality
-      });
+    } catch (error) {
+      console.error('Error processing frame:', error);
     }
-  };
+  }, [isStarted]);
+
+  const toggleMeasurement = useCallback(() => {
+    setIsStarted(prev => !prev);
+    if (!isStarted) {
+      resetMeasurements();
+      if (toast) {
+        toast({
+          title: "Iniciando medición",
+          description: "La medición durará 30 segundos. Por favor, mantenga su dedo frente a la cámara."
+        });
+      }
+    } else {
+      resetMeasurements();
+    }
+  }, [isStarted, toast]);
+
+  const resetMeasurements = useCallback(() => {
+    setBpm(0);
+    setSpo2(0);
+    setSystolic(0);
+    setDiastolic(0);
+    setHasArrhythmia(false);
+    setArrhythmiaType('Normal');
+    setReadings([]);
+  }, []);
 
   return (
     <VitalsContext.Provider value={{
@@ -131,10 +124,15 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       hasArrhythmia,
       arrhythmiaType,
       readings,
+      isProcessing,
       isStarted,
+      measurementProgress,
+      measurementQuality,
       fingerPresent,
+      sensitivitySettings,
       toggleMeasurement,
-      processFrame
+      processFrame,
+      updateSensitivitySettings
     }}>
       {children}
     </VitalsContext.Provider>
@@ -143,8 +141,8 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
 export const useVitals = () => {
   const context = useContext(VitalsContext);
-  if (!context) {
-    throw new Error("useVitals debe usarse dentro de un VitalsProvider");
+  if (context === undefined) {
+    throw new Error('useVitals must be used within a VitalsProvider');
   }
   return context;
 };
