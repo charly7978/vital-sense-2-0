@@ -11,6 +11,7 @@ interface VitalReading {
 interface VitalsContextType {
   bpm: number;
   readings: VitalReading[];
+  isMeasuring: boolean;
   startMeasurement: () => void;
   stopMeasurement: () => void;
 }
@@ -22,18 +23,22 @@ const ppgProcessor = new PPGProcessor();
 
 export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [bpm, setBPM] = useState(0);
-  const [readings, setReadings] = useState<VitalReading[]>([]); // Asegurar que `readings` es un array vacío por defecto
+  const [readings, setReadings] = useState<VitalReading[]>([]);
+  const [isMeasuring, setIsMeasuring] = useState(false);
   const processingRef = useRef<boolean>(false);
 
   const startMeasurement = () => {
+    if (isMeasuring) return; // Evitar múltiples inicios
+    setIsMeasuring(true);
     processingRef.current = true;
     processSignal();
   };
 
   const stopMeasurement = () => {
+    setIsMeasuring(false);
     processingRef.current = false;
     setBPM(0);
-    setReadings([]); // Asegurar que `readings` se reinicie correctamente
+    setReadings([]);
   };
 
   const processSignal = () => {
@@ -55,7 +60,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   return (
-    <VitalsContext.Provider value={{ bpm, readings, startMeasurement, stopMeasurement }}>
+    <VitalsContext.Provider value={{ bpm, readings, isMeasuring, startMeasurement, stopMeasurement }}>
       {children}
     </VitalsContext.Provider>
   );
