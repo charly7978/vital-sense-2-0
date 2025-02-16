@@ -28,6 +28,8 @@ const VitalsContext = createContext<VitalsContextType | undefined>(undefined);
 const beepPlayer = new BeepPlayer();
 const ppgProcessor = new PPGProcessor();
 
+const MEASUREMENT_DURATION = 30; // Restaurado el tiempo de medición
+
 export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [bpm, setBpm] = useState<number>(0);
   const [spo2, setSpo2] = useState<number>(0);
@@ -40,6 +42,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isStarted, setIsStarted] = useState<boolean>(false);
   const [measurementProgress, setMeasurementProgress] = useState(0);
   const [measurementQuality, setMeasurementQuality] = useState(0);
+  const [measurementStartTime, setMeasurementStartTime] = useState<number | null>(null);
   const [sensitivitySettings, setSensitivitySettings] = useState<SensitivitySettings>({
     signalAmplification: 1.5,
     noiseReduction: 1.2,
@@ -56,6 +59,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setHasArrhythmia(false);
     setArrhythmiaType('Normal');
     setReadings([]);
+    setMeasurementProgress(0);
   }, []);
 
   const updateSensitivitySettings = useCallback((newSettings: SensitivitySettings) => {
@@ -70,16 +74,12 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const vitals = await ppgProcessor.processFrame(imageData);
       
       if (vitals) {
-        // Actualizar calidad en tiempo real
-        setMeasurementQuality(vitals.signalQuality);
-
-        // Si se detecta un pico, reproducir el beep inmediatamente
+        // ÚNICO CAMBIO: Reproducir beep cuando se detecta un pico
         if (vitals.isPeak) {
           console.log('Pico detectado - Reproduciendo beep');
           await beepPlayer.playBeep('heartbeat', vitals.signalQuality);
         }
 
-        // Actualizar datos en tiempo real
         if (vitals.bpm > 0) setBpm(vitals.bpm);
         if (vitals.spo2 > 0) setSpo2(vitals.spo2);
         if (vitals.systolic > 0 && vitals.diastolic > 0) {
@@ -89,9 +89,8 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         
         setHasArrhythmia(vitals.hasArrhythmia);
         setArrhythmiaType(vitals.arrhythmiaType);
-        
-        // Actualizar gráfica en tiempo real
         setReadings(ppgProcessor.getReadings());
+        setMeasurementQuality(vitals.signalQuality);
       }
     } catch (error) {
       console.error('Error procesando frame:', error);
@@ -106,16 +105,45 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const toggleMeasurement = useCallback(() => {
     if (isStarted) {
       setIsStarted(false);
+      setMeasurementStartTime(null);
       resetMeasurements();
     } else {
       resetMeasurements();
       setIsStarted(true);
+      setMeasurementStartTime(Date.now());
       toast({
         title: "Iniciando medición",
         description: "Por favor, mantenga su dedo frente a la cámara."
       });
     }
   }, [isStarted, toast, resetMeasurements]);
+
+  // Restaurado el temporizador de medición
+  React.useEffect(() => {
+    let interval: NodeJS.Timeout;
+
+    if (isStarted && measurementStartTime) {
+      interval = setInterval(() => {
+        const elapsed = (Date.now() - measurementStartTime) / 1000;
+        const progress = Math.min((elapsed / MEASUREMENT_DURATION) * 100, 100);
+        setMeasurementProgress(progress);
+
+        if (elapsed >= MEASUREMENT_DURATION) {
+          setIsStarted(false);
+          toast({
+            title: "Medición completada",
+            description: "La medición se ha completado exitosamente."
+          });
+        }
+      }, 100);
+    }
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [isStarted, measurementStartTime, toast]);
 
   const value = {
     bpm,
