@@ -158,15 +158,15 @@ export const CalibrationConfig = {
   // Configuraciones de Control de Calidad
   quality: {
     // Rango normal: 2.0-4.0. Aumentar: requiere mejor calidad. Reducir: más tolerante a ruido
-    signalToNoiseRatio: 3.0,   
+    signalToNoiseRatio: 2.0,   
 
     // Rango normal: 0.2-0.5. Aumentar: más tolerante a movimiento. Reducir: más estricto
-    motionTolerance: 0.3,      
+    motionTolerance: 0.1,      
 
     // Rango normal: 0.7-0.9. Aumentar: requiere señal más estable. Reducir: más tolerante a inestabilidad
     baselineStability: 0.8,    
 
     // Rango normal: 0.2-0.4. Aumentar: más tolerante a artefactos. Reducir: más estricto con calidad
-    artifactThreshold: 0.25    
+    artifactThreshold: 0.10    
   }
 };
