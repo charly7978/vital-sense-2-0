@@ -17,6 +17,12 @@ const SignalQualityIndicator: React.FC<SignalQualityIndicatorProps> = ({
 }) => {
   if (!isStarted) return null;
 
+  const getQualityColor = (quality: number) => {
+    if (quality < 0.3) return "bg-red-500";
+    if (quality < 0.6) return "bg-yellow-500";
+    return "bg-green-500";
+  };
+
   const getSignalQualityIndicator = () => {
     if (measurementQuality === 0) {
       return (
@@ -31,16 +37,16 @@ const SignalQualityIndicator: React.FC<SignalQualityIndicatorProps> = ({
       return (
         <div className="flex items-center space-x-2 text-red-500">
           <SignalLow className="w-6 h-6" />
-          <span>Señal débil</span>
+          <span>Señal débil - Ajuste la posición del dedo</span>
         </div>
       );
     }
     
-    if (measurementQuality < 0.8) {
+    if (measurementQuality < 0.6) {
       return (
         <div className="flex items-center space-x-2 text-yellow-500">
           <SignalMedium className="w-6 h-6" />
-          <span>Señal regular</span>
+          <span>Señal regular - Mantenga el dedo quieto</span>
         </div>
       );
     }
@@ -73,14 +79,15 @@ const SignalQualityIndicator: React.FC<SignalQualityIndicatorProps> = ({
               <span>Calidad de la señal</span>
               <span>{Math.round(measurementQuality * 100)}%</span>
             </div>
-            <Progress 
-              value={measurementQuality * 100} 
-              className={cn(
-                "h-2",
-                measurementQuality < 0.3 ? "destructive" : 
-                measurementQuality < 0.8 ? "warning" : ""
-              )}
-            />
+            <div className="h-2 bg-black/20 rounded-full overflow-hidden">
+              <div 
+                className={cn(
+                  "h-full transition-all duration-300 ease-in-out",
+                  getQualityColor(measurementQuality)
+                )}
+                style={{ width: `${measurementQuality * 100}%` }}
+              />
+            </div>
           </div>
         </div>
       </div>

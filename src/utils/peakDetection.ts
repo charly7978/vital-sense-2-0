@@ -1,11 +1,11 @@
 
 export class PeakDetector {
   private adaptiveThreshold = 0;
-  private readonly minPeakDistance = 500; // Ajustado para latidos reales (120 BPM máximo)
+  private readonly minPeakDistance = 300; // Reducido para permitir más latidos
   private lastPeakTime = 0;
-  private readonly bufferSize = 20; // Aumentado para mejor detección
-  private readonly minAmplitude = 0.2; // Aumentado para evitar falsos positivos
-  private readonly adaptiveRate = 0.3;
+  private readonly bufferSize = 30;
+  private readonly minAmplitude = 0.1; // Reducido para mejor sensibilidad
+  private readonly adaptiveRate = 0.2;
   private peakBuffer: number[] = [];
   private timeBuffer: number[] = [];
   private frameCount = 0;
@@ -14,17 +14,30 @@ export class PeakDetector {
 
   isRealPeak(currentValue: number, now: number, signalBuffer: number[]): boolean {
     this.frameCount++;
+    console.log('🔍 Analizando pico potencial:', {
+      valor: currentValue,
+      tiempo: now,
+      ultimoPico: this.lastPeakTime
+    });
     
     // Verificar si ha pasado suficiente tiempo desde el último pico
     const timeSinceLastPeak = now - this.lastPeakTime;
-    const minTimeGap = (60 / this.MAX_BPM) * 1000; // Tiempo mínimo entre latidos
-    const maxTimeGap = (60 / this.MIN_BPM) * 1000; // Tiempo máximo entre latidos
+    const minTimeGap = (60 / this.MAX_BPM) * 1000;
+    const maxTimeGap = (60 / this.MIN_BPM) * 1000;
+
+    console.log('⏱️ Intervalos:', {
+      tiempoDesdeUltimoPico: timeSinceLastPeak,
+      intervaloMinimo: minTimeGap,
+      intervaloMaximo: maxTimeGap
+    });
 
     if (timeSinceLastPeak < minTimeGap) {
+      console.log('⚠️ Muy poco tiempo desde el último pico');
       return false;
     }
 
     if (signalBuffer.length < 8) {
+      console.log('⚠️ Buffer de señal insuficiente');
       return false;
     }
 
@@ -35,17 +48,28 @@ export class PeakDetector {
       recentValues.reduce((a, b) => a + Math.pow(b - avgValue, 2), 0) / recentValues.length
     );
 
-    // Umbral adaptativo más estricto
-    this.adaptiveThreshold = avgValue + (stdDev * 1.2);
+    console.log('📊 Estadísticas de señal:', {
+      promedio: avgValue,
+      desviacionEstandar: stdDev
+    });
+
+    // Umbral adaptativo más sensible
+    this.adaptiveThreshold = avgValue + (stdDev * 1.0);
 
     const isValidShape = this.validatePeakShape(currentValue, signalBuffer);
-    const hasSignificantAmplitude = currentValue > this.adaptiveThreshold && 
-                                  currentValue > avgValue + (this.minAmplitude * stdDev);
+    const hasSignificantAmplitude = currentValue > this.adaptiveThreshold;
     const isLocalMaximum = this.isLocalMax(currentValue, signalBuffer);
+
+    console.log('🎯 Validaciones:', {
+      formaValida: isValidShape,
+      amplitudSignificativa: hasSignificantAmplitude,
+      esMaximoLocal: isLocalMaximum,
+      umbralAdaptativo: this.adaptiveThreshold
+    });
 
     if (hasSignificantAmplitude && isLocalMaximum && isValidShape) {
       if (timeSinceLastPeak > maxTimeGap) {
-        // Reset si ha pasado demasiado tiempo
+        console.log('⚠️ Demasiado tiempo desde el último pico, reseteando');
         this.lastPeakTime = now;
         this.peakBuffer = [];
         this.timeBuffer = [];
@@ -53,16 +77,19 @@ export class PeakDetector {
       }
 
       const currentInterval = timeSinceLastPeak;
+      const isValidInterval = this.validatePeakInterval(currentInterval);
       
-      if (this.validatePeakInterval(currentInterval)) {
+      console.log('⏱️ Validación de intervalo:', {
+        intervalo: currentInterval,
+        valido: isValidInterval
+      });
+
+      if (isValidInterval) {
         this.lastPeakTime = now;
         this.updatePeakHistory(currentValue, now);
         const estimatedBPM = 60000 / currentInterval;
         
-        console.log('¡LATIDO REAL DETECTADO!', {
-          valor: currentValue,
-          umbral: this.adaptiveThreshold,
-          intervalo: currentInterval,
+        console.log('💓 PICO VÁLIDO DETECTADO:', {
           bpmEstimado: estimatedBPM,
           calidad: this.calculatePeakQuality(currentValue, avgValue, stdDev)
         });
