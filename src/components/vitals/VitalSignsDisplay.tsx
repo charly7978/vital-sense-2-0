@@ -37,7 +37,7 @@ const VitalSignsDisplay: React.FC<VitalSignsDisplayProps> = ({
             <h2 className="text-xl font-semibold text-gray-100">Heart Rate</h2>
           </div>
           <div className="flex items-baseline space-x-2">
-            <span className="text-4xl font-bold text-gray-100">{Math.round(bpm) || 0}</span>
+            <span className="text-4xl font-bold text-gray-100">{bpm > 0 ? Math.round(bpm) : '--'}</span>
             <span className="text-sm text-gray-300">BPM</span>
           </div>
         </div>
@@ -50,7 +50,7 @@ const VitalSignsDisplay: React.FC<VitalSignsDisplayProps> = ({
             <h2 className="text-xl font-semibold text-gray-100">SpO2</h2>
           </div>
           <div className="flex items-baseline space-x-2">
-            <span className="text-4xl font-bold text-gray-100">{Math.round(spo2) || 0}</span>
+            <span className="text-4xl font-bold text-gray-100">{spo2 > 0 ? Math.round(spo2) : '--'}</span>
             <span className="text-sm text-gray-300">%</span>
           </div>
         </div>
@@ -63,7 +63,9 @@ const VitalSignsDisplay: React.FC<VitalSignsDisplayProps> = ({
             <h2 className="text-xl font-semibold text-gray-100">Blood Pressure</h2>
           </div>
           <div className="flex items-baseline space-x-2">
-            <span className="text-4xl font-bold text-gray-100">{Math.round(systolic) || 0}/{Math.round(diastolic) || 0}</span>
+            <span className="text-4xl font-bold text-gray-100">
+              {systolic > 0 && diastolic > 0 ? `${Math.round(systolic)}/${Math.round(diastolic)}` : '--/--'}
+            </span>
             <span className="text-sm text-gray-300">mmHg</span>
           </div>
         </div>

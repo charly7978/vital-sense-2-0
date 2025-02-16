@@ -67,6 +67,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setReadings([]);
     setValidReadingsCount(0);
     setConsecutiveLowQualityCount(0);
+    setMeasurementQuality(0);
   }, []);
 
   const updateSensitivitySettings = useCallback((newSettings: SensitivitySettings) => {
@@ -75,7 +76,10 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, []);
 
   const processFrame = useCallback(async (imageData: ImageData) => {
-    if (!isStarted) return;
+    if (!isStarted) {
+      resetMeasurements();
+      return;
+    }
 
     setIsProcessing(true);
     try {
@@ -88,7 +92,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (consecutiveLowQualityCount >= CONSECUTIVE_LOW_QUALITY_LIMIT) {
           console.log('No se detecta dedo o señal muy baja:', vitals?.signalQuality || 0);
           resetMeasurements();
-          setMeasurementQuality(0);
         }
         return;
       }
@@ -106,7 +109,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         if (vitals.isPeak) {
           console.log('Pico detectado, reproduciendo beep');
-          await beepPlayer.playBeep('heartbeat');
+          await beepPlayer.playBeep('heartbeat', vitals.signalQuality);
         }
 
         // Actualizar BPM solo si es válido y hay suficiente calidad
@@ -132,7 +135,11 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         setHasArrhythmia(vitals.hasArrhythmia);
         setArrhythmiaType(vitals.arrhythmiaType);
-        setReadings(ppgProcessor.getReadings());
+        
+        // Solo actualizar lecturas si la calidad es buena
+        if (vitals.signalQuality > MIN_QUALITY_THRESHOLD) {
+          setReadings(ppgProcessor.getReadings());
+        }
       }
     } catch (error) {
       console.error('Error processing frame:', error);
@@ -145,19 +152,22 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [isStarted, consecutiveLowQualityCount, validReadingsCount, toast, resetMeasurements]);
 
   const toggleMeasurement = useCallback(() => {
-    setIsStarted(prev => !prev);
-    if (!isStarted) {
+    if (isStarted) {
+      // Si estamos deteniendo la medición
+      setIsStarted(false);
+      setMeasurementStartTime(null);
+      setIsProcessing(false);
       resetMeasurements();
+    } else {
+      // Si estamos iniciando la medición
+      resetMeasurements();
+      setIsStarted(true);
       setMeasurementStartTime(Date.now());
       setMeasurementProgress(0);
       toast({
         title: "Iniciando medición",
         description: `La medición durará ${MEASUREMENT_DURATION} segundos. Por favor, mantenga su dedo frente a la cámara.`
       });
-    } else {
-      setMeasurementStartTime(null);
-      setIsProcessing(false);
-      resetMeasurements();
     }
   }, [isStarted, toast, resetMeasurements]);
 
