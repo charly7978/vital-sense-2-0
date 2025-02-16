@@ -77,20 +77,28 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const processFrame = useCallback(async (imageData: ImageData) => {
     if (!isStarted) {
+      console.log('📊 Procesamiento: Medición no iniciada, reseteando valores');
       resetMeasurements();
       return;
     }
 
+    console.log('🔄 Procesamiento: Nuevo frame recibido');
     setIsProcessing(true);
+    
     try {
       const vitals = await ppgProcessor.processFrame(imageData);
+      console.log('📈 Procesamiento: Datos procesados:', vitals);
       
       // Verificar si no hay dedo presente
       if (!vitals || vitals.signalQuality < NO_FINGER_THRESHOLD) {
         setConsecutiveLowQualityCount(prev => prev + 1);
+        console.log('👆 Detección: Calidad de señal baja o no hay dedo', {
+          calidad: vitals?.signalQuality || 0,
+          framesConsecutivosBajos: consecutiveLowQualityCount + 1
+        });
         
         if (consecutiveLowQualityCount >= CONSECUTIVE_LOW_QUALITY_LIMIT) {
-          console.log('No se detecta dedo o señal muy baja:', vitals?.signalQuality || 0);
+          console.log('❌ Detección: Demasiados frames consecutivos con baja calidad, reseteando');
           resetMeasurements();
         }
         return;
@@ -98,27 +106,32 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       // Resetear contador si la calidad es buena
       if (vitals.signalQuality > MIN_QUALITY_THRESHOLD) {
+        console.log('✅ Calidad: Señal buena, reseteando contador de baja calidad');
         setConsecutiveLowQualityCount(0);
       }
 
+      console.log('📊 Calidad: Actualizando calidad de señal:', vitals.signalQuality);
       setMeasurementQuality(vitals.signalQuality);
 
       // Solo procesar si la calidad es suficiente
       if (vitals.signalQuality > MIN_QUALITY_THRESHOLD) {
         setValidReadingsCount(prev => prev + 1);
+        console.log('📝 Lecturas: Nueva lectura válida registrada, total:', validReadingsCount + 1);
 
         if (vitals.isPeak) {
-          console.log('Pico detectado, reproduciendo beep');
+          console.log('💓 Detección: PICO DETECTADO - Reproduciendo sonido de latido');
           await beepPlayer.playBeep('heartbeat', vitals.signalQuality);
         }
 
         // Actualizar BPM solo si es válido y hay suficiente calidad
         if (vitals.bpm > 40 && vitals.bpm < 200) {
+          console.log('❤️ BPM: Actualizando frecuencia cardíaca:', vitals.bpm);
           setBpm(vitals.bpm);
         }
 
         // Actualizar SpO2 solo si es válido y hay suficiente calidad
         if (vitals.spo2 >= 80 && vitals.spo2 <= 100) {
+          console.log('💉 SpO2: Actualizando saturación de oxígeno:', vitals.spo2);
           setSpo2(vitals.spo2);
         }
 
@@ -128,21 +141,30 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               vitals.systolic > vitals.diastolic &&
               vitals.systolic >= 90 && vitals.systolic <= 180 &&
               vitals.diastolic >= 60 && vitals.diastolic <= 120) {
+            console.log('🩺 Presión: Actualizando presión arterial:', {
+              systolic: vitals.systolic,
+              diastolic: vitals.diastolic
+            });
             setSystolic(vitals.systolic);
             setDiastolic(vitals.diastolic);
           }
         }
 
+        console.log('💕 Arritmia: Actualizando estado:', {
+          hasArrhythmia: vitals.hasArrhythmia,
+          type: vitals.arrhythmiaType
+        });
         setHasArrhythmia(vitals.hasArrhythmia);
         setArrhythmiaType(vitals.arrhythmiaType);
         
         // Solo actualizar lecturas si la calidad es buena
         if (vitals.signalQuality > MIN_QUALITY_THRESHOLD) {
+          console.log('📊 Gráfica: Actualizando lecturas con nueva señal');
           setReadings(ppgProcessor.getReadings());
         }
       }
     } catch (error) {
-      console.error('Error processing frame:', error);
+      console.error('❌ Error en el procesamiento:', error);
       toast({
         variant: "destructive",
         title: "Error en el procesamiento",
