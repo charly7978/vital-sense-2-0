@@ -184,8 +184,21 @@ export class PPGProcessor {
     
     const { red, ir, quality } = this.signalExtractor.extractChannels(imageData);
     
+    // Log detallado de la detección del dedo y calidad
+    console.log('Estado del sensor:', {
+      detectandoDedo: red > this.processingSettings.MIN_RED_VALUE,
+      valorRojo: red.toFixed(2),
+      umbralMinimo: this.processingSettings.MIN_RED_VALUE,
+      calidadSenal: (quality * 100).toFixed(1) + '%'
+    });
+    
     if (quality < this.qualityThreshold || red < this.processingSettings.MIN_RED_VALUE) {
-      console.log('No se detecta dedo o señal de baja calidad', { red, quality });
+      console.log('❌ No se detecta dedo o señal de baja calidad:', { 
+        red: red.toFixed(2), 
+        calidad: (quality * 100).toFixed(1) + '%',
+        umbralCalidad: (this.qualityThreshold * 100).toFixed(1) + '%',
+        umbralRojo: this.processingSettings.MIN_RED_VALUE
+      });
       this.redBuffer = [];
       this.irBuffer = [];
       this.readings = [];
@@ -241,7 +254,12 @@ export class PPGProcessor {
 
     if (isPeak) {
       this.peakTimes.push(now);
-      console.log('Peak detected:', { normalizedValue, time: now });
+      console.log('📊 Mediciones actuales:', { 
+        bpm: validatedVitals.bpm.toFixed(1),
+        spo2: spo2Result.spo2.toFixed(1) + '%',
+        presion: `${validatedVitals.systolic}/${validatedVitals.diastolic}`,
+        calidadSenal: (signalQuality * 100).toFixed(1) + '%'
+      });
       
       if (this.peakTimes.length > 10) {
         this.peakTimes.shift();
