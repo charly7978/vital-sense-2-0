@@ -10,8 +10,13 @@ interface CameraViewProps {
   isActive: boolean;
 }
 
+// Extendemos la interfaz correctamente
 declare global {
   interface MediaTrackConstraintSet {
+    torch?: boolean;
+  }
+  
+  interface MediaTrackCapabilities {
     torch?: boolean;
   }
 }
