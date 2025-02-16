@@ -8,22 +8,22 @@ export const CalibrationConfig = {
   // Configuraciones de Detección de Señal
   signal: {
     // Rango normal: 15-30. Aumentar: más sensible a dedos oscuros. Reducir: menos falsos positivos
-    minRedValue: 20,           
+    minRedValue: 10,           
 
     // Rango normal: 60-100. Aumentar: requiere más luz. Reducir: más tolerante a baja iluminación
-    minBrightness: 80,         
+    minBrightness: 100,         
 
     // Rango normal: 0.15-0.4. Aumentar: mejor calidad requerida. Reducir: más tolerante a mala colocación
-    minValidPixelsRatio: 0.2,  
+    minValidPixelsRatio: 0.4,  
 
     // Rango normal: 1.0-2.0. Aumentar: señal más fuerte pero más ruido. Reducir: señal más limpia pero más débil
     signalAmplification: 1.5,  
 
     // Rango normal: 1.0-1.5. Aumentar: más filtrado pero puede perder picos. Reducir: menos filtrado, más ruido
-    noiseReduction: 1.2,       
+    noiseReduction: 1.0,       
 
     // Rango normal: 0.6-1.0. Aumentar: corrección más agresiva. Reducir: mantiene más la señal original
-    baselineCorrection: 0.8    
+    baselineCorrection: 1.2    
   },
 
   // Configuraciones de Detección de Picos
