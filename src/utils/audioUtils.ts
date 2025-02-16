@@ -10,6 +10,7 @@ export class BeepPlayer {
     try {
       this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       await this.audioContext.resume();
+      console.log('Contexto de audio inicializado');
     } catch (error) {
       console.error('Error inicializando audio:', error);
     }
@@ -32,26 +33,18 @@ export class BeepPlayer {
       oscillator.connect(gainNode);
       gainNode.connect(this.audioContext.destination);
 
-      // Configurar el tipo de sonido
       if (type === 'heartbeat') {
         oscillator.frequency.value = 40;
         const now = this.audioContext.currentTime;
         
-        // Primer sonido (lub)
         gainNode.gain.setValueAtTime(0, now);
         gainNode.gain.linearRampToValueAtTime(0.6, now + 0.01);
         gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
         
         oscillator.start(now);
         oscillator.stop(now + 0.1);
-      } else {
-        oscillator.frequency.value = type === 'warning' ? 440 : 880;
-        const now = this.audioContext.currentTime;
-        gainNode.gain.setValueAtTime(0.3, now);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
         
-        oscillator.start(now);
-        oscillator.stop(now + 0.1);
+        console.log('Beep de latido reproducido');
       }
 
     } catch (error) {

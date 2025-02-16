@@ -28,9 +28,6 @@ const VitalsContext = createContext<VitalsContextType | undefined>(undefined);
 const beepPlayer = new BeepPlayer();
 const ppgProcessor = new PPGProcessor();
 
-const MEASUREMENT_DURATION = 30;
-const MIN_QUALITY_THRESHOLD = 0.3;
-
 export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [bpm, setBpm] = useState<number>(0);
   const [spo2, setSpo2] = useState<number>(0);
@@ -43,7 +40,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isStarted, setIsStarted] = useState<boolean>(false);
   const [measurementProgress, setMeasurementProgress] = useState(0);
   const [measurementQuality, setMeasurementQuality] = useState(0);
-  const [measurementStartTime, setMeasurementStartTime] = useState<number | null>(null);
   const [sensitivitySettings, setSensitivitySettings] = useState<SensitivitySettings>({
     signalAmplification: 1.5,
     noiseReduction: 1.2,
@@ -70,29 +66,32 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const processFrame = useCallback(async (imageData: ImageData) => {
     if (!isStarted) return;
 
-    setIsProcessing(true);
     try {
       const vitals = await ppgProcessor.processFrame(imageData);
       
       if (vitals) {
+        // Actualizar calidad en tiempo real
         setMeasurementQuality(vitals.signalQuality);
 
-        if (vitals.signalQuality > MIN_QUALITY_THRESHOLD) {
-          if (vitals.isPeak) {
-            await beepPlayer.playBeep('heartbeat', vitals.signalQuality);
-          }
-
-          if (vitals.bpm > 0) setBpm(vitals.bpm);
-          if (vitals.spo2 > 0) setSpo2(vitals.spo2);
-          if (vitals.systolic > 0 && vitals.diastolic > 0) {
-            setSystolic(vitals.systolic);
-            setDiastolic(vitals.diastolic);
-          }
-          
-          setHasArrhythmia(vitals.hasArrhythmia);
-          setArrhythmiaType(vitals.arrhythmiaType);
-          setReadings(ppgProcessor.getReadings());
+        // Si se detecta un pico, reproducir el beep inmediatamente
+        if (vitals.isPeak) {
+          console.log('Pico detectado - Reproduciendo beep');
+          await beepPlayer.playBeep('heartbeat', vitals.signalQuality);
         }
+
+        // Actualizar datos en tiempo real
+        if (vitals.bpm > 0) setBpm(vitals.bpm);
+        if (vitals.spo2 > 0) setSpo2(vitals.spo2);
+        if (vitals.systolic > 0 && vitals.diastolic > 0) {
+          setSystolic(vitals.systolic);
+          setDiastolic(vitals.diastolic);
+        }
+        
+        setHasArrhythmia(vitals.hasArrhythmia);
+        setArrhythmiaType(vitals.arrhythmiaType);
+        
+        // Actualizar gráfica en tiempo real
+        setReadings(ppgProcessor.getReadings());
       }
     } catch (error) {
       console.error('Error procesando frame:', error);
@@ -101,54 +100,22 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         title: "Error en el procesamiento",
         description: "Error al procesar la imagen de la cámara."
       });
-    } finally {
-      setIsProcessing(false);
     }
   }, [isStarted, toast]);
 
   const toggleMeasurement = useCallback(() => {
     if (isStarted) {
       setIsStarted(false);
-      setMeasurementStartTime(null);
       resetMeasurements();
     } else {
       resetMeasurements();
       setIsStarted(true);
-      setMeasurementStartTime(Date.now());
-      setMeasurementProgress(0);
       toast({
         title: "Iniciando medición",
         description: "Por favor, mantenga su dedo frente a la cámara."
       });
     }
   }, [isStarted, toast, resetMeasurements]);
-
-  React.useEffect(() => {
-    let interval: NodeJS.Timeout;
-
-    if (isStarted && measurementStartTime) {
-      interval = setInterval(() => {
-        const elapsed = (Date.now() - measurementStartTime) / 1000;
-        const progress = Math.min((elapsed / MEASUREMENT_DURATION) * 100, 100);
-        setMeasurementProgress(progress);
-
-        if (elapsed >= MEASUREMENT_DURATION) {
-          setIsStarted(false);
-          beepPlayer.playBeep('success');
-          toast({
-            title: "Medición completada",
-            description: "La medición se ha completado exitosamente."
-          });
-        }
-      }, 100);
-    }
-
-    return () => {
-      if (interval) {
-        clearInterval(interval);
-      }
-    };
-  }, [isStarted, measurementStartTime, toast]);
 
   const value = {
     bpm,
