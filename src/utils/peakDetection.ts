@@ -1,10 +1,9 @@
-
 export class PeakDetector {
   private adaptiveThreshold = 0;
-  private readonly minPeakDistance = 300; // Reducido para permitir más latidos
+  private readonly minPeakDistance = 300;
   private lastPeakTime = 0;
   private readonly bufferSize = 30;
-  private readonly minAmplitude = 0.1; // Reducido para mejor sensibilidad
+  private readonly minAmplitude = 0.1;
   private readonly adaptiveRate = 0.2;
   private peakBuffer: number[] = [];
   private timeBuffer: number[] = [];
@@ -20,7 +19,6 @@ export class PeakDetector {
       ultimoPico: this.lastPeakTime
     });
     
-    // Verificar si ha pasado suficiente tiempo desde el último pico
     const timeSinceLastPeak = now - this.lastPeakTime;
     const minTimeGap = (60 / this.MAX_BPM) * 1000;
     const maxTimeGap = (60 / this.MIN_BPM) * 1000;
@@ -44,20 +42,25 @@ export class PeakDetector {
     // Análisis de señal mejorado
     const recentValues = signalBuffer.slice(-this.bufferSize);
     const avgValue = recentValues.reduce((a, b) => a + b, 0) / recentValues.length;
-    const stdDev = Math.sqrt(
-      recentValues.reduce((a, b) => a + Math.pow(b - avgValue, 2), 0) / recentValues.length
-    );
+    
+    // Calcular desviación estándar solo con valores positivos
+    const positiveValues = recentValues.filter(v => v > 0);
+    const stdDev = positiveValues.length > 0 ? 
+      Math.sqrt(
+        positiveValues.reduce((a, b) => a + Math.pow(b - avgValue, 2), 0) / positiveValues.length
+      ) : 1;
 
     console.log('📊 Estadísticas de señal:', {
       promedio: avgValue,
       desviacionEstandar: stdDev
     });
 
-    // Umbral adaptativo más sensible
-    this.adaptiveThreshold = avgValue + (stdDev * 1.0);
+    // Umbral adaptativo siempre positivo
+    this.adaptiveThreshold = Math.abs(avgValue) + (stdDev * 0.5);
 
+    // Validaciones más flexibles
     const isValidShape = this.validatePeakShape(currentValue, signalBuffer);
-    const hasSignificantAmplitude = currentValue > this.adaptiveThreshold;
+    const hasSignificantAmplitude = Math.abs(currentValue) > this.adaptiveThreshold * 0.5;
     const isLocalMaximum = this.isLocalMax(currentValue, signalBuffer);
 
     console.log('🎯 Validaciones:', {
@@ -67,7 +70,7 @@ export class PeakDetector {
       umbralAdaptativo: this.adaptiveThreshold
     });
 
-    if (hasSignificantAmplitude && isLocalMaximum && isValidShape) {
+    if (isLocalMaximum && (hasSignificantAmplitude || isValidShape)) {
       if (timeSinceLastPeak > maxTimeGap) {
         console.log('⚠️ Demasiado tiempo desde el último pico, reseteando');
         this.lastPeakTime = now;
@@ -102,9 +105,9 @@ export class PeakDetector {
   }
 
   private isLocalMax(currentValue: number, signalBuffer: number[]): boolean {
-    const window = 5; // Ventana de análisis aumentada
+    const window = 5;
     const recent = signalBuffer.slice(-window);
-    return currentValue >= Math.max(...recent);
+    return Math.abs(currentValue) >= Math.max(...recent.map(Math.abs));
   }
 
   private validatePeakShape(currentValue: number, signalBuffer: number[]): boolean {
@@ -112,14 +115,15 @@ export class PeakDetector {
 
     const last6Values = [...signalBuffer.slice(-5), currentValue];
     
-    // Verificar forma de onda típica de PPG
-    const isRising = last6Values[4] > last6Values[3] && 
-                    last6Values[3] > last6Values[2] &&
-                    last6Values[2] > last6Values[1];
-    const isPeak = currentValue > last6Values[4];
-    const hasDip = last6Values[1] < last6Values[0]; // Verifica el valle anterior
+    // Verificar tendencia creciente
+    let increasing = 0;
+    for (let i = 1; i < last6Values.length; i++) {
+      if (Math.abs(last6Values[i]) > Math.abs(last6Values[i-1])) {
+        increasing++;
+      }
+    }
     
-    return isRising && isPeak && hasDip;
+    return increasing >= 3; // Al menos 3 incrementos en los últimos 6 valores
   }
 
   private validatePeakInterval(currentInterval: number): boolean {
@@ -130,13 +134,12 @@ export class PeakDetector {
     const recentIntervals = this.timeBuffer.slice(-3);
     const avgInterval = recentIntervals.reduce((a, b) => a + b, 0) / recentIntervals.length;
     
-    // Tolerancia más estricta para latidos reales
-    const maxVariation = 0.25; // 25% de variación máxima
+    const maxVariation = 0.4; // 40% de variación máxima
     const isWithinRange = Math.abs(currentInterval - avgInterval) <= avgInterval * maxVariation;
     const isPhysiologicallyValid = currentInterval >= this.minPeakDistance && 
                                   currentInterval <= (60 / this.MIN_BPM) * 1000;
 
-    return isWithinRange && isPhysiologicallyValid;
+    return isPhysiologicallyValid || isWithinRange;
   }
 
   private calculatePeakQuality(peakValue: number, mean: number, stdDev: number): number {
