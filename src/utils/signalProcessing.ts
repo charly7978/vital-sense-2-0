@@ -15,7 +15,7 @@ export class SignalProcessor {
   private readonly BPM_HISTORY_SIZE = 10;
   private readonly MIN_QUALITY_FOR_BP = 0.6;
   private noFingerTimer: number | null = null;
-  private readonly RESET_DELAY = 2000; // 2 segundos sin dedo para resetear valores
+  private readonly RESET_DELAY = 2000;
 
   constructor(windowSize: number) {
     this.windowSize = windowSize;
@@ -181,80 +181,100 @@ export class SignalProcessor {
         .maybeSingle();
 
       if (error) {
-        console.error('Error obteniendo calibración:', error);
-        return this.lastValidPressure;
+        console.log('Error o tabla no existente, usando valores por defecto:', error);
+        return this.estimateWithoutCalibration(signal, peakTimes);
       }
 
       if (!calibrationData) {
-        console.log('No hay datos de calibración');
-        return this.lastValidPressure;
+        console.log('No hay datos de calibración, usando estimación base');
+        return this.estimateWithoutCalibration(signal, peakTimes);
       }
 
-      const ptts = [];
-      for (let i = 1; i < peakTimes.length; i++) {
-        const ptt = peakTimes[i] - peakTimes[i-1];
-        if (ptt >= 500 && ptt <= 1200) {
-          ptts.push(ptt);
-        }
-      }
-
-      if (ptts.length < 2) {
-        console.log('PTTs insuficientes');
-        return this.lastValidPressure;
-      }
-
-      const avgPTT = ptts.reduce((a, b) => a + b, 0) / ptts.length;
-      
-      const maxAmplitude = Math.max(...signal);
-      const minAmplitude = Math.min(...signal);
-      const pulseAmplitude = maxAmplitude - minAmplitude;
-
-      const pttCoeff = -0.3;
-      const amplitudeCoeff = 0.2;
-      const ageCoeff = 0.02;
-      const heightCoeff = -0.01;
-      const weightCoeff = 0.005;
-
-      const ageFactor = ((calibrationData.age || 30) - 30) * ageCoeff;
-      const heightFactor = ((calibrationData.height || 170) - 170) * heightCoeff;
-      const weightFactor = ((calibrationData.weight || 70) - 70) * weightCoeff;
-
-      let systolic = Math.round(
-        calibrationData.systolic_reference +
-        pttCoeff * (avgPTT - 800) +
-        amplitudeCoeff * (pulseAmplitude - 50) +
-        ageFactor + heightFactor + weightFactor
-      );
-
-      const pulsePress = systolic - calibrationData.diastolic_reference;
-      let diastolic = Math.round(systolic - pulsePress * 0.7);
-
-      systolic = Math.min(Math.max(systolic, 100), 160);
-      diastolic = Math.min(Math.max(diastolic, 60), 100);
-
-      if (systolic <= diastolic) {
-        systolic = diastolic + 30;
-      }
-
-      this.lastValidPressure = {
-        systolic: Math.round(this.lastValidPressure.systolic * 0.8 + systolic * 0.2),
-        diastolic: Math.round(this.lastValidPressure.diastolic * 0.8 + diastolic * 0.2)
-      };
-
-      console.log('Estimación BP:', {
-        systolic: this.lastValidPressure.systolic,
-        diastolic: this.lastValidPressure.diastolic,
-        avgPTT,
-        pulseAmplitude,
-        calibrationData
-      });
-
-      return this.lastValidPressure;
-
+      return this.estimateWithCalibration(signal, peakTimes, calibrationData);
     } catch (error) {
       console.error('Error en estimación BP:', error);
       return this.lastValidPressure;
     }
+  }
+
+  private estimateWithoutCalibration(signal: number[], peakTimes: number[]): { 
+    systolic: number;
+    diastolic: number;
+  } {
+    const ptts = this.calculatePTTs(peakTimes);
+    if (ptts.length < 2) return this.lastValidPressure;
+
+    const avgPTT = ptts.reduce((a, b) => a + b, 0) / ptts.length;
+    const pulseAmplitude = Math.max(...signal) - Math.min(...signal);
+
+    let systolic = Math.round(120 - (avgPTT - 800) * 0.1);
+    let diastolic = Math.round(systolic - 40);
+
+    systolic += Math.round((pulseAmplitude - 50) * 0.2);
+    diastolic += Math.round((pulseAmplitude - 50) * 0.1);
+
+    systolic = Math.min(Math.max(systolic, 90), 160);
+    diastolic = Math.min(Math.max(diastolic, 60), 90);
+
+    this.lastValidPressure = {
+      systolic: Math.round(this.lastValidPressure.systolic * 0.7 + systolic * 0.3),
+      diastolic: Math.round(this.lastValidPressure.diastolic * 0.7 + diastolic * 0.3)
+    };
+
+    return this.lastValidPressure;
+  }
+
+  private estimateWithCalibration(
+    signal: number[], 
+    peakTimes: number[], 
+    calibrationData: any
+  ): { systolic: number; diastolic: number; } {
+    const ptts = this.calculatePTTs(peakTimes);
+    if (ptts.length < 2) return this.lastValidPressure;
+
+    const avgPTT = ptts.reduce((a, b) => a + b, 0) / ptts.length;
+    const pulseAmplitude = Math.max(...signal) - Math.min(...signal);
+
+    const pttCoeff = -0.3;
+    const amplitudeCoeff = 0.2;
+    const ageCoeff = 0.02;
+    const heightCoeff = -0.01;
+    const weightCoeff = 0.005;
+
+    const ageFactor = ((calibrationData.age || 30) - 30) * ageCoeff;
+    const heightFactor = ((calibrationData.height || 170) - 170) * heightCoeff;
+    const weightFactor = ((calibrationData.weight || 70) - 70) * weightCoeff;
+
+    let systolic = Math.round(
+      calibrationData.systolic_reference +
+      pttCoeff * (avgPTT - 800) +
+      amplitudeCoeff * (pulseAmplitude - 50) +
+      ageFactor + heightFactor + weightFactor
+    );
+
+    const pulsePress = systolic - calibrationData.diastolic_reference;
+    let diastolic = Math.round(systolic - pulsePress * 0.7);
+
+    systolic = Math.min(Math.max(systolic, 90), 160);
+    diastolic = Math.min(Math.max(diastolic, 60), 90);
+
+    this.lastValidPressure = {
+      systolic: Math.round(this.lastValidPressure.systolic * 0.8 + systolic * 0.2),
+      diastolic: Math.round(this.lastValidPressure.diastolic * 0.8 + diastolic * 0.2)
+    };
+
+    return this.lastValidPressure;
+  }
+
+  private calculatePTTs(peakTimes: number[]): number[] {
+    const ptts = [];
+    for (let i = 1; i < peakTimes.length; i++) {
+      const ptt = peakTimes[i] - peakTimes[i-1];
+      if (ptt >= 500 && ptt <= 1200) {
+        ptts.push(ptt);
+      }
+    }
+    return ptts;
   }
 
   analyzeSignalQuality(signal: number[]): number {
