@@ -50,24 +50,51 @@ export type Database = {
           },
         ]
       }
-      audio_files: {
+      blood_pressure_calibration: {
         Row: {
-          created_at: string
-          file_path: string
+          age: number | null
+          calibration_date: string | null
+          calibration_quality: number | null
+          created_at: string | null
+          diastolic_reference: number
+          environmental_conditions: Json | null
+          height: number | null
           id: string
-          name: string
+          is_active: boolean | null
+          notes: string | null
+          systolic_reference: number
+          user_id: string | null
+          weight: number | null
         }
         Insert: {
-          created_at?: string
-          file_path: string
+          age?: number | null
+          calibration_date?: string | null
+          calibration_quality?: number | null
+          created_at?: string | null
+          diastolic_reference: number
+          environmental_conditions?: Json | null
+          height?: number | null
           id?: string
-          name: string
+          is_active?: boolean | null
+          notes?: string | null
+          systolic_reference: number
+          user_id?: string | null
+          weight?: number | null
         }
         Update: {
-          created_at?: string
-          file_path?: string
+          age?: number | null
+          calibration_date?: string | null
+          calibration_quality?: number | null
+          created_at?: string | null
+          diastolic_reference?: number
+          environmental_conditions?: Json | null
+          height?: number | null
           id?: string
-          name?: string
+          is_active?: boolean | null
+          notes?: string | null
+          systolic_reference?: number
+          user_id?: string | null
+          weight?: number | null
         }
         Relationships: []
       }
@@ -104,147 +131,6 @@ export type Database = {
           success?: boolean | null
           user_id?: string | null
           validation_metrics?: Json | null
-        }
-        Relationships: []
-      }
-      calibration_patterns: {
-        Row: {
-          affects: Json | null
-          algorithm_version: string | null
-          bpm_smoothing: Json
-          buffer_size: Json
-          calibration_date: string | null
-          created_at: string | null
-          description: string | null
-          device_characteristics: Json | null
-          device_requirements: Json | null
-          environmental_factors: Json | null
-          finger_detection_delay: Json
-          id: string
-          is_baseline: boolean | null
-          last_used_at: string | null
-          last_validated_at: string | null
-          max_peak_distance: Json
-          measurement_duration: Json
-          min_brightness: Json
-          min_frames_for_calculation: Json
-          min_peak_distance: Json
-          min_peaks_for_valid_hr: Json
-          min_processing_interval: Json
-          min_red_dominance: Json
-          min_red_threshold: Json
-          min_red_value: Json
-          min_spo2: Json
-          min_valid_pixels_ratio: Json
-          min_valid_readings: Json
-          name: string
-          noise_reduction: Json
-          peak_threshold: Json
-          peak_threshold_factor: Json
-          performance_metrics: Json | null
-          processing_parameters: Json | null
-          quality_threshold: Json
-          reset_delay: Json
-          signal_amplification: Json
-          signal_processing_config: Json | null
-          spo2_calibration: Json
-          stability_threshold: Json
-          updated_at: string | null
-          validation_metrics: Json | null
-          version: string | null
-          window_size: Json
-        }
-        Insert: {
-          affects?: Json | null
-          algorithm_version?: string | null
-          bpm_smoothing?: Json
-          buffer_size?: Json
-          calibration_date?: string | null
-          created_at?: string | null
-          description?: string | null
-          device_characteristics?: Json | null
-          device_requirements?: Json | null
-          environmental_factors?: Json | null
-          finger_detection_delay?: Json
-          id?: string
-          is_baseline?: boolean | null
-          last_used_at?: string | null
-          last_validated_at?: string | null
-          max_peak_distance?: Json
-          measurement_duration?: Json
-          min_brightness?: Json
-          min_frames_for_calculation?: Json
-          min_peak_distance?: Json
-          min_peaks_for_valid_hr?: Json
-          min_processing_interval?: Json
-          min_red_dominance?: Json
-          min_red_threshold?: Json
-          min_red_value?: Json
-          min_spo2?: Json
-          min_valid_pixels_ratio?: Json
-          min_valid_readings?: Json
-          name: string
-          noise_reduction?: Json
-          peak_threshold?: Json
-          peak_threshold_factor?: Json
-          performance_metrics?: Json | null
-          processing_parameters?: Json | null
-          quality_threshold?: Json
-          reset_delay?: Json
-          signal_amplification?: Json
-          signal_processing_config?: Json | null
-          spo2_calibration?: Json
-          stability_threshold?: Json
-          updated_at?: string | null
-          validation_metrics?: Json | null
-          version?: string | null
-          window_size?: Json
-        }
-        Update: {
-          affects?: Json | null
-          algorithm_version?: string | null
-          bpm_smoothing?: Json
-          buffer_size?: Json
-          calibration_date?: string | null
-          created_at?: string | null
-          description?: string | null
-          device_characteristics?: Json | null
-          device_requirements?: Json | null
-          environmental_factors?: Json | null
-          finger_detection_delay?: Json
-          id?: string
-          is_baseline?: boolean | null
-          last_used_at?: string | null
-          last_validated_at?: string | null
-          max_peak_distance?: Json
-          measurement_duration?: Json
-          min_brightness?: Json
-          min_frames_for_calculation?: Json
-          min_peak_distance?: Json
-          min_peaks_for_valid_hr?: Json
-          min_processing_interval?: Json
-          min_red_dominance?: Json
-          min_red_threshold?: Json
-          min_red_value?: Json
-          min_spo2?: Json
-          min_valid_pixels_ratio?: Json
-          min_valid_readings?: Json
-          name?: string
-          noise_reduction?: Json
-          peak_threshold?: Json
-          peak_threshold_factor?: Json
-          performance_metrics?: Json | null
-          processing_parameters?: Json | null
-          quality_threshold?: Json
-          reset_delay?: Json
-          signal_amplification?: Json
-          signal_processing_config?: Json | null
-          spo2_calibration?: Json
-          stability_threshold?: Json
-          updated_at?: string | null
-          validation_metrics?: Json | null
-          version?: string | null
-          window_size?: Json
         }
         Relationships: []
       }
@@ -287,36 +173,6 @@ export type Database = {
           ppg_calibration_data?: Json | null
           reference_measurements?: Json | null
           user_id?: string
-        }
-        Relationships: []
-      }
-      calibration_settings: {
-        Row: {
-          created_at: string
-          description: string | null
-          id: string
-          is_active: boolean | null
-          name: string
-          settings: Json
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          is_active?: boolean | null
-          name: string
-          settings?: Json
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          is_active?: boolean | null
-          name?: string
-          settings?: Json
-          updated_at?: string | null
         }
         Relationships: []
       }
@@ -386,42 +242,6 @@ export type Database = {
           systolic_pressure?: number | null
           user_id?: string | null
           validation_results?: Json | null
-        }
-        Relationships: []
-      }
-      measurement_sessions: {
-        Row: {
-          created_at: string | null
-          device_info: Json | null
-          end_time: string | null
-          environmental_conditions: Json | null
-          id: string
-          notes: string | null
-          session_quality: number | null
-          start_time: string | null
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          device_info?: Json | null
-          end_time?: string | null
-          environmental_conditions?: Json | null
-          id?: string
-          notes?: string | null
-          session_quality?: number | null
-          start_time?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          device_info?: Json | null
-          end_time?: string | null
-          environmental_conditions?: Json | null
-          id?: string
-          notes?: string | null
-          session_quality?: number | null
-          start_time?: string | null
-          user_id?: string | null
         }
         Relationships: []
       }
@@ -502,45 +322,6 @@ export type Database = {
         }
         Relationships: []
       }
-      medical_device_calibration: {
-        Row: {
-          calibration_date: string | null
-          calibration_values: Json | null
-          created_at: string | null
-          device_type: string | null
-          environmental_data: Json | null
-          id: string
-          is_active: boolean | null
-          reference_device: Json | null
-          user_id: string | null
-          validation_results: Json | null
-        }
-        Insert: {
-          calibration_date?: string | null
-          calibration_values?: Json | null
-          created_at?: string | null
-          device_type?: string | null
-          environmental_data?: Json | null
-          id?: string
-          is_active?: boolean | null
-          reference_device?: Json | null
-          user_id?: string | null
-          validation_results?: Json | null
-        }
-        Update: {
-          calibration_date?: string | null
-          calibration_values?: Json | null
-          created_at?: string | null
-          device_type?: string | null
-          environmental_data?: Json | null
-          id?: string
-          is_active?: boolean | null
-          reference_device?: Json | null
-          user_id?: string | null
-          validation_results?: Json | null
-        }
-        Relationships: []
-      }
       performance_metrics: {
         Row: {
           cpu_usage_percent: number | null
@@ -581,108 +362,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      ppg_calibration: {
-        Row: {
-          created_at: string
-          description: string | null
-          id: string
-          is_active: boolean | null
-          max_red_intensity: number
-          min_red_intensity: number
-          min_valid_pixels: number
-          name: string
-          pixel_step: number
-          red_dominance_threshold: number
-          roi_scale: number
-          updated_at: string
-          validated_by: string | null
-          validation_date: string | null
-          validation_score: number | null
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          is_active?: boolean | null
-          max_red_intensity: number
-          min_red_intensity: number
-          min_valid_pixels: number
-          name: string
-          pixel_step: number
-          red_dominance_threshold: number
-          roi_scale: number
-          updated_at?: string
-          validated_by?: string | null
-          validation_date?: string | null
-          validation_score?: number | null
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          is_active?: boolean | null
-          max_red_intensity?: number
-          min_red_intensity?: number
-          min_valid_pixels?: number
-          name?: string
-          pixel_step?: number
-          red_dominance_threshold?: number
-          roi_scale?: number
-          updated_at?: string
-          validated_by?: string | null
-          validation_date?: string | null
-          validation_score?: number | null
-        }
-        Relationships: []
-      }
-      ppg_learned_patterns: {
-        Row: {
-          brightness: number
-          created_at: string
-          id: string
-          red_dominance: number
-          red_intensity: number
-          red_threshold: number
-          sampling_rate: number
-          sensitivity: number
-          signal_quality: number
-          success_count: number | null
-          threshold: number
-          total_readings: number | null
-          updated_at: string
-        }
-        Insert: {
-          brightness: number
-          created_at?: string
-          id?: string
-          red_dominance: number
-          red_intensity: number
-          red_threshold: number
-          sampling_rate: number
-          sensitivity: number
-          signal_quality: number
-          success_count?: number | null
-          threshold: number
-          total_readings?: number | null
-          updated_at?: string
-        }
-        Update: {
-          brightness?: number
-          created_at?: string
-          id?: string
-          red_dominance?: number
-          red_intensity?: number
-          red_threshold?: number
-          sampling_rate?: number
-          sensitivity?: number
-          signal_quality?: number
-          success_count?: number | null
-          threshold?: number
-          total_readings?: number | null
-          updated_at?: string
-        }
-        Relationships: []
       }
       ppg_signals: {
         Row: {
@@ -812,54 +491,6 @@ export type Database = {
           spo2_calibration_data?: Json | null
           user_id?: string | null
           weight?: number | null
-        }
-        Relationships: []
-      }
-      vital_readings: {
-        Row: {
-          created_at: string | null
-          diastolic: number | null
-          environmental_conditions: Json | null
-          id: string
-          measurement_confidence: number | null
-          ppg_raw: number[]
-          processing_metadata: Json | null
-          pulse_rate: number | null
-          session_id: string
-          signal_quality: number | null
-          spo2: number | null
-          systolic: number | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          diastolic?: number | null
-          environmental_conditions?: Json | null
-          id?: string
-          measurement_confidence?: number | null
-          ppg_raw: number[]
-          processing_metadata?: Json | null
-          pulse_rate?: number | null
-          session_id: string
-          signal_quality?: number | null
-          spo2?: number | null
-          systolic?: number | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          diastolic?: number | null
-          environmental_conditions?: Json | null
-          id?: string
-          measurement_confidence?: number | null
-          ppg_raw?: number[]
-          processing_metadata?: Json | null
-          pulse_rate?: number | null
-          session_id?: string
-          signal_quality?: number | null
-          spo2?: number | null
-          systolic?: number | null
-          user_id?: string
         }
         Relationships: []
       }

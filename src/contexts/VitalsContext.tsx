@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { BeepPlayer } from '../utils/audioUtils';
 import { PPGProcessor } from '../utils/ppgProcessor';
@@ -16,7 +17,6 @@ interface VitalsContextType {
   isStarted: boolean;
   measurementProgress: number;
   measurementQuality: number;
-  fingerPresent: boolean;
   sensitivitySettings: SensitivitySettings;
   toggleMeasurement: () => void;
   processFrame: (imageData: ImageData) => void;
@@ -28,8 +28,11 @@ const VitalsContext = createContext<VitalsContextType | undefined>(undefined);
 const beepPlayer = new BeepPlayer();
 const ppgProcessor = new PPGProcessor();
 
-const MEASUREMENT_DURATION = 30;
+const MEASUREMENT_DURATION = 30; // seconds
+const MIN_QUALITY_THRESHOLD = 0.3;
 const MIN_READINGS_FOR_BP = 10;
+const NO_FINGER_THRESHOLD = 0.2; // Umbral para detectar cuando no hay dedo
+const CONSECUTIVE_LOW_QUALITY_LIMIT = 5; // Número de frames consecutivos con baja calidad para resetear
 
 export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [bpm, setBpm] = useState<number>(0);
@@ -43,15 +46,14 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isStarted, setIsStarted] = useState<boolean>(false);
   const [measurementProgress, setMeasurementProgress] = useState(0);
   const [measurementQuality, setMeasurementQuality] = useState(0);
-  const [fingerPresent, setFingerPresent] = useState<boolean>(false);
   const [measurementStartTime, setMeasurementStartTime] = useState<number | null>(null);
   const [validReadingsCount, setValidReadingsCount] = useState(0);
+  const [consecutiveLowQualityCount, setConsecutiveLowQualityCount] = useState(0);
   const [sensitivitySettings, setSensitivitySettings] = useState<SensitivitySettings>({
-    signalAmplification: 2.0,
-    noiseReduction: 1.0,
-    peakDetection: 1.1
+    signalAmplification: 1.5,
+    noiseReduction: 1.2,
+    peakDetection: 1.3
   });
-  const DETECTION_THRESHOLD = 165; // Umbral ajustado para mejor precisión
 
   const { toast } = useToast();
 
@@ -64,8 +66,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setArrhythmiaType('Normal');
     setReadings([]);
     setValidReadingsCount(0);
-    setFingerPresent(false);
-    setMeasurementQuality(0);
+    setConsecutiveLowQualityCount(0);
   }, []);
 
   const updateSensitivitySettings = useCallback((newSettings: SensitivitySettings) => {
@@ -80,46 +81,59 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const vitals = await ppgProcessor.processFrame(imageData);
       
-      if (vitals) {
-        // Detección inmediata del dedo
-        const isFingerDetected = vitals.redValue > DETECTION_THRESHOLD;
-        setFingerPresent(isFingerDetected);
+      // Verificar si no hay dedo presente
+      if (!vitals || vitals.signalQuality < NO_FINGER_THRESHOLD) {
+        setConsecutiveLowQualityCount(prev => prev + 1);
         
-        if (isFingerDetected) {
-          setReadings(vitals.readings);
-          
-          if (vitals.isPeak) {
-            await beepPlayer.playBeep('heartbeat');
-            setValidReadingsCount(prev => prev + 1);
-          }
+        if (consecutiveLowQualityCount >= CONSECUTIVE_LOW_QUALITY_LIMIT) {
+          console.log('No se detecta dedo o señal muy baja:', vitals?.signalQuality || 0);
+          resetMeasurements();
+          setMeasurementQuality(0);
+        }
+        return;
+      }
 
-          if (vitals.bpm > 0) {
-            setBpm(vitals.bpm);
-          }
+      // Resetear contador si la calidad es buena
+      if (vitals.signalQuality > MIN_QUALITY_THRESHOLD) {
+        setConsecutiveLowQualityCount(0);
+      }
 
-          if (vitals.spo2 >= 80 && vitals.spo2 <= 100) {
-            setSpo2(vitals.spo2);
-          }
+      setMeasurementQuality(vitals.signalQuality);
 
-          if (vitals.systolic > 0 && vitals.diastolic > 0) {
+      // Solo procesar si la calidad es suficiente
+      if (vitals.signalQuality > MIN_QUALITY_THRESHOLD) {
+        setValidReadingsCount(prev => prev + 1);
+
+        if (vitals.isPeak) {
+          console.log('Pico detectado, reproduciendo beep');
+          await beepPlayer.playBeep('heartbeat');
+        }
+
+        // Actualizar BPM solo si es válido y hay suficiente calidad
+        if (vitals.bpm > 40 && vitals.bpm < 200) {
+          setBpm(vitals.bpm);
+        }
+
+        // Actualizar SpO2 solo si es válido y hay suficiente calidad
+        if (vitals.spo2 >= 80 && vitals.spo2 <= 100) {
+          setSpo2(vitals.spo2);
+        }
+
+        // Actualizar presión arterial solo si hay suficientes lecturas válidas
+        if (validReadingsCount >= MIN_READINGS_FOR_BP) {
+          if (vitals.systolic > 0 && vitals.diastolic > 0 && 
+              vitals.systolic > vitals.diastolic &&
+              vitals.systolic >= 90 && vitals.systolic <= 180 &&
+              vitals.diastolic >= 60 && vitals.diastolic <= 120) {
             setSystolic(vitals.systolic);
             setDiastolic(vitals.diastolic);
           }
-
-          setHasArrhythmia(vitals.hasArrhythmia);
-          setArrhythmiaType(vitals.arrhythmiaType);
-        } else {
-          // Reset inmediato cuando no hay dedo
-          setReadings([]);
-          setBpm(0);
-          setSpo2(0);
-          setSystolic(0);
-          setDiastolic(0);
-          setHasArrhythmia(false);
-          setArrhythmiaType('Normal');
         }
-      }
 
+        setHasArrhythmia(vitals.hasArrhythmia);
+        setArrhythmiaType(vitals.arrhythmiaType);
+        setReadings(ppgProcessor.getReadings());
+      }
     } catch (error) {
       console.error('Error processing frame:', error);
       toast({
@@ -128,7 +142,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         description: "Error al procesar la imagen de la cámara."
       });
     }
-  }, [isStarted, beepPlayer, toast]);
+  }, [isStarted, consecutiveLowQualityCount, validReadingsCount, toast, resetMeasurements]);
 
   const toggleMeasurement = useCallback(() => {
     setIsStarted(prev => !prev);
@@ -195,7 +209,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     isStarted,
     measurementProgress,
     measurementQuality,
-    fingerPresent,
     sensitivitySettings,
     toggleMeasurement,
     processFrame,

@@ -16,7 +16,6 @@ export interface PPGData {
   readings: VitalReading[];
   isPeak?: boolean;
   signalQuality: number;
-  redValue: number;
   hrvMetrics?: {
     sdnn: number;
     rmssd: number;
@@ -71,3 +70,4 @@ export interface BPCalibrationData {
   notes?: string;
   environmental_conditions?: Record<string, any>;
 }
+
