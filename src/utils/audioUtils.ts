@@ -1,6 +1,8 @@
 
 export class BeepPlayer {
   private audioContext: AudioContext | null = null;
+  private lastBeepTime: number = 0;
+  private readonly minBeepInterval = 300; // Mínimo tiempo entre beeps para evitar sobreposición
 
   constructor() {
     this.initAudioContext();
@@ -10,19 +12,25 @@ export class BeepPlayer {
     try {
       this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       await this.audioContext.resume();
-      console.log('Contexto de audio inicializado');
+      console.log('✓ Audio Context inicializado correctamente');
     } catch (error) {
-      console.error('Error inicializando audio:', error);
+      console.error('✗ Error inicializando audio:', error);
     }
   }
 
   async playBeep(type: 'heartbeat' | 'warning' | 'success' = 'heartbeat', quality: number = 1) {
+    const now = Date.now();
+    if (now - this.lastBeepTime < this.minBeepInterval) {
+      console.log('⚠ Beep ignorado: demasiado pronto');
+      return;
+    }
+
     if (!this.audioContext) {
       await this.initAudioContext();
     }
 
     if (!this.audioContext) {
-      console.error('No se pudo inicializar el audio');
+      console.error('✗ No se pudo inicializar el audio');
       return;
     }
 
@@ -33,22 +41,26 @@ export class BeepPlayer {
       oscillator.connect(gainNode);
       gainNode.connect(this.audioContext.destination);
 
+      const currentTime = this.audioContext.currentTime;
+
       if (type === 'heartbeat') {
-        oscillator.frequency.value = 40;
-        const now = this.audioContext.currentTime;
+        // Configuración específica para sonido de latido
+        oscillator.frequency.value = 150; // Frecuencia más audible
         
-        gainNode.gain.setValueAtTime(0, now);
-        gainNode.gain.linearRampToValueAtTime(0.6, now + 0.01);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+        // Primer pulso (más fuerte)
+        gainNode.gain.setValueAtTime(0, currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.7, currentTime + 0.01);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.08);
         
-        oscillator.start(now);
-        oscillator.stop(now + 0.1);
-        
-        console.log('Beep de latido reproducido');
+        oscillator.start(currentTime);
+        oscillator.stop(currentTime + 0.08);
+
+        console.log('♥ Beep de latido reproducido');
+        this.lastBeepTime = now;
       }
 
     } catch (error) {
-      console.error('Error reproduciendo beep:', error);
+      console.error('✗ Error reproduciendo beep:', error);
     }
   }
 }
