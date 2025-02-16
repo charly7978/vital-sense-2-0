@@ -1,4 +1,3 @@
-
 import { PTTProcessor } from './pttProcessor';
 import { PPGFeatureExtractor } from './ppgFeatureExtractor';
 import { SignalFilter } from './signalFilter';
@@ -17,17 +16,137 @@ export class SignalProcessor {
   private readonly MIN_QUALITY_FOR_BP = 0.6;
   private noFingerTimer: number | null = null;
   private readonly RESET_DELAY = 2000;
-  private useDefaultEstimation = true;
 
   constructor(windowSize: number) {
     this.windowSize = windowSize;
+    console.log('SignalProcessor inicializado');
+  }
+
+  async estimateBloodPressure(signal: number[], peakTimes: number[]): Promise<{ 
+    systolic: number;
+    diastolic: number;
+  }> {
+    const maxSignal = Math.max(...signal);
+    if (maxSignal < 10) {
+      if (this.noFingerTimer === null) {
+        this.noFingerTimer = Date.now();
+      } else if (Date.now() - this.noFingerTimer >= this.RESET_DELAY) {
+        this.resetValues();
+      }
+      return this.lastValidPressure;
+    }
+
+    this.noFingerTimer = null;
+
+    if (signal.length < 30 || peakTimes.length < 3) {
+      console.log('Señal insuficiente para BP:', {
+        signalLength: signal.length,
+        peaksCount: peakTimes.length
+      });
+      return this.lastValidPressure;
+    }
+
+    try {
+      const { data: calibrationData, error } = await supabase
+        .from('medical_device_calibration')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error) {
+        console.log('Error accediendo a calibración, usando estimación base:', error);
+        return this.estimateWithoutCalibration(signal, peakTimes);
+      }
+
+      if (!calibrationData) {
+        console.log('No hay datos de calibración, usando estimación base');
+        return this.estimateWithoutCalibration(signal, peakTimes);
+      }
+
+      return this.estimateWithCalibration(signal, peakTimes, calibrationData);
+    } catch (error) {
+      console.error('Error en estimación BP:', error);
+      return this.lastValidPressure;
+    }
+  }
+
+  private estimateWithoutCalibration(signal: number[], peakTimes: number[]): { 
+    systolic: number;
+    diastolic: number;
+  } {
+    const ptts = this.calculatePTTs(peakTimes);
+    if (ptts.length < 2) return this.lastValidPressure;
+
+    const avgPTT = ptts.reduce((a, b) => a + b, 0) / ptts.length;
+    const pulseAmplitude = Math.max(...signal) - Math.min(...signal);
+
+    let systolic = Math.round(120 - (avgPTT - 800) * 0.1);
+    let diastolic = Math.round(systolic - 40);
+
+    systolic += Math.round((pulseAmplitude - 50) * 0.2);
+    diastolic += Math.round((pulseAmplitude - 50) * 0.1);
+
+    systolic = Math.min(Math.max(systolic, 90), 160);
+    diastolic = Math.min(Math.max(diastolic, 60), 90);
+
+    this.lastValidPressure = {
+      systolic: Math.round(this.lastValidPressure.systolic * 0.7 + systolic * 0.3),
+      diastolic: Math.round(this.lastValidPressure.diastolic * 0.7 + diastolic * 0.3)
+    };
+
+    return this.lastValidPressure;
+  }
+
+  private estimateWithCalibration(
+    signal: number[], 
+    peakTimes: number[], 
+    calibrationData: any
+  ): { systolic: number; diastolic: number; } {
+    const ptts = this.calculatePTTs(peakTimes);
+    if (ptts.length < 2) return this.lastValidPressure;
+
+    const avgPTT = ptts.reduce((a, b) => a + b, 0) / ptts.length;
+    const pulseAmplitude = Math.max(...signal) - Math.min(...signal);
+
+    const baselinePressure = calibrationData.baseline_pressure || 120;
+    const calibrationFactor = calibrationData.calibration_factor || 1.0;
+
+    let systolic = Math.round(
+      baselinePressure +
+      (avgPTT - 800) * -0.3 * calibrationFactor +
+      (pulseAmplitude - 50) * 0.2
+    );
+
+    let diastolic = Math.round(systolic - 40);
+
+    systolic = Math.min(Math.max(systolic, 90), 160);
+    diastolic = Math.min(Math.max(diastolic, 60), 90);
+
+    this.lastValidPressure = {
+      systolic: Math.round(this.lastValidPressure.systolic * 0.8 + systolic * 0.2),
+      diastolic: Math.round(this.lastValidPressure.diastolic * 0.8 + diastolic * 0.2)
+    };
+
+    return this.lastValidPressure;
+  }
+
+  private calculatePTTs(peakTimes: number[]): number[] {
+    const ptts = [];
+    for (let i = 1; i < peakTimes.length; i++) {
+      const ptt = peakTimes[i] - peakTimes[i-1];
+      if (ptt >= 500 && ptt <= 1200) {
+        ptts.push(ptt);
+      }
+    }
+    return ptts;
   }
 
   private resetValues() {
     this.lastValidPressure = { systolic: 120, diastolic: 80 };
-    this.lastValidSpO2 = 98;
     this.bpmBuffer = [];
-    console.log('Valores reseteados por ausencia de dedo');
+    console.log('SignalProcessor: valores reseteados');
   }
 
   private calculateMovingAverage(values: number[], windowSize: number): number {
@@ -147,144 +266,6 @@ export class SignalProcessor {
       pnn50,
       lfhf: 1.5
     };
-  }
-
-  async estimateBloodPressure(signal: number[], peakTimes: number[]): Promise<{ 
-    systolic: number;
-    diastolic: number;
-  }> {
-    // Si no hay señal válida, retornar último valor válido
-    const maxSignal = Math.max(...signal);
-    if (maxSignal < 10) {
-      if (this.noFingerTimer === null) {
-        this.noFingerTimer = Date.now();
-      } else if (Date.now() - this.noFingerTimer >= this.RESET_DELAY) {
-        this.resetValues();
-      }
-      return this.lastValidPressure;
-    } else {
-      this.noFingerTimer = null;
-    }
-
-    // Verificar que tenemos suficientes datos
-    if (signal.length < 30 || peakTimes.length < 3) {
-      console.log('Señal insuficiente para BP:', {
-        signalLength: signal.length,
-        peaksCount: peakTimes.length
-      });
-      return this.lastValidPressure;
-    }
-
-    // Si estamos usando estimación por defecto, no intentar acceder a Supabase
-    if (this.useDefaultEstimation) {
-      return this.estimateWithoutCalibration(signal, peakTimes);
-    }
-
-    try {
-      const { data: calibrationData, error } = await supabase
-        .from('blood_pressure_calibration')
-        .select('*')
-        .eq('is_active', true)
-        .order('calibration_date', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.log('Error accediendo a calibración, usando estimación por defecto:', error);
-        this.useDefaultEstimation = true; // Evitar futuros intentos de acceso a la tabla
-        return this.estimateWithoutCalibration(signal, peakTimes);
-      }
-
-      if (!calibrationData) {
-        return this.estimateWithoutCalibration(signal, peakTimes);
-      }
-
-      return this.estimateWithCalibration(signal, peakTimes, calibrationData);
-    } catch (error) {
-      console.error('Error en estimación BP:', error);
-      this.useDefaultEstimation = true; // Evitar futuros intentos
-      return this.lastValidPressure;
-    }
-  }
-
-  private estimateWithoutCalibration(signal: number[], peakTimes: number[]): { 
-    systolic: number;
-    diastolic: number;
-  } {
-    const ptts = this.calculatePTTs(peakTimes);
-    if (ptts.length < 2) return this.lastValidPressure;
-
-    const avgPTT = ptts.reduce((a, b) => a + b, 0) / ptts.length;
-    const pulseAmplitude = Math.max(...signal) - Math.min(...signal);
-
-    let systolic = Math.round(120 - (avgPTT - 800) * 0.1);
-    let diastolic = Math.round(systolic - 40);
-
-    systolic += Math.round((pulseAmplitude - 50) * 0.2);
-    diastolic += Math.round((pulseAmplitude - 50) * 0.1);
-
-    systolic = Math.min(Math.max(systolic, 90), 160);
-    diastolic = Math.min(Math.max(diastolic, 60), 90);
-
-    this.lastValidPressure = {
-      systolic: Math.round(this.lastValidPressure.systolic * 0.7 + systolic * 0.3),
-      diastolic: Math.round(this.lastValidPressure.diastolic * 0.7 + diastolic * 0.3)
-    };
-
-    return this.lastValidPressure;
-  }
-
-  private estimateWithCalibration(
-    signal: number[], 
-    peakTimes: number[], 
-    calibrationData: any
-  ): { systolic: number; diastolic: number; } {
-    const ptts = this.calculatePTTs(peakTimes);
-    if (ptts.length < 2) return this.lastValidPressure;
-
-    const avgPTT = ptts.reduce((a, b) => a + b, 0) / ptts.length;
-    const pulseAmplitude = Math.max(...signal) - Math.min(...signal);
-
-    const pttCoeff = -0.3;
-    const amplitudeCoeff = 0.2;
-    const ageCoeff = 0.02;
-    const heightCoeff = -0.01;
-    const weightCoeff = 0.005;
-
-    const ageFactor = ((calibrationData.age || 30) - 30) * ageCoeff;
-    const heightFactor = ((calibrationData.height || 170) - 170) * heightCoeff;
-    const weightFactor = ((calibrationData.weight || 70) - 70) * weightCoeff;
-
-    let systolic = Math.round(
-      calibrationData.systolic_reference +
-      pttCoeff * (avgPTT - 800) +
-      amplitudeCoeff * (pulseAmplitude - 50) +
-      ageFactor + heightFactor + weightFactor
-    );
-
-    const pulsePress = systolic - calibrationData.diastolic_reference;
-    let diastolic = Math.round(systolic - pulsePress * 0.7);
-
-    systolic = Math.min(Math.max(systolic, 90), 160);
-    diastolic = Math.min(Math.max(diastolic, 60), 90);
-
-    this.lastValidPressure = {
-      systolic: Math.round(this.lastValidPressure.systolic * 0.8 + systolic * 0.2),
-      diastolic: Math.round(this.lastValidPressure.diastolic * 0.8 + diastolic * 0.2)
-    };
-
-    return this.lastValidPressure;
-  }
-
-  private calculatePTTs(peakTimes: number[]): number[] {
-    const ptts = [];
-    for (let i = 1; i < peakTimes.length; i++) {
-      const ptt = peakTimes[i] - peakTimes[i-1];
-      if (ptt >= 500 && ptt <= 1200) {
-        ptts.push(ptt);
-      }
-    }
-    return ptts;
   }
 
   analyzeSignalQuality(signal: number[]): number {
