@@ -1,3 +1,4 @@
+
 import { PTTProcessor } from './pttProcessor';
 import { PPGFeatureExtractor } from './ppgFeatureExtractor';
 import { SignalFilter } from './signalFilter';
@@ -16,6 +17,7 @@ export class SignalProcessor {
   private readonly MIN_QUALITY_FOR_BP = 0.6;
   private noFingerTimer: number | null = null;
   private readonly RESET_DELAY = 2000;
+  private useDefaultEstimation = true;
 
   constructor(windowSize: number) {
     this.windowSize = windowSize;
@@ -151,6 +153,7 @@ export class SignalProcessor {
     systolic: number;
     diastolic: number;
   }> {
+    // Si no hay señal válida, retornar último valor válido
     const maxSignal = Math.max(...signal);
     if (maxSignal < 10) {
       if (this.noFingerTimer === null) {
@@ -163,12 +166,18 @@ export class SignalProcessor {
       this.noFingerTimer = null;
     }
 
+    // Verificar que tenemos suficientes datos
     if (signal.length < 30 || peakTimes.length < 3) {
       console.log('Señal insuficiente para BP:', {
         signalLength: signal.length,
         peaksCount: peakTimes.length
       });
       return this.lastValidPressure;
+    }
+
+    // Si estamos usando estimación por defecto, no intentar acceder a Supabase
+    if (this.useDefaultEstimation) {
+      return this.estimateWithoutCalibration(signal, peakTimes);
     }
 
     try {
@@ -181,18 +190,19 @@ export class SignalProcessor {
         .maybeSingle();
 
       if (error) {
-        console.log('Error o tabla no existente, usando valores por defecto:', error);
+        console.log('Error accediendo a calibración, usando estimación por defecto:', error);
+        this.useDefaultEstimation = true; // Evitar futuros intentos de acceso a la tabla
         return this.estimateWithoutCalibration(signal, peakTimes);
       }
 
       if (!calibrationData) {
-        console.log('No hay datos de calibración, usando estimación base');
         return this.estimateWithoutCalibration(signal, peakTimes);
       }
 
       return this.estimateWithCalibration(signal, peakTimes, calibrationData);
     } catch (error) {
       console.error('Error en estimación BP:', error);
+      this.useDefaultEstimation = true; // Evitar futuros intentos
       return this.lastValidPressure;
     }
   }
