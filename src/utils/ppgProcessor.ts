@@ -250,6 +250,23 @@ export class PPGProcessor {
       this.signalBuffer.shift();
     }
 
+    // Calcular todas las métricas antes de detectar el pico
+    const { frequencies, magnitudes } = this.frequencyAnalyzer.performFFT(filteredRed);
+    const dominantFreqIndex = magnitudes.indexOf(Math.max(...magnitudes));
+    const dominantFreq = frequencies[dominantFreqIndex];
+    const calculatedBpm = dominantFreq * 60;
+    
+    const intervals = [];
+    for (let i = 1; i < this.peakTimes.length; i++) {
+      intervals.push(this.peakTimes[i] - this.peakTimes[i-1]);
+    }
+    
+    const hrvAnalysis = this.signalProcessor.analyzeHRV(intervals);
+    const spo2Result = this.signalProcessor.calculateSpO2(this.redBuffer, this.irBuffer);
+    const bp = this.signalProcessor.estimateBloodPressure(filteredRed, this.peakTimes);
+    const signalQuality = this.signalProcessor.analyzeSignalQuality(filteredRed);
+    const validatedVitals = this.validateVitalSigns(calculatedBpm, bp.systolic, bp.diastolic);
+
     const isPeak = this.peakDetector.isRealPeak(normalizedValue, now, this.signalBuffer);
 
     if (isPeak) {
@@ -265,42 +282,11 @@ export class PPGProcessor {
         this.peakTimes.shift();
       }
       
-      this.beepPlayer.playBeep('heartbeat').catch(err => {
+      this.beepPlayer.playBeep('heartbeat', signalQuality).catch(err => {
         console.error('Error al reproducir beep:', err);
       });
     }
 
-    // Calcular frecuencia cardíaca usando análisis de frecuencia
-    const { frequencies, magnitudes } = this.frequencyAnalyzer.performFFT(filteredRed);
-    const dominantFreqIndex = magnitudes.indexOf(Math.max(...magnitudes));
-    const dominantFreq = frequencies[dominantFreqIndex];
-    const calculatedBpm = dominantFreq * 60;
-    
-    // Calcular intervalos para análisis HRV
-    const intervals = [];
-    for (let i = 1; i < this.peakTimes.length; i++) {
-      intervals.push(this.peakTimes[i] - this.peakTimes[i-1]);
-    }
-    
-    // Obtener análisis HRV
-    const hrvAnalysis = this.signalProcessor.analyzeHRV(intervals);
-    
-    // Calcular SpO2
-    const spo2Result = this.signalProcessor.calculateSpO2(this.redBuffer, this.irBuffer);
-    
-    // Calcular presión arterial usando PTT y características PPG
-    const bp = this.signalProcessor.estimateBloodPressure(filteredRed, this.peakTimes);
-    
-    // Analizar calidad de la señal
-    const signalQuality = this.signalProcessor.analyzeSignalQuality(filteredRed);
-
-    // Validar y ajustar los signos vitales
-    const validatedVitals = this.validateVitalSigns(
-      calculatedBpm,
-      bp.systolic,
-      bp.diastolic
-    );
-    
     // Cada 30 frames (aprox. 1 segundo) intentamos mejorar los parámetros
     if (this.frameCount % 30 === 0 && validatedVitals.bpm > 0) {
       this.saveTrainingData(validatedVitals.bpm, spo2Result.spo2, signalQuality);
