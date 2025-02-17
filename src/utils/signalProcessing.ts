@@ -1,3 +1,4 @@
+
 import { PTTProcessor } from './pttProcessor';
 import { PPGFeatureExtractor } from './ppgFeatureExtractor';
 import { SignalFilter } from './signalFilter';
@@ -36,6 +37,75 @@ export class SignalProcessor {
         ? (arr[index - 2] + arr[index - 1] + value + arr[index + 1] + arr[index + 2]) / 5 
         : value
     );
+  }
+
+  // Análisis de la Variabilidad de la Frecuencia Cardíaca (HRV)
+  analyzeHRV(intervals: number[]): { 
+    hasArrhythmia: boolean; 
+    type: string; 
+    sdnn: number; 
+    rmssd: number; 
+    pnn50: number; 
+    lfhf: number; 
+  } {
+    if (intervals.length < 2) {
+      return {
+        hasArrhythmia: false,
+        type: 'Normal',
+        sdnn: 0,
+        rmssd: 0,
+        pnn50: 0,
+        lfhf: 0
+      };
+    }
+
+    // Calcular SDNN (Desviación estándar de intervalos NN)
+    const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+    const sdnn = Math.sqrt(
+      intervals.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / 
+      (intervals.length - 1)
+    );
+
+    // Calcular RMSSD
+    const successiveDiffs = intervals.slice(1).map((val, i) => 
+      Math.pow(val - intervals[i], 2)
+    );
+    const rmssd = Math.sqrt(
+      successiveDiffs.reduce((a, b) => a + b, 0) / successiveDiffs.length
+    );
+
+    // Calcular pNN50
+    const nn50 = intervals.slice(1).filter((val, i) => 
+      Math.abs(val - intervals[i]) > 50
+    ).length;
+    const pnn50 = (nn50 / (intervals.length - 1)) * 100;
+
+    // Calcular ratio LF/HF usando el analizador de frecuencia
+    const { lf, hf } = this.frequencyAnalyzer.calculateFrequencyDomainMetrics(intervals);
+    const lfhf = hf !== 0 ? lf / hf : 0;
+
+    // Detectar arritmias basadas en los parámetros calculados
+    const hasArrhythmia = sdnn > 100 || rmssd > 50 || pnn50 > 20;
+    let type = 'Normal';
+    
+    if (hasArrhythmia) {
+      if (sdnn > 150 && rmssd > 70) {
+        type = 'Fibrilación Auricular';
+      } else if (pnn50 > 30) {
+        type = 'Arritmia Sinusal';
+      } else {
+        type = 'Arritmia No Específica';
+      }
+    }
+
+    return {
+      hasArrhythmia,
+      type,
+      sdnn,
+      rmssd,
+      pnn50,
+      lfhf
+    };
   }
 
   // ✅ Calcular SpO2 con mayor precisión
