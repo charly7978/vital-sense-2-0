@@ -13,8 +13,8 @@ export class PPGProcessor {
   private redBuffer: number[] = [];
   private irBuffer: number[] = [];
   private peakTimes: number[] = [];
-  private readonly samplingRate = 60;
-  private readonly windowSize = 600;
+  private readonly samplingRate = 30;
+  private readonly windowSize = 300;
   private readonly signalProcessor: SignalProcessor;
   private readonly signalExtractor: SignalExtractor;
   private readonly peakDetector: PeakDetector;
@@ -23,7 +23,7 @@ export class PPGProcessor {
   private readonly frequencyAnalyzer: SignalFrequencyAnalyzer;
   private beepPlayer: BeepPlayer;
   private readonly signalBuffer: number[] = [];
-  private readonly bufferSize = 60;
+  private readonly bufferSize = 30;
   private readonly qualityThreshold = 0.2;
   private mlModel: MLModel;
   private trainingData: number[][] = [];
@@ -32,15 +32,13 @@ export class PPGProcessor {
   private lastValidBpm: number = 0;
   private lastValidSystolic: number = 120;
   private lastValidDiastolic: number = 80;
-  private lastProcessingTime: number = 0;
-  private readonly minProcessingInterval = 16;
-
+  
   private sensitivitySettings: SensitivitySettings = {
-    signalAmplification: 1.8,
-    noiseReduction: 1.5,
-    peakDetection: 1.4
+    signalAmplification: 1.5,
+    noiseReduction: 1.2,
+    peakDetection: 1.3
   };
-
+  
   private processingSettings: ProcessingSettings = {
     MEASUREMENT_DURATION: 30,
     MIN_FRAMES_FOR_CALCULATION: 15,
@@ -56,7 +54,7 @@ export class PPGProcessor {
     FINGER_DETECTION_DELAY: 500,
     MIN_SPO2: 75
   };
-
+  
   constructor() {
     this.beepPlayer = new BeepPlayer();
     this.signalProcessor = new SignalProcessor(this.windowSize);
@@ -73,12 +71,18 @@ export class PPGProcessor {
     systolic: number;
     diastolic: number;
   } {
+    // Validar BPM (40-200 es un rango normal para humanos)
     const validBpm = bpm >= 40 && bpm <= 200 ? bpm : this.lastValidBpm || 0;
+    
+    // Validar presión sistólica (90-180 es un rango normal)
     const validSystolic = systolic >= 90 && systolic <= 180 ? 
       systolic : this.lastValidSystolic;
+    
+    // Validar presión diastólica (60-120 es un rango normal)
     const validDiastolic = diastolic >= 60 && diastolic <= 120 ? 
       diastolic : this.lastValidDiastolic;
     
+    // Asegurar que sistólica > diastólica
     if (validSystolic <= validDiastolic) {
       return {
         bpm: validBpm,
@@ -87,6 +91,7 @@ export class PPGProcessor {
       };
     }
 
+    // Actualizar últimos valores válidos
     this.lastValidBpm = validBpm;
     this.lastValidSystolic = validSystolic;
     this.lastValidDiastolic = validDiastolic;
@@ -174,16 +179,12 @@ export class PPGProcessor {
   }
 
   async processFrame(imageData: ImageData): Promise<PPGData | null> {
-    const now = Date.now();
-    
-    if (now - this.lastProcessingTime < this.minProcessingInterval) {
-      return null;
-    }
-    this.lastProcessingTime = now;
     this.frameCount++;
+    const now = Date.now();
     
     const { red, ir, quality } = this.signalExtractor.extractChannels(imageData);
     
+    // Log detallado de la detección del dedo y calidad
     console.log('Estado del sensor:', {
       detectandoDedo: red > this.processingSettings.MIN_RED_VALUE,
       valorRojo: red.toFixed(2),
@@ -198,8 +199,28 @@ export class PPGProcessor {
         umbralCalidad: (this.qualityThreshold * 100).toFixed(1) + '%',
         umbralRojo: this.processingSettings.MIN_RED_VALUE
       });
-      this.resetBuffers();
-      return this.getEmptyReading();
+      this.redBuffer = [];
+      this.irBuffer = [];
+      this.readings = [];
+      this.peakTimes = [];
+      return {
+        bpm: 0,
+        spo2: 0,
+        systolic: 0,
+        diastolic: 0,
+        hasArrhythmia: false,
+        arrhythmiaType: 'Normal',
+        signalQuality: 0,
+        confidence: 0,
+        readings: [],
+        isPeak: false,
+        hrvMetrics: {
+          sdnn: 0,
+          rmssd: 0,
+          pnn50: 0,
+          lfhf: 0
+        }
+      };
     }
     
     const amplifiedRed = red * this.sensitivitySettings.signalAmplification;
@@ -229,6 +250,7 @@ export class PPGProcessor {
       this.signalBuffer.shift();
     }
 
+    // Calcular todas las métricas antes de detectar el pico
     const { frequencies, magnitudes } = this.frequencyAnalyzer.performFFT(filteredRed);
     const dominantFreqIndex = magnitudes.indexOf(Math.max(...magnitudes));
     const dominantFreq = frequencies[dominantFreqIndex];
@@ -265,6 +287,7 @@ export class PPGProcessor {
       });
     }
 
+    // Cada 30 frames (aprox. 1 segundo) intentamos mejorar los parámetros
     if (this.frameCount % 30 === 0 && validatedVitals.bpm > 0) {
       this.saveTrainingData(validatedVitals.bpm, spo2Result.spo2, signalQuality);
       await this.trainMLModel();
@@ -287,35 +310,6 @@ export class PPGProcessor {
         rmssd: hrvAnalysis.rmssd,
         pnn50: hrvAnalysis.pnn50,
         lfhf: hrvAnalysis.lfhf
-      }
-    };
-  }
-
-  private resetBuffers(): void {
-    this.redBuffer = [];
-    this.irBuffer = [];
-    this.readings = [];
-    this.peakTimes = [];
-    this.signalBuffer.length = 0;
-  }
-
-  private getEmptyReading(): PPGData {
-    return {
-      bpm: 0,
-      spo2: 0,
-      systolic: 0,
-      diastolic: 0,
-      hasArrhythmia: false,
-      arrhythmiaType: 'Normal',
-      signalQuality: 0,
-      confidence: 0,
-      readings: [],
-      isPeak: false,
-      hrvMetrics: {
-        sdnn: 0,
-        rmssd: 0,
-        pnn50: 0,
-        lfhf: 0
       }
     };
   }
