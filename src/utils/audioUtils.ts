@@ -37,27 +37,47 @@ export class BeepPlayer {
     try {
       const oscillator = this.audioContext.createOscillator();
       const gainNode = this.audioContext.createGain();
+      const filterNode = this.audioContext.createBiquadFilter();
 
-      oscillator.connect(gainNode);
+      // Configuración del filtro para un sonido más limpio
+      filterNode.type = 'lowpass';
+      filterNode.frequency.value = 800;
+      filterNode.Q.value = 1;
+
+      // Conexión de nodos con el filtro
+      oscillator.connect(filterNode);
+      filterNode.connect(gainNode);
       gainNode.connect(this.audioContext.destination);
 
       const currentTime = this.audioContext.currentTime;
 
       if (type === 'heartbeat') {
         // Aumentada la frecuencia y volumen para mejor audibilidad
-        oscillator.frequency.value = 400; // Frecuencia más alta
+        oscillator.frequency.value = 600; // Frecuencia más alta y clara
         
         // Primer pulso (más fuerte)
         gainNode.gain.setValueAtTime(0, currentTime);
-        gainNode.gain.linearRampToValueAtTime(2.0, currentTime + 0.01); // Volumen aumentado significativamente
+        gainNode.gain.linearRampToValueAtTime(3.0, currentTime + 0.01); // Volumen aumentado significativamente
         gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.08);
         
+        // Segundo pulso (más suave pero aún audible)
+        gainNode.gain.linearRampToValueAtTime(0.001, currentTime + 0.1);
+        gainNode.gain.linearRampToValueAtTime(2.0, currentTime + 0.11);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.18);
+        
         oscillator.start(currentTime);
-        oscillator.stop(currentTime + 0.08);
+        oscillator.stop(currentTime + 0.2);
 
         console.log('♥ Beep de latido reproducido');
         this.lastBeepTime = now;
       }
+
+      // Limpieza después de la reproducción
+      setTimeout(() => {
+        oscillator.disconnect();
+        gainNode.disconnect();
+        filterNode.disconnect();
+      }, 300);
 
     } catch (error) {
       console.error('✗ Error reproduciendo beep:', error);
