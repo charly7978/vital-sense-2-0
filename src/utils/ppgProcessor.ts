@@ -32,6 +32,8 @@ export class PPGProcessor {
   private lastValidBpm: number = 0;
   private lastValidSystolic: number = 120;
   private lastValidDiastolic: number = 80;
+  private lastBeepTime: number = 0;
+  private readonly minBeepInterval = 300; // Mínimo intervalo entre beeps en ms
   
   private sensitivitySettings: SensitivitySettings = {
     signalAmplification: 1.5,
@@ -69,6 +71,28 @@ export class PPGProcessor {
     this.signalFilter = new SignalFilter(this.samplingRate);
     this.frequencyAnalyzer = new SignalFrequencyAnalyzer(this.samplingRate);
     this.mlModel = new MLModel();
+  }
+
+  private async playHeartbeatBeep(quality: number) {
+    const now = Date.now();
+    if (now - this.lastBeepTime < this.minBeepInterval) {
+      return; // Evitar beeps demasiado frecuentes
+    }
+    
+    try {
+      // Volumen basado en la calidad de la señal
+      const volume = Math.max(quality * 10, 3.0);
+      await this.beepPlayer.playBeep('heartbeat', volume);
+      this.lastBeepTime = now;
+      
+      console.log('💓 Beep de latido:', {
+        tiempo: now,
+        calidad: quality.toFixed(2),
+        volumen: volume.toFixed(2)
+      });
+    } catch (error) {
+      console.error('Error reproduciendo beep:', error);
+    }
   }
 
   private validateVitalSigns(bpm: number, systolic: number, diastolic: number): {
@@ -249,22 +273,14 @@ export class PPGProcessor {
 
     const isPeak = this.peakDetector.isRealPeak(normalizedValue, now, this.signalBuffer);
 
-    if (isPeak) {
+    if (isPeak && quality > this.qualityThreshold) {
       this.peakTimes.push(now);
       if (this.peakTimes.length > 10) {
         this.peakTimes.shift();
       }
       
-      try {
-        await this.beepPlayer.playBeep('heartbeat', 5.0);
-        console.log('🫀 Pico detectado + Beep reproducido:', {
-          tiempo: now,
-          valorPico: normalizedValue,
-          calidadSenal: quality
-        });
-      } catch (err) {
-        console.error('Error al reproducir beep:', err);
-      }
+      // Reproducir beep con volumen basado en la calidad
+      await this.playHeartbeatBeep(quality);
     }
 
     const { frequencies, magnitudes } = this.frequencyAnalyzer.performFFT(filteredRed);
