@@ -1,42 +1,66 @@
 
 export class SignalFilter {
   private readonly sampleRate: number;
+  private kalmanState = {
+    x: 0,
+    p: 1,
+    q: 0.1,
+    r: 1
+  };
 
   constructor(sampleRate: number = 30) {
     this.sampleRate = sampleRate;
   }
 
-  bandPassFilter(signal: number[], lowCutoff: number, highCutoff: number): number[] {
+  lowPassFilter(signal: number[], cutoffFreq: number): number[] {
+    // Apply Kalman filter first
+    const kalmanFiltered = signal.map(value => this.kalmanFilter(value));
+    
     const filtered: number[] = [];
-    const rc1 = 1.0 / (lowCutoff * 2 * Math.PI);
-    const rc2 = 1.0 / (highCutoff * 2 * Math.PI);
+    const rc = 1.0 / (cutoffFreq * 2 * Math.PI);
     const dt = 1.0 / this.sampleRate;
-    const alpha1 = dt / (rc1 + dt);
-    const alpha2 = dt / (rc2 + dt);
+    const alpha = dt / (rc + dt);
+    const windowSize = Math.min(10, signal.length);
     
-    // Implementar filtro pasa banda basado en Butterworth
-    let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
-    
-    for (let i = 0; i < signal.length; i++) {
-      // Pasa altas
-      const highPass = alpha1 * (y1 + signal[i] - x1);
-      x1 = signal[i];
-      y1 = highPass;
+    // Apply Hamming window for better frequency response
+    for (let i = 0; i < kalmanFiltered.length; i++) {
+      let sum = 0;
+      let weightSum = 0;
       
-      // Pasa bajas
-      const lowPass = y2 + alpha2 * (highPass - y2);
-      y2 = lowPass;
+      for (let j = Math.max(0, i - windowSize + 1); j <= i; j++) {
+        const weight = 0.54 - 0.46 * Math.cos((2 * Math.PI * (j - i + windowSize)) / windowSize);
+        sum += kalmanFiltered[j] * weight;
+        weightSum += weight;
+      }
       
-      filtered.push(lowPass);
+      filtered[i] = sum / weightSum;
     }
     
-    return this.removeDC(filtered);
+    // Apply additional RC filter for smoother output
+    let lastFiltered = filtered[0];
+    for (let i = 1; i < signal.length; i++) {
+      lastFiltered = lastFiltered + alpha * (filtered[i] - lastFiltered);
+      filtered[i] = lastFiltered;
+    }
+    
+    return filtered;
   }
 
-  private removeDC(signal: number[]): number[] {
-    if (signal.length === 0) return signal;
+  private kalmanFilter(measurement: number): number {
+    // Prediction step
+    const predictedState = this.kalmanState.x;
+    const predictedCovariance = this.kalmanState.p + this.kalmanState.q;
     
-    const mean = signal.reduce((a, b) => a + b, 0) / signal.length;
-    return signal.map(v => v - mean);
+    // Update step
+    const kalmanGain = predictedCovariance / (predictedCovariance + this.kalmanState.r);
+    this.kalmanState.x = predictedState + kalmanGain * (measurement - predictedState);
+    this.kalmanState.p = (1 - kalmanGain) * predictedCovariance;
+    
+    return this.kalmanState.x;
+  }
+
+  updateKalmanParameters(q: number, r: number) {
+    this.kalmanState.q = q;
+    this.kalmanState.r = r;
   }
 }
