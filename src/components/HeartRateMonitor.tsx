@@ -5,10 +5,7 @@ import VitalChart from './VitalChart';
 import VitalSignsDisplay from './vitals/VitalSignsDisplay';
 import SignalQualityIndicator from './vitals/SignalQualityIndicator';
 import MeasurementControls from './vitals/MeasurementControls';
-import { PPGProcessor } from '../utils/ppgProcessor';
 import { useVitals } from '@/contexts/VitalsContext';
-
-const ppgProcessor = new PPGProcessor();
 
 const HeartRateMonitor: React.FC = () => {
   const { 
@@ -26,20 +23,18 @@ const HeartRateMonitor: React.FC = () => {
     processFrame
   } = useVitals();
 
+  const showFingerIndicator = isStarted && (measurementQuality < 0.2 || bpm === 0);
+
   return (
     <div className="relative h-screen w-screen overflow-hidden">
-      {/* Cámara a pantalla completa */}
       <div className="absolute inset-0 z-0">
         <CameraView onFrame={processFrame} isActive={isStarted} />
       </div>
 
-      {/* Overlay con gradiente sutil */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/60 z-10" />
 
-      {/* Contenido superpuesto */}
       <div className="absolute inset-0 z-20">
         <div className="h-full w-full p-3 flex flex-col">
-          {/* Área superior - Indicadores de calidad y progreso */}
           <div className="space-y-2">
             {isStarted && (
               <div className="bg-black/30 backdrop-blur-md rounded-lg p-2 border border-white/10">
@@ -51,7 +46,7 @@ const HeartRateMonitor: React.FC = () => {
               </div>
             )}
             
-            {isStarted && bpm === 0 && (
+            {showFingerIndicator && (
               <div className="px-3 py-2 bg-yellow-500/10 border border-yellow-500/20 backdrop-blur-md rounded-lg">
                 <div className="flex items-center justify-center space-x-2">
                   <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"/>
@@ -63,7 +58,6 @@ const HeartRateMonitor: React.FC = () => {
             )}
           </div>
 
-          {/* Área de vitales y gráfico PPG */}
           <div className="mt-3 space-y-2">
             <div className="bg-black/30 backdrop-blur-md rounded-lg p-2.5 border border-white/10">
               <VitalSignsDisplay
@@ -84,10 +78,8 @@ const HeartRateMonitor: React.FC = () => {
             </div>
           </div>
 
-          {/* Espacio flexible */}
           <div className="flex-grow" />
 
-          {/* Botón centrado */}
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
             <div className="w-40">
               <MeasurementControls
