@@ -7,58 +7,46 @@ export class SignalQualityAnalyzer {
     const variance = signal.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / signal.length;
     const standardDeviation = Math.sqrt(variance);
     
-    // Análisis de amplitud con umbrales más permisivos
+    // Calcular la amplitud pico a pico con un umbral mínimo
     const peakToPeak = Math.max(...signal) - Math.min(...signal);
-    const amplitudeScore = this.calculateAmplitudeScore(peakToPeak);
+    if (peakToPeak < 20) return 0.1; // Si la amplitud es muy baja, la calidad es mala
     
-    // Análisis de ruido mejorado
-    const noiseScore = this.calculateNoiseScore(signal);
+    // Calcular el ruido de alta frecuencia
+    const noiseLevel = this.calculateNoiseLevel(signal);
     
-    // Análisis de estabilidad con ventana adaptativa
-    const stabilityScore = this.calculateStabilityScore(signal);
+    // Calcular la estabilidad de la línea base
+    const baselineStability = this.calculateBaselineStability(signal);
     
-    // Ponderación dinámica basada en las características de la señal
-    const weights = this.calculateDynamicWeights(amplitudeScore, noiseScore, stabilityScore);
+    // Evaluar si hay suficiente variación en la señal
+    const signalVariation = standardDeviation / mean;
+    if (signalVariation < 0.05) return 0.1; // Si hay muy poca variación, la calidad es mala
     
-    // Cálculo de calidad final con normalización adaptativa
-    const qualityScore = (
-      amplitudeScore * weights.amplitude +
-      noiseScore * weights.noise +
-      stabilityScore * weights.stability
-    );
+    // Pesos ajustados para cada métrica
+    const weights = {
+      amplitude: 0.35,
+      noise: 0.35,
+      baseline: 0.3
+    };
     
-    // Aplicar curva de respuesta suave para valores bajos
-    const finalQuality = this.smoothQualityResponse(qualityScore);
+    // Normalizar y combinar métricas con umbrales más estrictos
+    const amplitudeQuality = Math.min(peakToPeak / 150, 1);
+    const noiseQuality = 1 - Math.min(noiseLevel * 1.5, 1); // Más sensible al ruido
+    const baselineQuality = Math.min(baselineStability, 1);
     
-    // Logging detallado para diagnóstico
-    console.log('📊 Análisis de calidad:', {
-      amplitud: {
-        picoPico: peakToPeak.toFixed(2),
-        score: amplitudeScore.toFixed(3)
-      },
-      ruido: {
-        score: noiseScore.toFixed(3)
-      },
-      estabilidad: {
-        score: stabilityScore.toFixed(3)
-      },
-      pesos: weights,
-      calidadFinal: finalQuality.toFixed(3)
-    });
+    const quality = 
+      amplitudeQuality * weights.amplitude +
+      noiseQuality * weights.noise +
+      baselineQuality * weights.baseline;
     
-    return finalQuality;
+    // Ajuste exponencial para hacer el indicador más sensible a calidades bajas
+    const adjustedQuality = Math.pow(quality, 1.5);
+    
+    // Aplicar umbral mínimo más alto
+    return Math.min(Math.max(adjustedQuality, 0), 1);
   }
 
-  private calculateAmplitudeScore(peakToPeak: number): number {
-    // Curva de respuesta suave para amplitud
-    const minAmplitude = 3;
-    const optimalAmplitude = 30;
-    if (peakToPeak < minAmplitude) return 0.3;
-    return Math.min(1, Math.pow(peakToPeak / optimalAmplitude, 0.5));
-  }
-
-  private calculateNoiseScore(signal: number[]): number {
-    if (signal.length < 2) return 0;
+  private calculateNoiseLevel(signal: number[]): number {
+    if (signal.length < 2) return 1;
 
     const differences = [];
     for (let i = 1; i < signal.length; i++) {
@@ -66,54 +54,33 @@ export class SignalQualityAnalyzer {
     }
     
     const meanDiff = differences.reduce((a, b) => a + b, 0) / differences.length;
-    const maxDiff = Math.max(...differences);
+    const maxSignal = Math.max(...signal) - Math.min(...signal);
     
-    // Normalización adaptativa del ruido
-    const noiseRatio = meanDiff / maxDiff;
-    return 1 - Math.min(noiseRatio * 2, 0.7); // Más tolerante al ruido
+    if (maxSignal === 0) return 1;
+    
+    // Ajuste para ser más sensible al ruido
+    return Math.pow(meanDiff / maxSignal, 0.8);
   }
 
-  private calculateStabilityScore(signal: number[]): number {
-    if (signal.length < 8) return 0;
+  private calculateBaselineStability(signal: number[]): number {
+    if (signal.length < 10) return 0;
     
-    const windowSize = Math.min(8, Math.floor(signal.length / 2));
-    const windows = [];
+    // Ventana más grande para mejor estabilidad
+    const windowSize = 8;
+    const baseline = [];
     
     for (let i = windowSize; i < signal.length; i++) {
-      const window = signal.slice(i - windowSize, i);
-      const windowMean = window.reduce((a, b) => a + b, 0) / windowSize;
-      windows.push(windowMean);
+      const windowMean = signal.slice(i - windowSize, i).reduce((a, b) => a + b, 0) / windowSize;
+      baseline.push(windowMean);
     }
     
-    const meanStability = windows.reduce((a, b) => a + b, 0) / windows.length;
-    const stabilityVariation = Math.sqrt(
-      windows.reduce((acc, val) => acc + Math.pow(val - meanStability, 2), 0) / windows.length
+    // Calcular la variación de la línea base
+    const baselineVariation = Math.sqrt(
+      baseline.reduce((acc, val) => acc + Math.pow(val - baseline[0], 2), 0) / baseline.length
     );
     
-    // Función de estabilidad más tolerante
-    return Math.exp(-stabilityVariation / 25);
-  }
-
-  private calculateDynamicWeights(amplitude: number, noise: number, stability: number): {
-    amplitude: number;
-    noise: number;
-    stability: number;
-  } {
-    // Ajustar pesos según la calidad relativa de cada métrica
-    const total = amplitude + noise + stability;
-    const baseWeight = 1 / 3;
-    
-    return {
-      amplitude: 0.4 + (amplitude / total) * 0.2,
-      noise: 0.3 + (noise / total) * 0.2,
-      stability: 0.3 + (stability / total) * 0.2
-    };
-  }
-
-  private smoothQualityResponse(quality: number): number {
-    // Función de suavizado para mejorar la respuesta en valores bajos
-    const smoothedQuality = Math.pow(quality, 0.7);
-    return Math.min(Math.max(smoothedQuality, 0), 1);
+    // Normalizar la estabilidad con un factor más estricto
+    return Math.exp(-baselineVariation / 8);
   }
 
   calculateSignalStability(redSignal: number[], irSignal: number[]): number {
@@ -122,8 +89,7 @@ export class SignalQualityAnalyzer {
     const redQuality = this.analyzeSignalQuality(redSignal);
     const irQuality = this.analyzeSignalQuality(irSignal);
     
-    // Promedio ponderado con más peso en la señal roja
-    const weightedQuality = redQuality * 0.7 + irQuality * 0.3;
-    return Math.pow(weightedQuality, 0.8); // Suavizado final
+    // Usar el valor más bajo para ser más conservador
+    return Math.min(redQuality, irQuality);
   }
 }

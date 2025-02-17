@@ -1,6 +1,8 @@
+
 import React, { useRef, useEffect, useState } from "react";
 import Webcam from "react-webcam";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface CameraViewProps {
   onFrame: (imageData: ImageData) => void;
@@ -8,101 +10,128 @@ interface CameraViewProps {
   onMeasurementEnd?: () => void;
 }
 
+declare global {
+  interface MediaTrackConstraintSet {
+    torch?: boolean;
+    zoom?: number;
+    exposureMode?: string;
+    exposureCompensation?: number;
+    brightness?: number;
+  }
+}
+
 const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasurementEnd }) => {
   const webcamRef = useRef<Webcam>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number | null>(null);
   const { toast } = useToast();
-  const [bpm, setBpm] = useState(0);
-  const [spo2, setSpo2] = useState(98);
-  const [quality, setQuality] = useState(0);
-  const beepAudio = useRef(new Audio("/beep.mp3"));
+  const [isMeasuring, setIsMeasuring] = useState(false);
+  const isMobile = useIsMobile();
+  const isAndroid = /android/i.test(navigator.userAgent);
 
-  useEffect(() => {
-    beepAudio.current.volume = 1.0;
-  }, []);
+  const getDeviceConstraints = (): MediaTrackConstraints => ({
+    width: { ideal: 1280 },
+    height: { ideal: 720 },
+    facingMode: isAndroid ? "environment" : "user",
+    advanced: isAndroid 
+      ? [
+          {
+            torch: isMeasuring,
+            zoom: 1,
+            exposureMode: "manual",
+            exposureCompensation: -0.5 // Un valor más suave para Android
+          }
+        ] 
+      : [
+          {
+            exposureMode: "manual",
+            exposureCompensation: -1.0,
+            brightness: 0.3
+          }
+        ],
+  });
 
   const processFrame = () => {
     if (!isActive || !webcamRef.current?.video || !canvasRef.current) {
-      animationFrameRef.current = requestAnimationFrame(processFrame);
       return;
     }
 
     const video = webcamRef.current.video;
     const canvas = canvasRef.current;
-    const context = canvas.getContext("2d");
+    const context = canvas.getContext('2d');
 
-    if (!context || !video || video.readyState !== video.HAVE_ENOUGH_DATA) {
+    if (!context || video.readyState !== video.HAVE_ENOUGH_DATA) {
       animationFrameRef.current = requestAnimationFrame(processFrame);
       return;
     }
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
     try {
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0);
+      
       const frameData = context.getImageData(0, 0, canvas.width, canvas.height);
-
-      if (!frameData || frameData.data.length < 4) {
-        animationFrameRef.current = requestAnimationFrame(processFrame);
-        return;
-      }
-
-      const { bpm, spo2, quality, isValid } = analyzeVitalSigns(frameData);
-      if (isValid) {
-        setBpm(bpm);
-        setSpo2(spo2);
-        setQuality(quality);
+      
+      if (frameData && frameData.data.length > 0) {
         onFrame(frameData);
       }
     } catch (error) {
-      console.error("❌ Error al procesar el frame:", error);
+      console.error("Error al procesar frame:", error);
+      if (isActive) {
+        toast({
+          variant: "destructive",
+          title: "Error de cámara",
+          description: "Hubo un problema al procesar la imagen de la cámara."
+        });
+      }
     }
 
-    animationFrameRef.current = requestAnimationFrame(processFrame);
+    if (isActive) {
+      animationFrameRef.current = requestAnimationFrame(processFrame);
+    }
+  };
+
+  const stopCamera = () => {
+    if (webcamRef.current?.video?.srcObject) {
+      const tracks = (webcamRef.current.video.srcObject as MediaStream).getTracks();
+      tracks.forEach(track => track.stop());
+    }
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    setIsMeasuring(false);
   };
 
   useEffect(() => {
     if (isActive) {
+      setIsMeasuring(true);
       processFrame();
-    } else if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
+    } else {
+      stopCamera();
     }
+
+    return () => {
+      stopCamera();
+    };
   }, [isActive]);
 
+  if (!isActive) {
+    return null;
+  }
+
   return (
-    <div className="relative w-full h-screen">
-      {/* 🔹 Cámara a pantalla completa, aseguramos que no se vea borrosa */}
-      {isActive && (
-        <Webcam
-          ref={webcamRef}
-          audio={false}
-          videoConstraints={{ width: 1280, height: 720, facingMode: "environment" }}
-          className="absolute w-full h-full object-cover z-0"
-        />
-      )}
-      <canvas ref={canvasRef} style={{ display: "none" }} />
-
-      {/* 🔹 Contenedor de datos sobre la cámara, ajustado para mejor visibilidad */}
-      <div className="absolute top-0 left-0 w-full h-full flex flex-col items-center justify-center bg-black/10 backdrop-blur-sm text-white p-4 z-10">
-        <div className="bg-black/40 rounded-lg p-3 w-3/4 text-center">
-          {/* 🔹 BPM */}
-          <div className="text-4xl font-bold">BPM: {bpm}</div>
-
-          {/* 🔹 SpO2 */}
-          <div className="text-2xl mt-2">SpO2: {spo2}%</div>
-
-          {/* 🔹 Calidad de la señal */}
-          <div className="text-lg mt-2">Señal: {quality}%</div>
-        </div>
-
-        {/* 🔹 Gráfico de señal PPG, ahora más visible */}
-        <div className="absolute bottom-5 left-1/2 transform -translate-x-1/2 bg-black/30 p-3 rounded-xl text-sm">
-          📊 Gráfico PPG (Placeholder)
-        </div>
-      </div>
+    <div className="relative w-full h-full">
+      <Webcam
+        ref={webcamRef}
+        audio={false}
+        videoConstraints={getDeviceConstraints()}
+        className="absolute inset-0 w-full h-full object-cover"
+      />
+      <canvas 
+        ref={canvasRef} 
+        style={{ display: 'none' }}
+      />
     </div>
   );
 };
