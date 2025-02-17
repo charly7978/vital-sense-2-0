@@ -59,13 +59,14 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
     const canvas = canvasRef.current;
     const context = canvas.getContext("2d");
 
-    // 🔹 Verificar si el video está cargado correctamente antes de capturar la imagen
+    // 🔹 Validar si el video está disponible antes de procesar
     if (!context || !video || video.readyState !== video.HAVE_ENOUGH_DATA) {
+      console.warn("⚠️ Video no está listo, esperando...");
       animationFrameRef.current = requestAnimationFrame(processFrame);
       return;
     }
 
-    // 🔹 Ajustar el tamaño del canvas para que coincida con el video
+    // 🔹 Ajustar el tamaño del canvas al video
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
 
@@ -73,9 +74,9 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       const frameData = context.getImageData(0, 0, canvas.width, canvas.height);
 
-      // 🔹 Verificar si la imagen capturada tiene datos válidos
+      // 🔹 Validar si la imagen es válida antes de procesar
       if (!frameData || frameData.data.length < 4) {
-        console.warn("⚠️ Frame vacío detectado, saltando...");
+        console.warn("⚠️ Frame inválido detectado, omitiendo...");
         animationFrameRef.current = requestAnimationFrame(processFrame);
         return;
       }
