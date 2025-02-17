@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
-import { Gauge, Scale, Sparkles } from 'lucide-react';
+import { Gauge, Scale, Sparkles, Heart, Zap, Activity } from 'lucide-react';
 import type { SensitivitySettings } from '@/utils/types';
 
 interface CalibrationPanelProps {
@@ -107,6 +107,84 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
               />
               <p className="mt-1 text-xs text-gray-500">
                 Controla la precisión en la detección de picos
+              </p>
+            </div>
+
+            {/* Umbral de Latidos */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Heart className="w-4 h-4 text-red-400" />
+                  <label className="text-sm font-medium text-white">
+                    Umbral de Latidos
+                  </label>
+                </div>
+                <span className="text-xs text-gray-400">
+                  {settings.heartbeatThreshold.toFixed(2)}x
+                </span>
+              </div>
+              <Slider
+                value={[settings.heartbeatThreshold]}
+                min={0.1}
+                max={1}
+                step={0.05}
+                onValueChange={handleSettingChange('heartbeatThreshold')}
+                className="[&_[role=slider]]:bg-red-400"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Ajusta la sensibilidad para detectar latidos
+              </p>
+            </div>
+
+            {/* Tiempo de Respuesta */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-yellow-400" />
+                  <label className="text-sm font-medium text-white">
+                    Tiempo de Respuesta
+                  </label>
+                </div>
+                <span className="text-xs text-gray-400">
+                  {settings.responseTime.toFixed(2)}x
+                </span>
+              </div>
+              <Slider
+                value={[settings.responseTime]}
+                min={0.5}
+                max={2}
+                step={0.1}
+                onValueChange={handleSettingChange('responseTime')}
+                className="[&_[role=slider]]:bg-yellow-400"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Controla la velocidad de respuesta del sensor
+              </p>
+            </div>
+
+            {/* Estabilidad de Señal */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-orange-400" />
+                  <label className="text-sm font-medium text-white">
+                    Estabilidad de Señal
+                  </label>
+                </div>
+                <span className="text-xs text-gray-400">
+                  {settings.signalStability.toFixed(2)}x
+                </span>
+              </div>
+              <Slider
+                value={[settings.signalStability]}
+                min={0.1}
+                max={1}
+                step={0.05}
+                onValueChange={handleSettingChange('signalStability')}
+                className="[&_[role=slider]]:bg-orange-400"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Ajusta la estabilidad de la señal capturada
               </p>
             </div>
           </div>

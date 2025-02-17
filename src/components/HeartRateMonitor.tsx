@@ -50,27 +50,9 @@ const HeartRateMonitor: React.FC = () => {
 
       <div className="absolute inset-0 z-20">
         <Tabs defaultValue="monitor" className="h-full w-full">
-          <div className="absolute top-14 left-1/2 -translate-x-1/2">
-            <TabsList className="bg-black/50 backdrop-blur-md border border-white/20 shadow-lg">
-              <TabsTrigger 
-                value="monitor"
-                className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-300"
-              >
-                Monitor
-              </TabsTrigger>
-              <TabsTrigger 
-                value="calibration" 
-                className="gap-2 data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-300"
-              >
-                <Settings className="w-4 h-4" />
-                Calibración
-              </TabsTrigger>
-            </TabsList>
-          </div>
-
           <TabsContent value="monitor" className="h-full m-0">
             <div className="h-full w-full p-3 flex flex-col">
-              <div className="mt-14 space-y-2">
+              <div className="space-y-2">
                 {isStarted && (
                   <div className="bg-black/30 backdrop-blur-md rounded-lg p-2 border border-white/10">
                     <SignalQualityIndicator
@@ -111,6 +93,24 @@ const HeartRateMonitor: React.FC = () => {
                     <VitalChart data={readings} color="#ea384c" />
                   </div>
                 </div>
+
+                <div className="mt-2">
+                  <TabsList className="bg-black/50 backdrop-blur-md border border-white/20 shadow-lg w-full">
+                    <TabsTrigger 
+                      value="monitor"
+                      className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-300 flex-1"
+                    >
+                      Monitor
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="calibration" 
+                      className="gap-2 data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-300 flex-1"
+                    >
+                      <Settings className="w-4 h-4" />
+                      Calibración
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
               </div>
 
               <div className="flex-grow" />
@@ -127,12 +127,10 @@ const HeartRateMonitor: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="calibration" className="h-full m-0 p-3">
-            <div className="mt-14">
-              <CalibrationPanel 
-                settings={sensitivitySettings}
-                onUpdateSettings={updateSensitivitySettings}
-              />
-            </div>
+            <CalibrationPanel 
+              settings={sensitivitySettings}
+              onUpdateSettings={updateSensitivitySettings}
+            />
           </TabsContent>
         </Tabs>
       </div>
