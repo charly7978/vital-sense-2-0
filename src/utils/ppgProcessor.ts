@@ -88,8 +88,26 @@ export class PPGProcessor {
     
     const { red, ir, quality } = this.signalExtractor.extractChannels(imageData);
     
+    // Validación más estricta de la calidad de la señal
     if (quality < this.qualityThreshold || red < this.processingSettings.MIN_RED_VALUE) {
-      return null;
+      return {
+        bpm: this.lastValidBpm,
+        spo2: 0,
+        systolic: 0,
+        diastolic: 0,
+        signalQuality: 0,
+        confidence: 0,
+        readings: this.readings,
+        isPeak: false,
+        hasArrhythmia: false,
+        arrhythmiaType: 'Normal',
+        hrvMetrics: {
+          sdnn: 0,
+          rmssd: 0,
+          pnn50: 0,
+          lfhf: 0
+        }
+      };
     }
     
     const amplifiedRed = red * this.sensitivitySettings.signalAmplification;
@@ -118,10 +136,10 @@ export class PPGProcessor {
       this.signalBuffer.shift();
     }
 
+    // Validación más estricta de picos para evitar falsos positivos
     const isPeak = this.peakDetector.isRealPeak(normalizedValue, now, this.signalBuffer);
-    let calculatedBpm = 0;
-
-    if (isPeak) {
+    
+    if (isPeak && quality > 0.3) { // Solo procesar picos con buena calidad de señal
       this.peakTimes.push(now);
       if (this.peakTimes.length > 10) {
         this.peakTimes.shift();
@@ -130,26 +148,25 @@ export class PPGProcessor {
       if (this.peakTimes.length >= 2) {
         const intervals = [];
         for (let i = 1; i < this.peakTimes.length; i++) {
-          intervals.push(this.peakTimes[i] - this.peakTimes[i-1]);
+          const interval = this.peakTimes[i] - this.peakTimes[i-1];
+          if (interval >= this.processingSettings.MIN_PEAK_DISTANCE && 
+              interval <= this.processingSettings.MAX_PEAK_DISTANCE) {
+            intervals.push(interval);
+          }
         }
         
-        const validIntervals = intervals.filter(interval => 
-          interval >= this.processingSettings.MIN_PEAK_DISTANCE && 
-          interval <= this.processingSettings.MAX_PEAK_DISTANCE
-        );
-        
-        if (validIntervals.length > 0) {
-          const avgInterval = validIntervals.reduce((a, b) => a + b, 0) / validIntervals.length;
-          calculatedBpm = Math.round(60000 / avgInterval);
+        if (intervals.length > 0) {
+          const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+          const calculatedBpm = Math.round(60000 / avgInterval);
           
           if (calculatedBpm >= 30 && calculatedBpm <= 220) {
-            calculatedBpm = this.updateBpmSmooth(calculatedBpm);
+            this.lastValidBpm = calculatedBpm;
           }
         }
       }
       
-      // Solo reproducir beep si la calidad es buena
-      if (quality > 0.3) {
+      // Solo reproducir beep si es un pico válido y la calidad es muy buena
+      if (quality > 0.5) {
         await this.beepPlayer.playBeep('heartbeat', quality);
       }
     }
@@ -158,15 +175,16 @@ export class PPGProcessor {
     const spo2Result = this.signalProcessor.calculateSpO2(this.redBuffer, this.irBuffer);
     const bp = this.signalProcessor.estimateBloodPressure(filteredRed, this.peakTimes);
 
+    // Retornar solo valores validados
     return {
       bpm: this.lastValidBpm,
-      spo2: spo2Result.spo2,
+      spo2: spo2Result.confidence > 0.5 ? spo2Result.spo2 : 0,
       systolic: bp.systolic,
       diastolic: bp.diastolic,
       signalQuality,
       confidence: spo2Result.confidence,
       readings: this.readings,
-      isPeak,
+      isPeak: isPeak && quality > 0.3, // Solo indicar pico si la calidad es buena
       hasArrhythmia: false,
       arrhythmiaType: 'Normal',
       hrvMetrics: {
