@@ -40,10 +40,7 @@ export class SignalProcessor {
 
   // ✅ Calcular SpO2 con mayor precisión
   calculateSpO2(redSignal: number[], irSignal: number[]): { spo2: number; confidence: number } {
-    console.log('💉 Calculando SpO2:', { muestrasRojas: redSignal.length, muestrasIR: irSignal.length });
-
     if (redSignal.length !== irSignal.length || redSignal.length < 2) {
-      console.log('⚠️ Muestras insuficientes para SpO2');
       return { spo2: 0, confidence: 0 };
     }
 
@@ -95,10 +92,7 @@ export class SignalProcessor {
 
   // ✅ Estimación de presión arterial con mejor calibración
   estimateBloodPressure(signal: number[], peakTimes: number[]): { systolic: number; diastolic: number } {
-    console.log('🩺 Estimando presión arterial');
-
     if (peakTimes.length < 2) {
-      console.log('⚠️ Picos insuficientes para BP');
       return { systolic: 0, diastolic: 0 };
     }
 
@@ -106,7 +100,6 @@ export class SignalProcessor {
     const ppgFeatures = this.featureExtractor.extractFeatures(signal);
 
     if (!pttResult || !ppgFeatures) {
-      console.log('⚠️ No se pudo calcular PTT o extraer características');
       return { systolic: 0, diastolic: 0 };
     }
 
