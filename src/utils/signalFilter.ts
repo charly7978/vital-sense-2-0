@@ -1,66 +1,55 @@
 
 export class SignalFilter {
   private readonly sampleRate: number;
-  private kalmanState = {
-    x: 0,
-    p: 1,
-    q: 0.1,
-    r: 1
-  };
+  private readonly alpha: number;
+  private lastFiltered: number = 0;
 
   constructor(sampleRate: number = 30) {
     this.sampleRate = sampleRate;
+    this.alpha = 1 / (1 + 2 * Math.PI * (5 / sampleRate)); // Filtro paso bajo a 5Hz
   }
 
   lowPassFilter(signal: number[], cutoffFreq: number): number[] {
-    // Apply Kalman filter first
-    const kalmanFiltered = signal.map(value => this.kalmanFilter(value));
-    
     const filtered: number[] = [];
-    const rc = 1.0 / (cutoffFreq * 2 * Math.PI);
     const dt = 1.0 / this.sampleRate;
+    const rc = 1.0 / (cutoffFreq * 2 * Math.PI);
     const alpha = dt / (rc + dt);
-    const windowSize = Math.min(10, signal.length);
     
-    // Apply Hamming window for better frequency response
-    for (let i = 0; i < kalmanFiltered.length; i++) {
+    // Aplicar filtro paso bajo
+    for (let i = 0; i < signal.length; i++) {
+      if (i === 0) {
+        filtered[i] = signal[i];
+      } else {
+        filtered[i] = filtered[i-1] + alpha * (signal[i] - filtered[i-1]);
+      }
+    }
+    
+    // Aplicar suavizado adicional
+    const smoothed = this.smoothSignal(filtered);
+    
+    return smoothed;
+  }
+
+  private smoothSignal(signal: number[]): number[] {
+    const windowSize = 5;
+    const smoothed: number[] = [];
+    
+    for (let i = 0; i < signal.length; i++) {
       let sum = 0;
-      let weightSum = 0;
+      let count = 0;
       
-      for (let j = Math.max(0, i - windowSize + 1); j <= i; j++) {
-        const weight = 0.54 - 0.46 * Math.cos((2 * Math.PI * (j - i + windowSize)) / windowSize);
-        sum += kalmanFiltered[j] * weight;
-        weightSum += weight;
+      for (let j = Math.max(0, i - windowSize + 1); j <= Math.min(i + windowSize - 1, signal.length - 1); j++) {
+        sum += signal[j];
+        count++;
       }
       
-      filtered[i] = sum / weightSum;
+      smoothed[i] = sum / count;
     }
     
-    // Apply additional RC filter for smoother output
-    let lastFiltered = filtered[0];
-    for (let i = 1; i < signal.length; i++) {
-      lastFiltered = lastFiltered + alpha * (filtered[i] - lastFiltered);
-      filtered[i] = lastFiltered;
-    }
-    
-    return filtered;
+    return smoothed;
   }
 
-  private kalmanFilter(measurement: number): number {
-    // Prediction step
-    const predictedState = this.kalmanState.x;
-    const predictedCovariance = this.kalmanState.p + this.kalmanState.q;
-    
-    // Update step
-    const kalmanGain = predictedCovariance / (predictedCovariance + this.kalmanState.r);
-    this.kalmanState.x = predictedState + kalmanGain * (measurement - predictedState);
-    this.kalmanState.p = (1 - kalmanGain) * predictedCovariance;
-    
-    return this.kalmanState.x;
-  }
-
-  updateKalmanParameters(q: number, r: number) {
-    this.kalmanState.q = q;
-    this.kalmanState.r = r;
+  reset() {
+    this.lastFiltered = 0;
   }
 }
