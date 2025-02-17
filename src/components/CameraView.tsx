@@ -51,8 +51,8 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
     }
 
     try {
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const frameData = context.getImageData(0, 0, canvas.width, canvas.height);
+      context.drawImage(video, 0, 0, Math.min(canvas.width, video.videoWidth), Math.min(canvas.height, video.videoHeight));
+      const frameData = context.getImageData(0, 0, Math.min(canvas.width, video.videoWidth), Math.min(canvas.height, video.videoHeight));
 
       const { bpm, spo2, quality, isValid } = analyzeVitalSigns(frameData);
       if (isValid) {
@@ -83,11 +83,11 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
     if (pulseData.length > 50) pulseData.shift();
 
     const bpm = calculateBPM();
+    if (bpm < 40 || bpm > 180) return { bpm: 0, spo2: 0, quality: 0, isValid: false };
+
     const spo2 = calculateSpO2(avgRed);
     const quality = calculateQuality();
-    const isValid = bpm > 40 && bpm < 160; // Validación básica
-
-    return { bpm, spo2, quality, isValid };
+    return { bpm, spo2, quality, isValid: true };
   };
 
   const calculateBPM = () => {
