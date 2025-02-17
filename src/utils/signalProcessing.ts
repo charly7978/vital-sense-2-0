@@ -114,6 +114,14 @@ export class SignalProcessor {
       return { spo2: 0, confidence: 0 };
     }
 
+    const redMean = redSignal.reduce((a, b) => a + b, 0) / redSignal.length;
+    const irMean = irSignal.reduce((a, b) => a + b, 0) / irSignal.length;
+    
+    if (redMean < 0.1 || irMean < 0.1) {
+      console.log('⚠️ Señal PPG muy débil:', { red: redMean, ir: irMean });
+      return { spo2: 0, confidence: 0 };
+    }
+
     let redAC = 0, redDC = 0, irAC = 0, irDC = 0;
     const windowSize = Math.min(30, redSignal.length);
 
@@ -136,6 +144,11 @@ export class SignalProcessor {
 
     const R = (redAC * irDC) / (irAC * redDC);
     
+    if (R < 0.1 || R > 10) {
+      console.log('⚠️ Ratio R fuera de rango:', R);
+      return { spo2: 0, confidence: 0 };
+    }
+
     let spo2 = 110 - 25 * R;
     spo2 = Math.min(100, Math.max(70, spo2));
 
@@ -143,6 +156,11 @@ export class SignalProcessor {
       (redAC / redDC) * 100,
       (irAC / irDC) * 100
     ) / 3;
+
+    if (confidence < 0.2) {
+      console.log('⚠️ Confianza muy baja:', confidence);
+      return { spo2: 0, confidence: 0 };
+    }
 
     return { 
       spo2: Math.round(spo2), 
@@ -162,40 +180,46 @@ export class SignalProcessor {
     const minPeakDistance = Math.floor(this.sampleRate * 0.3); // 300ms mínimo entre picos
     let lastPeakIndex = -minPeakDistance;
 
-    // Calculamos el umbral adaptativo basado en la señal
+    const signalStrength = intervals.reduce((a, b) => a + Math.abs(b), 0) / intervals.length;
+    if (signalStrength < 0.1) {
+      console.log('⚠️ Señal demasiado débil:', signalStrength);
+      return 0;
+    }
+
     const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
     const stdDev = Math.sqrt(
       intervals.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / intervals.length
     );
-    threshold = mean + 0.3 * stdDev;
+    threshold = mean + 0.25 * stdDev;
 
-    // Detectamos picos usando un algoritmo más sensible
     for (let i = 2; i < intervals.length - 2; i++) {
       if (
         i - lastPeakIndex >= minPeakDistance &&
         intervals[i] > threshold &&
-        intervals[i] > intervals[i - 1] &&
-        intervals[i] > intervals[i + 1] &&
+        intervals[i] > intervals[i - 1] * 1.1 &&
+        intervals[i] > intervals[i + 1] * 1.1 &&
         intervals[i] > intervals[i - 2] &&
         intervals[i] > intervals[i + 2]
       ) {
         peaks++;
         lastPeakIndex = i;
         
-        // Ajustamos el umbral localmente
         const localMean = intervals
           .slice(Math.max(0, i - 5), Math.min(intervals.length, i + 6))
           .reduce((a, b) => a + b, 0) / 11;
-        threshold = localMean * 0.6; // Umbral más sensible
+        threshold = localMean * 0.5;
       }
     }
 
-    // Calculamos BPM usando la ventana de tiempo real
     const timeWindow = intervals.length / this.sampleRate;
     const bpm = (peaks * 60) / timeWindow;
 
-    // Limitamos a rangos más realistas
-    return Math.min(Math.max(Math.round(bpm), 40), 200);
+    if (bpm < 40 || bpm > 200) {
+      console.log('⚠️ BPM fuera de rango:', bpm);
+      return 0;
+    }
+
+    return Math.round(bpm);
   }
 
   estimateBloodPressure(signal: number[], peakTimes: number[]): { systolic: number; diastolic: number } {
@@ -213,36 +237,31 @@ export class SignalProcessor {
     const ptt = pttResult.ptt;
     const { augmentationIndex, stiffnessIndex } = ppgFeatures;
 
-    // Coeficientes ajustados para mejor sensibilidad
     const coefficients = {
-      ptt: -1.2,  // Aumentado para más sensibilidad
-      aix: 35,    // Ajustado para mejor respuesta
-      si: 4,      // Aumentado para más precisión
+      ptt: -1.2,
+      aix: 35,
+      si: 4,
       baselineSys: 120,
       baselineDia: 80
     };
 
-    // Cálculo más sensible de presión sistólica
     let systolic = Math.round(
       coefficients.baselineSys +
-      (coefficients.ptt * (1000 / ptt - 4)) + // Ajustado el offset
+      (coefficients.ptt * (1000 / ptt - 4)) +
       (coefficients.aix * augmentationIndex) +
       (coefficients.si * stiffnessIndex)
     );
 
-    // Cálculo más sensible de presión diastólica
     let diastolic = Math.round(
       coefficients.baselineDia +
-      (coefficients.ptt * (1000 / ptt - 4) * 0.7) + // Factor ajustado
+      (coefficients.ptt * (1000 / ptt - 4) * 0.7) +
       (coefficients.aix * augmentationIndex * 0.5) +
       (coefficients.si * stiffnessIndex * 0.4)
     );
 
-    // Validaciones más permisivas
     systolic = Math.min(Math.max(systolic, 90), 180);
     diastolic = Math.min(Math.max(diastolic, 60), 120);
 
-    // Aseguramos diferencia sistólica-diastólica realista
     if (systolic <= diastolic) {
       const diff = Math.round((systolic - diastolic) * 0.4);
       systolic = diastolic + Math.max(30, diff);
