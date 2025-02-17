@@ -1,4 +1,3 @@
-
 export class PeakDetector {
   private adaptiveThreshold = 0;
   private readonly minPeakDistance = 400;
@@ -11,15 +10,15 @@ export class PeakDetector {
   private readonly MAX_BPM = 180;
   private readonly MIN_BPM = 40;
   private readonly peakWindowSize = 5;
-  private readonly minPeakProminence = 0.3;
+  private readonly minPeakProminence = 0.2;
+  private readonly minSignalStrength = 0.08;
   private frameCount = 0;
-  private readonly minSignalStrength = 0.1; // Nueva propiedad
 
   isRealPeak(currentValue: number, now: number, signalBuffer: number[]): boolean {
     this.frameCount++;
     
-    // Verificar fuerza mínima de la señal
     if (Math.abs(currentValue) < this.minSignalStrength) {
+      console.log('Señal muy débil:', currentValue);
       return false;
     }
     
@@ -32,6 +31,7 @@ export class PeakDetector {
     }
 
     if (signalBuffer.length < 8) {
+      console.log('Buffer insuficiente:', signalBuffer.length);
       return false;
     }
 
@@ -44,10 +44,10 @@ export class PeakDetector {
         positiveValues.reduce((a, b) => a + Math.pow(b - avgValue, 2), 0) / positiveValues.length
       ) : 1;
 
-    this.adaptiveThreshold = Math.abs(avgValue) + (stdDev * 1.2);
+    this.adaptiveThreshold = Math.abs(avgValue) + (stdDev * 1.1);
 
     const isValidShape = this.validatePeakShape(currentValue, signalBuffer);
-    const hasSignificantAmplitude = Math.abs(currentValue) > this.adaptiveThreshold * 0.8;
+    const hasSignificantAmplitude = Math.abs(currentValue) > this.adaptiveThreshold * 0.7;
     const isLocalMaximum = this.isLocalMax(currentValue, signalBuffer);
     const hasProminence = this.checkPeakProminence(currentValue, signalBuffer);
 
@@ -63,6 +63,13 @@ export class PeakDetector {
       if (isValidInterval) {
         this.lastPeakTime = now;
         this.updatePeakHistory(currentValue, now);
+        console.log('✓ Pico válido detectado:', {
+          valor: currentValue,
+          tiempo: now,
+          intervalo: currentInterval,
+          amplitud: Math.abs(currentValue),
+          umbral: this.adaptiveThreshold
+        });
         return true;
       }
     }
