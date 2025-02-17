@@ -1,7 +1,7 @@
-
 import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Settings, ArrowLeft } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import CameraView from './CameraView';
 import VitalChart from './VitalChart';
 import VitalSignsDisplay from './vitals/VitalSignsDisplay';
@@ -9,10 +9,8 @@ import SignalQualityIndicator from './vitals/SignalQualityIndicator';
 import MeasurementControls from './vitals/MeasurementControls';
 import CalibrationPanel from './CalibrationPanel';
 import { useVitals } from '@/contexts/VitalsContext';
-import { useNavigate } from 'react-router-dom';
 
 const HeartRateMonitor: React.FC = () => {
-  const navigate = useNavigate();
   const { 
     bpm, 
     spo2, 
@@ -35,12 +33,12 @@ const HeartRateMonitor: React.FC = () => {
   return (
     <div className="relative h-screen w-screen overflow-hidden">
       {/* Botón de retorno */}
-      <button 
-        onClick={() => navigate(-1)}
+      <Link 
+        to="/"
         className="absolute top-3 left-3 z-30 p-2 rounded-full bg-black/30 backdrop-blur-sm border border-white/10 text-white/80 hover:bg-black/40 transition-colors"
       >
         <ArrowLeft className="w-5 h-5" />
-      </button>
+      </Link>
 
       <div className="absolute inset-0 z-0">
         <CameraView onFrame={processFrame} isActive={isStarted} />
