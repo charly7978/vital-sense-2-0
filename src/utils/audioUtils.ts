@@ -43,18 +43,20 @@ export class BeepPlayer {
 
       const currentTime = this.audioContext.currentTime;
 
-      // Ajustar frecuencia y volumen según la calidad de la señal
-      const baseFrequency = 150;
-      oscillator.frequency.value = baseFrequency + (quality * 50);
-      const volume = Math.min(0.5, Math.max(0.1, quality));
+      // Aumentamos la frecuencia base y el rango de variación
+      const baseFrequency = 440; // Aumentado de 150 a 440 Hz (más audible)
+      oscillator.frequency.value = baseFrequency + (quality * 100); // Aumentado el factor de calidad
+      
+      // Aumentamos el volumen base y máximo
+      const volume = Math.min(0.8, Math.max(0.3, quality)); // Aumentado de 0.5 a 0.8
 
-      // Configurar la envolvente del sonido
+      // Configurar la envolvente del sonido con mayor duración
       gainNode.gain.setValueAtTime(0, currentTime);
-      gainNode.gain.linearRampToValueAtTime(volume, currentTime + 0.01);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.05);
+      gainNode.gain.linearRampToValueAtTime(volume, currentTime + 0.02);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.08);
 
       oscillator.start(currentTime);
-      oscillator.stop(currentTime + 0.05);
+      oscillator.stop(currentTime + 0.08);
 
       this.lastBeepTime = now;
       console.log('♥ Beep reproducido:', {
@@ -68,7 +70,7 @@ export class BeepPlayer {
       setTimeout(() => {
         oscillator.disconnect();
         gainNode.disconnect();
-      }, 100);
+      }, 150);
 
     } catch (error) {
       console.error('✗ Error reproduciendo beep:', error);

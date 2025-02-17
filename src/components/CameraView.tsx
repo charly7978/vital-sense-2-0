@@ -10,7 +10,6 @@ interface CameraViewProps {
   isActive: boolean;
 }
 
-// Extendemos la interfaz MediaTrackConstraints para incluir torch
 interface ExtendedTrackConstraints extends MediaTrackConstraints {
   advanced?: Array<{ [key: string]: any }>;
 }
@@ -38,7 +37,18 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
         };
 
         if (isAndroid) {
-          constraints.advanced = [{ torch: true }];
+          // Agregamos configuración específica para Android
+          constraints.advanced = [
+            { 
+              // Reducimos la intensidad de la linterna
+              torch: true,
+              // Ajustamos exposición y brillo para compensar
+              exposureMode: 'manual',
+              exposureTime: 1000, // Tiempo de exposición más largo
+              brightness: 0.5, // Reducimos el brillo
+              contrast: 1.2 // Aumentamos un poco el contraste
+            }
+          ];
         }
 
         stream = await navigator.mediaDevices.getUserMedia({ video: constraints });
@@ -47,15 +57,12 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
           webcamRef.current.video.srcObject = stream;
           const track = stream.getVideoTracks()[0];
           
-          // Usar type assertion para acceder a torch
-          const capabilities = track.getCapabilities() as any;
-          if (isAndroid && capabilities?.torch) {
-            const torchConstraints = {
-              advanced: [{ torch: true }]
-            } as unknown as MediaTrackConstraints;
-            
-            await track.applyConstraints(torchConstraints);
-            console.log('✓ Linterna activada');
+          if (isAndroid && track.getCapabilities) {
+            const capabilities = track.getCapabilities() as any;
+            if (capabilities?.torch) {
+              await track.applyConstraints(constraints);
+              console.log('✓ Cámara Android configurada con ajustes optimizados');
+            }
           }
         }
       } catch (error) {
