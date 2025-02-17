@@ -25,9 +25,7 @@ const App = () => {
             <div 
               className={`fixed inset-0 transition-transform duration-500 ${showControls ? 'translate-x-0' : 'translate-x-full'}`}
             >
-              {showControls && (
-                <Index onClose={() => setShowControls(false)} />
-              )}
+              <Index onClose={() => setShowControls(false)} />
             </div>
           </div>
         </BrowserRouter>
