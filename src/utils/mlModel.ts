@@ -1,19 +1,16 @@
 
 import * as tf from "@tensorflow/tfjs";
-
-interface TrainingData {
-  input: number[];
-  output: number[];
-}
+import { MLDataManager } from './ml/dataManager';
+import { MLTrainer } from './ml/trainer';
+import { MLPredictor } from './ml/predictor';
+import { ModelConfig, ModelStats } from './ml/types';
 
 export class MLModel {
   private model: tf.Sequential;
   private isTrained: boolean = false;
-  private readonly maxMemoryEntries = 1000;
-  private memoryBuffer: TrainingData[] = [];
   private readonly defaultValues = [25, 0.5, 0.35];
   private currentTraining: Promise<void> | null = null;
-  private readonly modelConfig = {
+  private readonly modelConfig: ModelConfig = {
     inputUnits: 16,
     hiddenUnits: 8,
     learningRate: 0.001,
@@ -21,105 +18,15 @@ export class MLModel {
     l2Regularization: 0.01
   };
 
+  private readonly dataManager: MLDataManager;
+  private readonly trainer: MLTrainer;
+  private readonly predictor: MLPredictor;
+
   constructor() {
-    this.model = tf.sequential();
-    this.initializeModel();
-  }
-
-  private initializeModel() {
-    this.model.add(tf.layers.dense({ 
-      inputShape: [3], 
-      units: this.modelConfig.inputUnits, 
-      activation: "relu",
-      kernelRegularizer: tf.regularizers.l2({ l2: this.modelConfig.l2Regularization })
-    }));
-
-    this.model.add(tf.layers.dropout({ rate: this.modelConfig.dropoutRate }));
-
-    this.model.add(tf.layers.dense({ 
-      units: this.modelConfig.hiddenUnits, 
-      activation: "relu",
-      kernelRegularizer: tf.regularizers.l2({ l2: this.modelConfig.l2Regularization })
-    }));
-
-    this.model.add(tf.layers.dense({ 
-      units: 3, 
-      activation: "linear" 
-    }));
-
-    this.model.compile({ 
-      optimizer: tf.train.adam(this.modelConfig.learningRate),
-      loss: "meanSquaredError",
-      metrics: ["mse"]
-    });
-  }
-
-  private async executeTraining(trainingData: number[][], targetData: number[][]): Promise<void> {
-    const newData: TrainingData[] = trainingData.map((input, index) => ({
-      input,
-      output: targetData[index]
-    }));
-
-    this.memoryBuffer.push(...newData);
-
-    if (this.memoryBuffer.length > this.maxMemoryEntries) {
-      this.memoryBuffer = this.memoryBuffer.slice(-this.maxMemoryEntries);
-    }
-
-    const shuffleArray = <T>(array: T[]): T[] => {
-      const shuffled = [...array];
-      for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-      }
-      return shuffled;
-    };
-
-    const shuffledData = shuffleArray(this.memoryBuffer);
-    const inputData = shuffledData.map(d => d.input);
-    const outputData = shuffledData.map(d => d.output);
-
-    let tensors: { xs: tf.Tensor2D; ys: tf.Tensor2D } | null = null;
-
-    try {
-      tensors = {
-        xs: tf.tensor2d(inputData),
-        ys: tf.tensor2d(outputData)
-      };
-
-      await tf.engine().startScope();
-      const history = await this.model.fit(tensors.xs, tensors.ys, { 
-        epochs: 50,
-        batchSize: 32,
-        validationSplit: 0.2,
-        shuffle: true,
-        callbacks: {
-          onEpochEnd: (epoch, logs) => {
-            if (logs) {
-              console.log(
-                `Epoch ${epoch + 1}: loss = ${logs.loss.toFixed(4)}, ` +
-                `val_loss = ${logs.val_loss.toFixed(4)}, ` +
-                `mse = ${logs.mse.toFixed(4)}`
-              );
-            }
-          }
-        }
-      });
-      
-      this.isTrained = true;
-      console.log("✔ Modelo ML entrenado correctamente", {
-        finalLoss: history.history.loss[history.history.loss.length - 1],
-        finalValLoss: history.history.val_loss[history.history.val_loss.length - 1],
-        finalMSE: history.history.mse[history.history.mse.length - 1]
-      });
-
-    } finally {
-      if (tensors) {
-        tensors.xs.dispose();
-        tensors.ys.dispose();
-      }
-      await tf.engine().endScope();
-    }
+    this.dataManager = new MLDataManager(1000);
+    this.trainer = new MLTrainer();
+    this.predictor = new MLPredictor();
+    this.model = this.trainer.initializeModel(this.modelConfig);
   }
 
   async trainModel(trainingData: number[][], targetData: number[][]): Promise<void> {
@@ -129,7 +36,6 @@ export class MLModel {
     }
 
     try {
-      // Si hay un entrenamiento en curso, esperamos a que termine
       if (this.currentTraining) {
         console.log("⚠ Esperando a que termine el entrenamiento anterior...");
         await this.currentTraining;
@@ -147,12 +53,42 @@ export class MLModel {
     }
   }
 
+  private async executeTraining(trainingData: number[][], targetData: number[][]): Promise<void> {
+    this.dataManager.addData(trainingData, targetData);
+    const shuffledData = this.dataManager.getShuffledData();
+    
+    const inputData = shuffledData.map(d => d.input);
+    const outputData = shuffledData.map(d => d.output);
+
+    const history = await this.trainer.trainModel(
+      this.model,
+      inputData,
+      outputData,
+      (epoch, logs) => {
+        if (logs) {
+          console.log(
+            `Epoch ${epoch + 1}: loss = ${logs.loss.toFixed(4)}, ` +
+            `val_loss = ${logs.val_loss.toFixed(4)}, ` +
+            `mse = ${logs.mse.toFixed(4)}`
+          );
+        }
+      }
+    );
+
+    this.isTrained = true;
+    console.log("✔ Modelo ML entrenado correctamente", {
+      finalLoss: history.history.loss[history.history.loss.length - 1],
+      finalValLoss: history.history.val_loss[history.history.val_loss.length - 1],
+      finalMSE: history.history.mse[history.history.mse.length - 1]
+    });
+  }
+
   private handleModelError(error: any) {
     console.error("Detalles del error:", {
       message: error.message,
       stack: error.stack,
       modelState: this.isTrained ? "Entrenado" : "No entrenado",
-      memoryBufferSize: this.memoryBuffer.length,
+      memoryBufferSize: this.dataManager.size,
       isTraining: this.currentTraining !== null
     });
   }
@@ -164,26 +100,14 @@ export class MLModel {
     }
 
     try {
-      const inputTensor = tf.tensor2d([inputData]);
-      await tf.engine().startScope();
-      const prediction = this.model.predict(inputTensor) as tf.Tensor;
-      const result = Array.from(await prediction.data());
-      
-      inputTensor.dispose();
-      prediction.dispose();
-      await tf.engine().endScope();
-      
-      const clampedResult = [
-        Math.max(10, Math.min(30, result[0])),
-        Math.max(0.3, Math.min(0.7, result[1])),
-        Math.max(0.1, Math.min(0.5, result[2]))
-      ];
+      const result = await this.predictor.predict(this.model, inputData);
+      const clampedResult = this.predictor.clampPrediction(result);
 
       console.log("Predicción ML:", {
         entrada: inputData,
         original: result,
         ajustada: clampedResult,
-        confianza: this.calculateConfidence(result, clampedResult)
+        confianza: this.predictor.calculateConfidence(result, clampedResult)
       });
       
       return clampedResult;
@@ -194,30 +118,18 @@ export class MLModel {
     }
   }
 
-  private calculateConfidence(original: number[], clamped: number[]): number {
-    const confidenceScores = original.map((val, idx) => {
-      const min = idx === 0 ? 10 : idx === 1 ? 0.3 : 0.1;
-      const max = idx === 0 ? 30 : idx === 1 ? 0.7 : 0.5;
-      const range = max - min;
-      const distance = Math.abs(val - clamped[idx]);
-      return 1 - (distance / range);
-    });
-
-    return confidenceScores.reduce((acc, val) => acc + val, 0) / confidenceScores.length;
-  }
-
   clearMemory() {
-    this.memoryBuffer = [];
+    this.dataManager.clear();
     this.isTrained = false;
     this.currentTraining = null;
     console.log("Memoria del modelo limpiada");
   }
 
-  getModelStats(): object {
+  getModelStats(): ModelStats {
     return {
       isTrained: this.isTrained,
       isTraining: this.currentTraining !== null,
-      memoryBufferSize: this.memoryBuffer.length,
+      memoryBufferSize: this.dataManager.size,
       modelConfig: this.modelConfig,
       defaultValues: this.defaultValues
     };
