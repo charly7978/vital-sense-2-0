@@ -1,4 +1,3 @@
-
 import { PTTProcessor } from './pttProcessor';
 import { PPGFeatureExtractor } from './ppgFeatureExtractor';
 import { SignalFilter } from './signalFilter';
@@ -11,8 +10,8 @@ export class SignalProcessor {
   private readonly spO2CalibrationCoefficients = {
     a: 110,
     b: 25,
-    c: 1,
-    perfusionIndexThreshold: 0.2
+    c: 1.5,
+    perfusionIndexThreshold: 0.3
   };
 
   private readonly pttProcessor: PTTProcessor;
@@ -30,16 +29,23 @@ export class SignalProcessor {
     this.qualityAnalyzer = new SignalQualityAnalyzer();
   }
 
-  // ✅ Mejor filtrado de señal (Menos ruido)
   private applySmoothingFilter(signal: number[]): number[] {
-    return signal.map((value, index, arr) => 
-      index > 1 && index < arr.length - 1 
-        ? (arr[index - 2] + arr[index - 1] + value + arr[index + 1] + arr[index + 2]) / 5 
-        : value
-    );
+    const windowSize = 5;
+    const halfWindow = Math.floor(windowSize / 2);
+    const smoothed = [...signal];
+
+    for (let i = halfWindow; i < signal.length - halfWindow; i++) {
+      let sum = 0;
+      for (let j = -halfWindow; j <= halfWindow; j++) {
+        const coeff = j === 0 ? 0.7 : (j === -1 || j === 1) ? 0.2 : -0.1;
+        sum += signal[i + j] * coeff;
+      }
+      smoothed[i] = sum;
+    }
+
+    return smoothed;
   }
 
-  // Análisis de la Variabilidad de la Frecuencia Cardíaca (HRV)
   analyzeHRV(intervals: number[]): { 
     hasArrhythmia: boolean; 
     type: string; 
@@ -59,14 +65,12 @@ export class SignalProcessor {
       };
     }
 
-    // Calcular SDNN (Desviación estándar de intervalos NN)
     const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
     const sdnn = Math.sqrt(
       intervals.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / 
       (intervals.length - 1)
     );
 
-    // Calcular RMSSD
     const successiveDiffs = intervals.slice(1).map((val, i) => 
       Math.pow(val - intervals[i], 2)
     );
@@ -74,17 +78,14 @@ export class SignalProcessor {
       successiveDiffs.reduce((a, b) => a + b, 0) / successiveDiffs.length
     );
 
-    // Calcular pNN50
     const nn50 = intervals.slice(1).filter((val, i) => 
       Math.abs(val - intervals[i]) > 50
     ).length;
     const pnn50 = (nn50 / (intervals.length - 1)) * 100;
 
-    // Calcular ratio LF/HF usando el analizador de frecuencia
     const { lf, hf } = this.frequencyAnalyzer.calculateFrequencyDomainMetrics(intervals);
     const lfhf = hf !== 0 ? lf / hf : 0;
 
-    // Detectar arritmias basadas en los parámetros calculados
     const hasArrhythmia = sdnn > 100 || rmssd > 50 || pnn50 > 20;
     let type = 'Normal';
     
@@ -108,7 +109,6 @@ export class SignalProcessor {
     };
   }
 
-  // ✅ Calcular SpO2 con mayor precisión
   calculateSpO2(redSignal: number[], irSignal: number[]): { spo2: number; confidence: number } {
     if (redSignal.length !== irSignal.length || redSignal.length < 2) {
       return { spo2: 0, confidence: 0 };
@@ -119,48 +119,87 @@ export class SignalProcessor {
 
     const windowSize = Math.min(30, filteredRed.length);
     let redAC = 0, redDC = 0, irAC = 0, irDC = 0;
+    const perfusionIndices: number[] = [];
 
     for (let i = filteredRed.length - windowSize; i < filteredRed.length; i++) {
+      const redACTemp = Math.abs(filteredRed[i] - (i > 0 ? filteredRed[i-1] : filteredRed[i]));
+      const irACTemp = Math.abs(filteredIr[i] - (i > 0 ? filteredIr[i-1] : filteredIr[i]));
+      
+      redAC += redACTemp;
+      irAC += irACTemp;
       redDC += filteredRed[i];
       irDC += filteredIr[i];
-      if (i > filteredRed.length - windowSize + 1) {
-        redAC += Math.abs(filteredRed[i] - filteredRed[i - 1]);
-        irAC += Math.abs(filteredIr[i] - filteredIr[i - 1]);
-      }
+
+      const perfusionIndex = (redACTemp / filteredRed[i]) * 100;
+      perfusionIndices.push(perfusionIndex);
     }
 
     redDC /= windowSize;
     irDC /= windowSize;
-    redAC /= (windowSize - 1);
-    irAC /= (windowSize - 1);
+    redAC /= windowSize;
+    irAC /= windowSize;
 
     const R = ((redAC * irDC) / (irAC * redDC)) * this.spO2CalibrationCoefficients.c;
-    let spo2 = Math.min(Math.max(Math.round(this.spO2CalibrationCoefficients.a - this.spO2CalibrationCoefficients.b * R), 70), 100);
     
-    const confidence = this.calculateConfidence(redAC, irAC, windowSize);
+    let spo2 = this.spO2CalibrationCoefficients.a - 
+               (this.spO2CalibrationCoefficients.b * Math.pow(R, 1.1));
+
+    spo2 = Math.min(Math.max(Math.round(spo2), 70), 100);
+
+    const avgPerfusionIndex = perfusionIndices.reduce((a, b) => a + b, 0) / perfusionIndices.length;
+    const signalStability = this.calculateSignalStability(perfusionIndices);
+    const confidence = Math.min(
+      (avgPerfusionIndex / this.spO2CalibrationCoefficients.perfusionIndexThreshold) * 
+      signalStability * 100, 
+      100
+    );
+
     return { spo2, confidence };
   }
 
-  private calculateConfidence(redAC: number, irAC: number, windowSize: number): number {
-    const signalStrength = (redAC + irAC) / 2;
-    return Math.min((signalStrength / 0.1) * (windowSize / 30) * 100, 100);
+  private calculateSignalStability(values: number[]): number {
+    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / values.length;
+    return Math.exp(-variance / (2 * Math.pow(mean, 2)));
   }
 
-  // ✅ Detección de picos cardíacos más precisa
   detectPeaks(intervals: number[]): number {
     let peaks = 0;
+    let threshold = 0;
+    const minPeakDistance = Math.floor(this.sampleRate * 0.3);
+    let lastPeakIndex = -minPeakDistance;
+
+    const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+    const stdDev = Math.sqrt(
+      intervals.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / intervals.length
+    );
+    threshold = mean + 0.3 * stdDev;
+
     for (let i = 2; i < intervals.length - 2; i++) {
       if (
-        intervals[i] > intervals[i - 1] && intervals[i] > intervals[i + 1] &&
-        intervals[i] > intervals[i - 2] && intervals[i] > intervals[i + 2]
+        i - lastPeakIndex >= minPeakDistance &&
+        intervals[i] > threshold &&
+        intervals[i] > intervals[i - 1] &&
+        intervals[i] > intervals[i + 1] &&
+        intervals[i] > intervals[i - 2] &&
+        intervals[i] > intervals[i + 2]
       ) {
         peaks++;
+        lastPeakIndex = i;
+        
+        const localMean = intervals
+          .slice(Math.max(0, i - 5), Math.min(intervals.length, i + 6))
+          .reduce((a, b) => a + b, 0) / 11;
+        threshold = localMean * 0.7;
       }
     }
-    return peaks * 2; // Ajuste para BPM más preciso
+
+    const timeWindow = intervals.length / this.sampleRate;
+    const bpm = (peaks * 60) / timeWindow;
+
+    return Math.min(Math.max(Math.round(bpm), 40), 200);
   }
 
-  // ✅ Estimación de presión arterial con mejor calibración
   estimateBloodPressure(signal: number[], peakTimes: number[]): { systolic: number; diastolic: number } {
     if (peakTimes.length < 2) {
       return { systolic: 0, diastolic: 0 };
