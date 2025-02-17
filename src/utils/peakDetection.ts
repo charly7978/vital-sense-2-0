@@ -1,3 +1,4 @@
+
 export class PeakDetector {
   private adaptiveThreshold = 0;
   private readonly minPeakDistance = 300;
@@ -10,9 +11,9 @@ export class PeakDetector {
   private frameCount = 0;
   private readonly MAX_BPM = 180;
   private readonly MIN_BPM = 40;
-  private readonly MIN_VALID_PEAKS = 3;
-  private readonly MIN_SIGNAL_QUALITY = 0.4;
-  private readonly MIN_PEAK_AMPLITUDE = 0.3;
+  private readonly MIN_VALID_PEAKS = 2; // Reducido para ser menos estricto
+  private readonly MIN_SIGNAL_QUALITY = 0.25; // Reducido para ser menos estricto
+  private readonly MIN_PEAK_AMPLITUDE = 0.2; // Reducido para ser menos estricto
 
   isRealPeak(currentValue: number, now: number, signalBuffer: number[]): boolean {
     this.frameCount++;
@@ -52,7 +53,8 @@ export class PeakDetector {
       amplitudPico: Math.abs(currentValue)
     });
 
-    this.adaptiveThreshold = Math.abs(avgValue) + (stdDev * 1.5);
+    // Umbral adaptativo menos estricto
+    this.adaptiveThreshold = Math.abs(avgValue) + (stdDev * 1.2);
 
     const isValidShape = this.validatePeakShape(currentValue, signalBuffer);
     const hasSignificantAmplitude = Math.abs(currentValue) > this.adaptiveThreshold * this.MIN_PEAK_AMPLITUDE;
@@ -94,7 +96,7 @@ export class PeakDetector {
         this.updatePeakHistory(currentValue, now);
         const quality = this.calculatePeakQuality(currentValue, avgValue, stdDev);
         
-        if (quality > 0.5) {
+        if (quality > 0.3) { // Umbral de calidad reducido para permitir más beeps
           console.log('💓 PICO VÁLIDO DETECTADO:', {
             calidad: quality,
             picosTotales: this.peakBuffer.length

@@ -7,9 +7,9 @@ export class SignalQualityAnalyzer {
     const variance = signal.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / signal.length;
     const standardDeviation = Math.sqrt(variance);
     
-    // Calcular la amplitud pico a pico con un umbral mínimo
+    // Calcular la amplitud pico a pico con un umbral mínimo más bajo
     const peakToPeak = Math.max(...signal) - Math.min(...signal);
-    if (peakToPeak < 20) return 0.1; // Si la amplitud es muy baja, la calidad es mala
+    if (peakToPeak < 10) return 0.1; // Umbral más bajo para la amplitud mínima
     
     // Calcular el ruido de alta frecuencia
     const noiseLevel = this.calculateNoiseLevel(signal);
@@ -17,20 +17,20 @@ export class SignalQualityAnalyzer {
     // Calcular la estabilidad de la línea base
     const baselineStability = this.calculateBaselineStability(signal);
     
-    // Evaluar si hay suficiente variación en la señal
+    // Evaluar si hay suficiente variación en la señal (umbral más bajo)
     const signalVariation = standardDeviation / mean;
-    if (signalVariation < 0.05) return 0.1; // Si hay muy poca variación, la calidad es mala
+    if (signalVariation < 0.02) return 0.1; // Umbral más bajo para la variación mínima
     
     // Pesos ajustados para cada métrica
     const weights = {
-      amplitude: 0.35,
-      noise: 0.35,
+      amplitude: 0.4,
+      noise: 0.3,
       baseline: 0.3
     };
     
-    // Normalizar y combinar métricas con umbrales más estrictos
-    const amplitudeQuality = Math.min(peakToPeak / 150, 1);
-    const noiseQuality = 1 - Math.min(noiseLevel * 1.5, 1); // Más sensible al ruido
+    // Normalizar y combinar métricas con umbrales más bajos
+    const amplitudeQuality = Math.min(peakToPeak / 100, 1); // Umbral más bajo para amplitud
+    const noiseQuality = 1 - Math.min(noiseLevel * 1.2, 1);
     const baselineQuality = Math.min(baselineStability, 1);
     
     const quality = 
@@ -38,10 +38,9 @@ export class SignalQualityAnalyzer {
       noiseQuality * weights.noise +
       baselineQuality * weights.baseline;
     
-    // Ajuste exponencial para hacer el indicador más sensible a calidades bajas
-    const adjustedQuality = Math.pow(quality, 1.5);
+    // Ajuste menos agresivo para hacer el indicador más sensible
+    const adjustedQuality = Math.pow(quality, 1.2);
     
-    // Aplicar umbral mínimo más alto
     return Math.min(Math.max(adjustedQuality, 0), 1);
   }
 
@@ -58,14 +57,13 @@ export class SignalQualityAnalyzer {
     
     if (maxSignal === 0) return 1;
     
-    // Ajuste para ser más sensible al ruido
-    return Math.pow(meanDiff / maxSignal, 0.8);
+    // Ajuste menos sensible al ruido
+    return Math.pow(meanDiff / maxSignal, 0.5);
   }
 
   private calculateBaselineStability(signal: number[]): number {
     if (signal.length < 10) return 0;
     
-    // Ventana más grande para mejor estabilidad
     const windowSize = 8;
     const baseline = [];
     
@@ -74,13 +72,12 @@ export class SignalQualityAnalyzer {
       baseline.push(windowMean);
     }
     
-    // Calcular la variación de la línea base
     const baselineVariation = Math.sqrt(
       baseline.reduce((acc, val) => acc + Math.pow(val - baseline[0], 2), 0) / baseline.length
     );
     
-    // Normalizar la estabilidad con un factor más estricto
-    return Math.exp(-baselineVariation / 8);
+    // Normalizar la estabilidad con un factor menos estricto
+    return Math.exp(-baselineVariation / 12);
   }
 
   calculateSignalStability(redSignal: number[], irSignal: number[]): number {
@@ -89,7 +86,7 @@ export class SignalQualityAnalyzer {
     const redQuality = this.analyzeSignalQuality(redSignal);
     const irQuality = this.analyzeSignalQuality(irSignal);
     
-    // Usar el valor más bajo para ser más conservador
-    return Math.min(redQuality, irQuality);
+    // Usar un promedio ponderado en lugar del mínimo
+    return (redQuality * 0.7 + irQuality * 0.3);
   }
 }
