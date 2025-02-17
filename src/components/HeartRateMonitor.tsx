@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Settings, ArrowRight } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import CameraView from './CameraView';
 import VitalChart from './VitalChart';
 import VitalSignsDisplay from './vitals/VitalSignsDisplay';
@@ -37,13 +37,6 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
 
   return (
     <div className="relative h-screen w-screen overflow-hidden">
-      <button 
-        onClick={onShowControls}
-        className="absolute top-3 right-3 z-30 p-2 rounded-full bg-black/30 backdrop-blur-sm border border-white/10 text-white/80 hover:bg-black/40 transition-colors cursor-pointer"
-      >
-        <ArrowRight className="w-5 h-5" />
-      </button>
-
       <div className="absolute inset-0 z-0">
         <CameraView onFrame={processFrame} isActive={isStarted} />
       </div>
@@ -102,7 +95,7 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
 
           {/* Vista de Calibración */}
           <div className={`absolute inset-0 transition-transform duration-500 ${currentView === 'calibration' ? 'translate-x-0' : 'translate-x-full'}`}>
-            <div className="h-full w-full p-3">
+            <div className="h-full w-full p-3 pb-32">
               <CalibrationPanel 
                 settings={sensitivitySettings}
                 onUpdateSettings={updateSensitivitySettings}

@@ -50,6 +50,11 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       context.drawImage(video, 0, 0);
+
+      // Aplicar un ligero oscurecimiento a la imagen
+      context.fillStyle = 'rgba(0, 0, 0, 0.2)'; // Capa semitransparente negra
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      
       const frameData = context.getImageData(0, 0, canvas.width, canvas.height);
       
       if (frameData && frameData.data.length > 0) {
