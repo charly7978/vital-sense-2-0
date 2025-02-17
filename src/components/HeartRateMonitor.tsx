@@ -1,5 +1,5 @@
-import React from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+import React, { useState } from 'react';
 import { Settings, ArrowRight } from 'lucide-react';
 import CameraView from './CameraView';
 import VitalChart from './VitalChart';
@@ -8,12 +8,14 @@ import SignalQualityIndicator from './vitals/SignalQualityIndicator';
 import MeasurementControls from './vitals/MeasurementControls';
 import CalibrationPanel from './CalibrationPanel';
 import { useVitals } from '@/contexts/VitalsContext';
+import { Button } from "@/components/ui/button";
 
 interface HeartRateMonitorProps {
   onShowControls: () => void;
 }
 
 const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) => {
+  const [currentView, setCurrentView] = useState<'monitor' | 'calibration'>('monitor');
   const { 
     bpm, 
     spo2, 
@@ -49,8 +51,9 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
       <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/60 z-10" />
 
       <div className="absolute inset-0 z-20">
-        <Tabs defaultValue="monitor" className="h-full w-full">
-          <TabsContent value="monitor" className="h-full m-0">
+        <div className="h-full w-full relative">
+          {/* Vista del Monitor */}
+          <div className={`absolute inset-0 transition-transform duration-500 ${currentView === 'monitor' ? 'translate-x-0' : '-translate-x-full'}`}>
             <div className="h-full w-full p-3 flex flex-col">
               <div className="space-y-2">
                 {isStarted && (
@@ -94,45 +97,47 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
                   </div>
                 </div>
               </div>
-
-              <div className="flex-grow" />
-
-              <div className="mt-auto mb-20">
-                <TabsList className="bg-black/50 backdrop-blur-md border border-white/20 shadow-lg w-full">
-                  <TabsTrigger 
-                    value="monitor"
-                    className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-300 flex-1"
-                  >
-                    Monitor
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="calibration" 
-                    className="gap-2 data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-300 flex-1"
-                  >
-                    <Settings className="w-4 h-4" />
-                    Calibración
-                  </TabsTrigger>
-                </TabsList>
-              </div>
-
-              <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
-                <div className="w-40">
-                  <MeasurementControls
-                    isStarted={isStarted}
-                    onToggleMeasurement={toggleMeasurement}
-                  />
-                </div>
-              </div>
             </div>
-          </TabsContent>
+          </div>
 
-          <TabsContent value="calibration" className="h-full m-0 p-3">
-            <CalibrationPanel 
-              settings={sensitivitySettings}
-              onUpdateSettings={updateSensitivitySettings}
-            />
-          </TabsContent>
-        </Tabs>
+          {/* Vista de Calibración */}
+          <div className={`absolute inset-0 transition-transform duration-500 ${currentView === 'calibration' ? 'translate-x-0' : 'translate-x-full'}`}>
+            <div className="h-full w-full p-3">
+              <CalibrationPanel 
+                settings={sensitivitySettings}
+                onUpdateSettings={updateSensitivitySettings}
+              />
+            </div>
+          </div>
+
+          {/* Controles fijos en la parte inferior */}
+          <div className="absolute bottom-6 left-0 right-0 px-4 z-30">
+            <div className="flex gap-2 justify-center mb-4">
+              <Button
+                variant={currentView === 'monitor' ? 'default' : 'secondary'}
+                className="flex-1 max-w-40"
+                onClick={() => setCurrentView('monitor')}
+              >
+                Monitor
+              </Button>
+              <Button
+                variant={currentView === 'calibration' ? 'default' : 'secondary'}
+                className="flex-1 max-w-40 gap-2"
+                onClick={() => setCurrentView('calibration')}
+              >
+                <Settings className="w-4 h-4" />
+                Calibración
+              </Button>
+            </div>
+
+            <div className="w-40 mx-auto">
+              <MeasurementControls
+                isStarted={isStarted}
+                onToggleMeasurement={toggleMeasurement}
+              />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
