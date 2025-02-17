@@ -23,7 +23,8 @@ const HeartRateMonitor: React.FC = () => {
     processFrame
   } = useVitals();
 
-  const showFingerIndicator = isStarted && (measurementQuality < 0.2 || bpm === 0);
+  // Ajustado para ser más preciso en la detección del dedo
+  const showFingerIndicator = isStarted && measurementQuality < 0.2;
 
   return (
     <div className="relative h-screen w-screen overflow-hidden">
