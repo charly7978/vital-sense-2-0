@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Settings } from 'lucide-react';
+import { Settings, ArrowRight } from 'lucide-react';
 import CameraView from './CameraView';
 import VitalChart from './VitalChart';
 import VitalSignsDisplay from './vitals/VitalSignsDisplay';
@@ -36,15 +36,19 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
   const showFingerIndicator = isStarted && measurementQuality < 0.2;
 
   return (
-    <div className="fixed inset-0 w-screen h-screen overflow-hidden">
+    <div className="relative h-screen w-screen overflow-hidden">
+      <button 
+        onClick={onShowControls}
+        className="absolute top-3 right-3 z-30 p-2 rounded-full bg-black/30 backdrop-blur-sm border border-white/10 text-white/80 hover:bg-black/40 transition-colors cursor-pointer"
+      >
+        <ArrowRight className="w-5 h-5" />
+      </button>
+
       <div className="absolute inset-0 z-0">
         <CameraView onFrame={processFrame} isActive={isStarted} />
       </div>
 
-      {/* Gradiente estético solo cuando no está midiendo */}
-      {!isStarted && (
-        <div className="absolute inset-0 bg-gradient-to-b from-[#221F26]/60 via-[#1EAEDB]/30 to-[#33C3F0]/40 z-10" />
-      )}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/60 z-10" />
 
       <div className="absolute inset-0 z-20">
         <div className="h-full w-full relative">
@@ -88,7 +92,7 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
 
                 <div className="rounded-lg p-2">
                   <h3 className="text-xs font-medium mb-1 text-gray-100">PPG en Tiempo Real</h3>
-                  <div className="h-[50px]">
+                  <div className="h-[80px]">
                     <VitalChart data={readings} color="#ea384c" />
                   </div>
                 </div>
@@ -111,17 +115,17 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
             <div className="flex gap-2 justify-center mb-4">
               <Button
                 variant={currentView === 'monitor' ? 'default' : 'secondary'}
-                className="h-8 flex-1 max-w-32 text-sm"
+                className="flex-1 max-w-40"
                 onClick={() => setCurrentView('monitor')}
               >
                 Monitor
               </Button>
               <Button
                 variant={currentView === 'calibration' ? 'default' : 'secondary'}
-                className="h-8 flex-1 max-w-32 gap-2 text-sm"
+                className="flex-1 max-w-40 gap-2"
                 onClick={() => setCurrentView('calibration')}
               >
-                <Settings className="w-3.5 h-3.5" />
+                <Settings className="w-4 h-4" />
                 Calibración
               </Button>
             </div>
