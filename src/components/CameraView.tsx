@@ -59,13 +59,13 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
     const canvas = canvasRef.current;
     const context = canvas.getContext("2d");
 
-    // 🔹 Verificar si el video tiene dimensiones correctas antes de capturar imagen
+    // 🔹 Verificar si el video está cargado correctamente antes de capturar la imagen
     if (!context || !video || video.readyState !== video.HAVE_ENOUGH_DATA) {
       animationFrameRef.current = requestAnimationFrame(processFrame);
       return;
     }
 
-    // 🔹 Asegurar que el canvas tenga las mismas dimensiones que el video
+    // 🔹 Ajustar el tamaño del canvas para que coincida con el video
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
 
@@ -73,7 +73,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       const frameData = context.getImageData(0, 0, canvas.width, canvas.height);
 
-      // 🔹 Evitar procesar frames vacíos o con errores
+      // 🔹 Verificar si la imagen capturada tiene datos válidos
       if (!frameData || frameData.data.length < 4) {
         console.warn("⚠️ Frame vacío detectado, saltando...");
         animationFrameRef.current = requestAnimationFrame(processFrame);
