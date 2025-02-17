@@ -2,7 +2,7 @@
 import * as tf from "@tensorflow/tfjs";
 import { MLDataManager } from './ml/dataManager';
 import { MLTrainer } from './ml/trainer';
-import { MLPredictor } from './ml/predictor';
+import { MLPredictor } from '../../../utils/ml/predictor'; // Actualizada la ruta
 import { ModelConfig, ModelStats } from './ml/types';
 
 export class MLModel {

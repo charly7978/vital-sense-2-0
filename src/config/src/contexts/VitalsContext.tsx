@@ -1,6 +1,7 @@
+
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { BeepPlayer } from '../utils/audioUtils';
-import { PPGProcessor } from '../utils/ppgProcessor';
+import { PPGProcessor } from '../../../utils/ppgProcessor'; // Actualizada la ruta
 import { useToast } from "@/hooks/use-toast";
 import type { VitalReading, SensitivitySettings } from '../utils/types';
 
