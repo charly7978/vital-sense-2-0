@@ -13,6 +13,10 @@ interface CameraViewProps {
 declare global {
   interface MediaTrackConstraintSet {
     torch?: boolean;
+    zoom?: number;
+    exposureMode?: string;
+    exposureCompensation?: number;
+    brightness?: number;
   }
 }
 
@@ -25,19 +29,23 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
   const isMobile = useIsMobile();
   const isAndroid = /android/i.test(navigator.userAgent);
 
-  const getDeviceConstraints = () => ({
+  const getDeviceConstraints = (): MediaTrackConstraints => ({
     width: { ideal: 1280 },
     height: { ideal: 720 },
-    facingMode: isAndroid ? { exact: "environment" } : "user",
+    facingMode: isAndroid ? "environment" : "user",
     advanced: isAndroid 
       ? [
-          { torch: isMeasuring },
-          { zoom: 1 }
+          {
+            torch: isMeasuring,
+            zoom: 1
+          }
         ] 
       : [
-          { exposureMode: "manual" },
-          { exposureCompensation: -1.0 },
-          { brightness: 0.3 },
+          {
+            exposureMode: "manual",
+            exposureCompensation: -1.0,
+            brightness: 0.3
+          }
         ],
   });
 
