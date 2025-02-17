@@ -30,64 +30,50 @@ const HeartRateMonitor: React.FC = () => {
   const { toast } = useToast();
 
   return (
-    <div className="container max-w-xl mx-auto px-2">
-      {/* Cámara centrada en la parte superior */}
-      <div className="flex justify-center mb-2">
-        <div className="w-32 aspect-[3/4] bg-black/40 backdrop-blur-xl rounded-lg p-1.5 border border-white/5 shadow-lg">
-          <div className="w-full h-full overflow-hidden rounded-md">
-            <CameraView onFrame={processFrame} isActive={isStarted} />
+    <div className="space-y-4 max-w-7xl mx-auto">
+      <VitalSignsDisplay
+        bpm={bpm}
+        spo2={spo2}
+        systolic={systolic}
+        diastolic={diastolic}
+        hasArrhythmia={hasArrhythmia}
+        arrhythmiaType={arrhythmiaType}
+      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="space-y-4">
+          <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-4 border border-white/5">
+            <div className="aspect-video w-full overflow-hidden rounded-lg">
+              <CameraView onFrame={processFrame} isActive={isStarted} />
+            </div>
+            {isStarted && bpm === 0 && (
+              <div className="mt-2 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                <p className="text-yellow-300 text-sm">
+                  Coloque su dedo sobre el lente de la cámara
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-black/40 backdrop-blur-xl rounded-2xl p-4 border border-white/5">
+            <h3 className="text-lg font-medium mb-2 text-gray-100">PPG en Tiempo Real</h3>
+            <VitalChart data={readings} color="#ea384c" />
           </div>
         </div>
-      </div>
 
-      {/* Controles y mensaje de ayuda */}
-      <div className="flex flex-col items-center space-y-1 mb-2">
-        {isStarted && bpm === 0 && (
-          <div className="p-1.5 bg-yellow-500/10 border border-yellow-500/20 rounded text-center w-full">
-            <p className="text-yellow-300 text-xs">
-              Coloque su dedo sobre el lente
-            </p>
-          </div>
-        )}
-        
-        <div className="w-full max-w-xs">
-          <MeasurementControls
-            isStarted={isStarted}
-            onToggleMeasurement={toggleMeasurement}
-          />
-        </div>
-
-        {isStarted && (
-          <div className="w-full max-w-xs">
+        <div className="space-y-4">
+          {isStarted && (
             <SignalQualityIndicator
               isStarted={isStarted}
               measurementQuality={measurementQuality}
               measurementProgress={measurementProgress}
             />
-          </div>
-        )}
-      </div>
+          )}
 
-      {/* Grid de 2 columnas para métricas y gráfico */}
-      <div className="grid grid-cols-2 gap-2">
-        {/* Columna izquierda - Signos vitales */}
-        <div className="bg-black/40 backdrop-blur-xl rounded-lg p-2 border border-white/5">
-          <VitalSignsDisplay
-            bpm={bpm}
-            spo2={spo2}
-            systolic={systolic}
-            diastolic={diastolic}
-            hasArrhythmia={hasArrhythmia}
-            arrhythmiaType={arrhythmiaType}
+          <MeasurementControls
+            isStarted={isStarted}
+            onToggleMeasurement={toggleMeasurement}
           />
-        </div>
-
-        {/* Columna derecha - Gráfico PPG */}
-        <div className="bg-black/40 backdrop-blur-xl rounded-lg p-2 border border-white/5">
-          <h3 className="text-xs font-medium mb-1 text-gray-100">PPG en Tiempo Real</h3>
-          <div className="h-[120px]">
-            <VitalChart data={readings} color="#ea384c" />
-          </div>
         </div>
       </div>
     </div>
