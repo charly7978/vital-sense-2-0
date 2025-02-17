@@ -32,6 +32,11 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
   const isAndroid = /android/i.test(navigator.userAgent);
   const beepAudio = useRef(new Audio("/beep.mp3"));
 
+  // 🔹 Ajustar volumen del beep
+  useEffect(() => {
+    beepAudio.current.volume = 1.0; // Subimos el volumen al máximo
+  }, []);
+
   const getDeviceConstraints = () => ({
     width: { ideal: 1280 },
     height: { ideal: 720 },
@@ -67,7 +72,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
       const signal = calculateSignalStrength(frameData);
       setSignalStrength(signal);
 
-      if (signal < 20) {
+      if (signal < 15) { // 🔹 Aumentamos la sensibilidad de detección en Android
         setBpm(0);
         setSpo2(0);
         setQuality(0);
@@ -103,7 +108,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
       const g = data[i + 1];
       const b = data[i + 2];
 
-      if (r > 120 && g < 80 && b < 80) {
+      if (r > 100 && g < 80 && b < 80) {
         redIntensity += r;
       }
       totalPixels++;
@@ -128,7 +133,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
 
     const peaks = detectPeaks(pulseData);
     const bpm = calculateBPM(peaks);
-    if (bpm < 40 || bpm > 180) return { bpm: 0, spo2: 0, quality: 0, isValid: false, peaks: [] };
+    if (bpm < 50 || bpm > 160) return { bpm: 0, spo2: 0, quality: 0, isValid: false, peaks: [] };
 
     const spo2 = calculateSpO2(avgRed);
     const quality = calculateQuality();
@@ -137,8 +142,8 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
 
   const detectPeaks = (data: number[]) => {
     let peaks: number[] = [];
-    for (let i = 1; i < data.length - 1; i++) {
-      if (data[i] > data[i - 1] && data[i] > data[i + 1]) {
+    for (let i = 2; i < data.length - 2; i++) {
+      if (data[i] > data[i - 1] && data[i] > data[i + 1] && data[i] > data[i - 2] && data[i] > data[i + 2]) {
         peaks.push(i);
       }
     }
@@ -148,7 +153,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
   const calculateBPM = (peaks: number[]) => {
     if (peaks.length < 2) return 0;
     let avgRR = (peaks[peaks.length - 1] - peaks[0]) / (peaks.length - 1);
-    return Math.min(Math.max(60000 / avgRR, 60), 140);
+    return Math.min(Math.max(60000 / avgRR, 50), 160);
   };
 
   const calculateSpO2 = (red: number) => Math.max(85, Math.min(99, 110 - (red / 255) * 10));
@@ -157,6 +162,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
 
   const playBeep = () => {
     beepAudio.current.currentTime = 0;
+    beepAudio.current.volume = 1.0; // 🔹 Subimos volumen al máximo
     beepAudio.current.play();
   };
 
