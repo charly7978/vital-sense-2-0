@@ -23,9 +23,11 @@ const App = () => {
 
             {/* Panel de controles (deslizable) */}
             <div 
-              className={`fixed inset-0 transition-transform duration-500 ${showControls ? 'translate-x-0' : 'translate-x-full'}`}
+              className={`fixed inset-0 pointer-events-none ${showControls ? 'pointer-events-auto' : ''}`}
             >
-              <Index onClose={() => setShowControls(false)} />
+              <div className={`absolute inset-0 bg-black/80 backdrop-blur-sm transition-transform duration-500 ${showControls ? 'translate-x-0' : 'translate-x-full'}`}>
+                <Index onClose={() => setShowControls(false)} />
+              </div>
             </div>
           </div>
         </BrowserRouter>
