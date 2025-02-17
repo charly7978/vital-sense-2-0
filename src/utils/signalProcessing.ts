@@ -1,110 +1,31 @@
-import React, { useRef, useEffect, useState } from "react";
-import Webcam from "react-webcam";
-import { useToast } from "@/hooks/use-toast";
+export class SignalProcessor {
+  private sampleRate = 30;
 
-interface CameraViewProps {
-  onFrame: (imageData: ImageData) => void;
-  isActive: boolean;
-  onMeasurementEnd?: () => void;
+  constructor() {}
+
+  detectFinger(signal: number[]): boolean {
+    const avgRed = signal.reduce((sum, val) => sum + val, 0) / signal.length;
+    return avgRed > 100; // 🔹 Umbral dinámico para evitar falsos positivos
+  }
+
+  detectPeaks(signal: number[]): number[] {
+    let peaks = [];
+    for (let i = 2; i < signal.length - 2; i++) {
+      if (
+        signal[i] > signal[i - 1] &&
+        signal[i] > signal[i + 1] &&
+        signal[i] > signal[i - 2] &&
+        signal[i] > signal[i + 2]
+      ) {
+        peaks.push(i);
+      }
+    }
+    return peaks;
+  }
+
+  calculateBPM(peaks: number[]): number {
+    if (peaks.length < 2) return 0;
+    let avgInterval = (peaks[peaks.length - 1] - peaks[0]) / (peaks.length - 1);
+    return Math.round(60000 / avgInterval);
+  }
 }
-
-const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasurementEnd }) => {
-  const webcamRef = useRef<Webcam>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationFrameRef = useRef<number | null>(null);
-  const { toast } = useToast();
-  const [bpm, setBpm] = useState(0);
-  const [spo2, setSpo2] = useState(98);
-  const [quality, setQuality] = useState(0);
-  const beepAudio = useRef(new Audio("/beep.mp3"));
-
-  useEffect(() => {
-    beepAudio.current.volume = 1.0;
-  }, []);
-
-  const processFrame = () => {
-    if (!isActive || !webcamRef.current?.video || !canvasRef.current) {
-      animationFrameRef.current = requestAnimationFrame(processFrame);
-      return;
-    }
-
-    const video = webcamRef.current.video;
-    const canvas = canvasRef.current;
-    const context = canvas.getContext("2d");
-
-    if (!context || !video || video.readyState !== video.HAVE_ENOUGH_DATA) {
-      animationFrameRef.current = requestAnimationFrame(processFrame);
-      return;
-    }
-
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    try {
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const frameData = context.getImageData(0, 0, canvas.width, canvas.height);
-
-      if (!frameData || frameData.data.length < 4) {
-        animationFrameRef.current = requestAnimationFrame(processFrame);
-        return;
-      }
-
-      const { bpm, spo2, quality, isValid } = analyzeVitalSigns(frameData);
-      if (isValid) {
-        setBpm(bpm);
-        setSpo2(spo2);
-        setQuality(quality);
-        onFrame(frameData);
-      }
-    } catch (error) {
-      console.error("❌ Error al procesar el frame:", error);
-    }
-
-    animationFrameRef.current = requestAnimationFrame(processFrame);
-  };
-
-  useEffect(() => {
-    if (isActive) {
-      processFrame();
-    } else if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
-  }, [isActive]);
-
-  return (
-    <div className="relative w-full h-screen">
-      {/* 🔹 Cámara a pantalla completa, aseguramos que no se vea borrosa */}
-      {isActive && (
-        <Webcam
-          ref={webcamRef}
-          audio={false}
-          videoConstraints={{ width: 1280, height: 720, facingMode: "environment" }}
-          className="absolute w-full h-full object-cover z-0"
-        />
-      )}
-      <canvas ref={canvasRef} style={{ display: "none" }} />
-
-      {/* 🔹 Contenedor de datos sobre la cámara, ajustado para mejor visibilidad */}
-      <div className="absolute top-0 left-0 w-full h-full flex flex-col items-center justify-center bg-black/10 backdrop-blur-sm text-white p-4 z-10">
-        <div className="bg-black/40 rounded-lg p-3 w-3/4 text-center">
-          {/* 🔹 BPM */}
-          <div className="text-4xl font-bold">BPM: {bpm}</div>
-
-          {/* 🔹 SpO2 */}
-          <div className="text-2xl mt-2">SpO2: {spo2}%</div>
-
-          {/* 🔹 Calidad de la señal */}
-          <div className="text-lg mt-2">Señal: {quality}%</div>
-        </div>
-
-        {/* 🔹 Gráfico de señal PPG, ahora más visible */}
-        <div className="absolute bottom-5 left-1/2 transform -translate-x-1/2 bg-black/30 p-3 rounded-xl text-sm">
-          📊 Gráfico PPG (Placeholder)
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default CameraView;
