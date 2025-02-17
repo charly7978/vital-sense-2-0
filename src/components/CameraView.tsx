@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useState } from "react";
 import Webcam from "react-webcam";
 import { useToast } from "@/hooks/use-toast";
@@ -6,8 +5,9 @@ import { Camera } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface CameraViewProps {
-  onFrame: (imageData: ImageData) => void;
+  onFrame: (frame: ImageData) => Promise<void>;
   isActive: boolean;
+  options?: MediaTrackConstraints;
 }
 
 // Extendemos la interfaz correctamente
@@ -21,7 +21,11 @@ declare global {
   }
 }
 
-const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
+const CameraView: React.FC<CameraViewProps> = ({ 
+  onFrame, 
+  isActive,
+  options 
+}) => {
   const webcamRef = useRef<Webcam>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number | null>(null);
