@@ -216,22 +216,26 @@ export class SignalProcessor {
       baselineDia: 80
     };
 
-    let systolic = Math.min(Math.max(Math.round(
+    let systolic = Math.round(
       coefficients.baselineSys +
       (coefficients.ptt * (1000 / ptt - 5)) +
       (coefficients.aix * augmentationIndex) +
       (coefficients.si * stiffnessIndex)
-    ), 90), 180);
+    );
 
-    let diastolic = Math.min(Math.max(Math.round(
+    let diastolic = Math.round(
       coefficients.baselineDia +
       (coefficients.ptt * (1000 / ptt - 5) * 0.8) +
       (coefficients.aix * augmentationIndex * 0.6) +
       (coefficients.si * stiffnessIndex * 0.5)
-    ), 60), 120);
+    );
+
+    systolic = Math.min(Math.max(systolic, 90), 180);
+    diastolic = Math.min(Math.max(diastolic, 60), 120);
 
     if (systolic <= diastolic) {
-      systolic = diastolic + 40;
+      const diff = Math.round((120 - 80) * (ptt / 1000));
+      systolic = diastolic + diff;
     }
 
     return { systolic, diastolic };

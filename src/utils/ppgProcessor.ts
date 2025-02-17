@@ -100,16 +100,9 @@ export class PPGProcessor {
     diastolic: number;
   } {
     const validBpm = bpm >= 30 && bpm <= 220 ? bpm : this.lastValidBpm || 0;
-    const validSystolic = systolic >= 80 && systolic <= 200 ? systolic : this.lastValidSystolic;
-    const validDiastolic = diastolic >= 50 && diastolic <= 130 ? diastolic : this.lastValidDiastolic;
-
-    if (validSystolic <= validDiastolic) {
-      return {
-        bpm: validBpm,
-        systolic: this.lastValidSystolic,
-        diastolic: this.lastValidDiastolic
-      };
-    }
+    
+    const validSystolic = systolic;
+    const validDiastolic = diastolic;
 
     this.lastValidBpm = validBpm;
     this.lastValidSystolic = validSystolic;
