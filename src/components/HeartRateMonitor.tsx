@@ -36,12 +36,15 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
   const showFingerIndicator = isStarted && measurementQuality < 0.2;
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden">
+    <div className="fixed inset-0 w-screen h-screen overflow-hidden">
       <div className="absolute inset-0 z-0">
         <CameraView onFrame={processFrame} isActive={isStarted} />
       </div>
 
-      <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/60 z-10" />
+      {/* Gradiente estético solo cuando no está midiendo */}
+      {!isStarted && (
+        <div className="absolute inset-0 bg-gradient-to-b from-[#221F26]/60 via-[#1EAEDB]/30 to-[#33C3F0]/40 z-10" />
+      )}
 
       <div className="absolute inset-0 z-20">
         <div className="h-full w-full relative">
@@ -95,7 +98,7 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
 
           {/* Vista de Calibración */}
           <div className={`absolute inset-0 transition-transform duration-500 ${currentView === 'calibration' ? 'translate-x-0' : 'translate-x-full'}`}>
-            <div className="h-full w-full p-3 pb-32">
+            <div className="h-full w-full p-3">
               <CalibrationPanel 
                 settings={sensitivitySettings}
                 onUpdateSettings={updateSensitivitySettings}
