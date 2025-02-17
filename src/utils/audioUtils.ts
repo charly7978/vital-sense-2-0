@@ -1,20 +1,22 @@
+// ==================== audioUtils.ts ====================
 
 export class BeepPlayer {
   private audioContext: AudioContext | null = null;
+  private oscillator: OscillatorNode | null = null;
+  private gainNode: GainNode | null = null;
+  private filterNode: BiquadFilterNode | null = null;
   private lastBeepTime: number = 0;
   private readonly minBeepInterval = 300;
 
   constructor() {
-    this.initAudioContext();
+    // Inicializar bajo demanda para móviles
+    this.initAudioContext = this.initAudioContext.bind(this);
+    document.addEventListener('touchstart', this.initAudioContext, { once: true });
   }
 
-  private async initAudioContext() {
-    try {
+  private initAudioContext() {
+    if (!this.audioContext) {
       this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      await this.audioContext.resume();
-      console.log('✓ Audio Context inicializado correctamente');
-    } catch (error) {
-      console.error('✗ Error inicializando audio:', error);
     }
   }
 
@@ -25,53 +27,92 @@ export class BeepPlayer {
       return;
     }
 
-    if (!this.audioContext) {
-      await this.initAudioContext();
-    }
-
-    if (!this.audioContext) {
-      console.error('✗ No se pudo inicializar el audio');
-      return;
-    }
-
     try {
-      const oscillator = this.audioContext.createOscillator();
-      const gainNode = this.audioContext.createGain();
+      this.initAudioContext();
+      if (!this.audioContext) return;
 
-      oscillator.connect(gainNode);
-      gainNode.connect(this.audioContext.destination);
+      // Crear nodos de audio
+      this.oscillator = this.audioContext.createOscillator();
+      this.gainNode = this.audioContext.createGain();
+      this.filterNode = this.audioContext.createBiquadFilter();
 
-      const currentTime = this.audioContext.currentTime;
+      // Configurar filtro para sonido médico
+      this.filterNode.type = 'bandpass';
+      this.filterNode.frequency.value = 1000;
+      this.filterNode.Q.value = 10;
 
-      // Frecuencia base más alta para un beep más audible
-      oscillator.frequency.value = 880; // Nota A5
-      
-      // Volumen base mucho más alto
-      const baseVolume = 0.75;
-      const finalVolume = Math.min(baseVolume * volumeMultiplier, 1.0);
+      // Configurar oscilador
+      this.oscillator.type = 'sine';
+      const now = this.audioContext.currentTime;
+      this.oscillator.frequency.setValueAtTime(660, now);
+      this.oscillator.frequency.linearRampToValueAtTime(440, now + 0.03);
 
-      // Envolvente de amplitud más pronunciada
-      gainNode.gain.setValueAtTime(0, currentTime);
-      gainNode.gain.linearRampToValueAtTime(finalVolume, currentTime + 0.01);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, currentTime + 0.05);
+      // Envelope para sonido de monitor cardíaco
+      this.gainNode.gain.setValueAtTime(0, now);
+      this.gainNode.gain.linearRampToValueAtTime(0.4 * volumeMultiplier, now + 0.01);
+      this.gainNode.gain.linearRampToValueAtTime(0.2 * volumeMultiplier, now + 0.02);
+      this.gainNode.gain.linearRampToValueAtTime(0, now + 0.05);
 
-      oscillator.start(currentTime);
-      oscillator.stop(currentTime + 0.05);
+      // Conectar nodos
+      this.oscillator.connect(this.filterNode);
+      this.filterNode.connect(this.gainNode);
+      this.gainNode.connect(this.audioContext.destination);
 
-      this.lastBeepTime = now;
-      console.log('♥ Beep reproducido:', {
+      // Reproducir
+      this.oscillator.start(now);
+      this.oscillator.stop(now + 0.05);
+
+      this.lastBeepTime = Date.now();
+
+      // Log para debugging
+      console.log('🫀 Beep reproducido:', {
+        tipo: type,
         tiempo: now,
-        frecuencia: oscillator.frequency.value,
-        volumen: finalVolume
+        volumen: volumeMultiplier
       });
 
+      // Limpiar después de reproducir
       setTimeout(() => {
-        oscillator.disconnect();
-        gainNode.disconnect();
+        this.cleanup();
       }, 100);
 
     } catch (error) {
-      console.error('✗ Error reproduciendo beep:', error);
+      console.error('Error reproduciendo beep:', error);
+      this.cleanup();
     }
   }
+
+  private cleanup() {
+    if (this.oscillator) {
+      try {
+        this.oscillator.disconnect();
+        this.oscillator = null;
+      } catch (error) {
+        console.error('Error limpiando oscillator:', error);
+      }
+    }
+    if (this.filterNode) {
+      this.filterNode.disconnect();
+      this.filterNode = null;
+    }
+    if (this.gainNode) {
+      this.gainNode.disconnect();
+      this.gainNode = null;
+    }
+  }
+
+  stop() {
+    if (this.oscillator) {
+      try {
+        this.oscillator.stop();
+      } catch (error) {
+        console.error('Error deteniendo oscillator:', error);
+      }
+    }
+    this.cleanup();
+    document.removeEventListener('touchstart', this.initAudioContext);
+  }
 }
+
+// Exportar una instancia única para toda la aplicación
+export const beepPlayer = new BeepPlayer();
