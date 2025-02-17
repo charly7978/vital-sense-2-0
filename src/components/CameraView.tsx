@@ -13,10 +13,6 @@ interface CameraViewProps {
 declare global {
   interface MediaTrackConstraintSet {
     torch?: boolean;
-    zoom?: number;
-    exposureMode?: string;
-    exposureCompensation?: number;
-    brightness?: number;
   }
 }
 
@@ -29,24 +25,11 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
   const isMobile = useIsMobile();
   const isAndroid = /android/i.test(navigator.userAgent);
 
-  const getDeviceConstraints = (): MediaTrackConstraints => ({
+  const getDeviceConstraints = () => ({
     width: { ideal: 1280 },
     height: { ideal: 720 },
     facingMode: isAndroid ? "environment" : "user",
-    advanced: isAndroid 
-      ? [
-          {
-            torch: isMeasuring,
-            zoom: 1
-          }
-        ] 
-      : [
-          {
-            exposureMode: "manual",
-            exposureCompensation: -1.0,
-            brightness: 0.3
-          }
-        ],
+    advanced: isAndroid ? [{ torch: isMeasuring }] : undefined,
   });
 
   const processFrame = () => {
@@ -67,6 +50,10 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       context.drawImage(video, 0, 0);
+
+      // Aplicar un ligero oscurecimiento a la imagen
+      context.fillStyle = 'rgba(0, 0, 0, 0.2)'; // Capa semitransparente negra
+      context.fillRect(0, 0, canvas.width, canvas.height);
       
       const frameData = context.getImageData(0, 0, canvas.width, canvas.height);
       
