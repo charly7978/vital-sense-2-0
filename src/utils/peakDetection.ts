@@ -1,17 +1,18 @@
 
 export class PeakDetector {
   private adaptiveThreshold = 0;
-  private readonly minPeakDistance = 400; // Aumentado de 300 a 400ms
+  private readonly minPeakDistance = 400;
   private lastPeakTime = 0;
   private readonly bufferSize = 30;
-  private readonly minAmplitude = 0.15; // Aumentado de 0.1 a 0.15
-  private readonly adaptiveRate = 0.15; // Reducido de 0.2 a 0.15
+  private readonly minAmplitude = 0.15;
+  private readonly adaptiveRate = 0.15;
   private peakBuffer: number[] = [];
   private timeBuffer: number[] = [];
   private readonly MAX_BPM = 180;
   private readonly MIN_BPM = 40;
   private readonly peakWindowSize = 5;
   private readonly minPeakProminence = 0.3;
+  private frameCount = 0; // Agregamos la propiedad frameCount
 
   isRealPeak(currentValue: number, now: number, signalBuffer: number[]): boolean {
     this.frameCount++;
@@ -41,11 +42,11 @@ export class PeakDetector {
       ) : 1;
 
     // Umbral adaptativo más robusto
-    this.adaptiveThreshold = Math.abs(avgValue) + (stdDev * 1.2); // Factor aumentado de 0.5 a 1.2
+    this.adaptiveThreshold = Math.abs(avgValue) + (stdDev * 1.2);
 
     // Validaciones más estrictas
     const isValidShape = this.validatePeakShape(currentValue, signalBuffer);
-    const hasSignificantAmplitude = Math.abs(currentValue) > this.adaptiveThreshold * 0.8; // Aumentado de 0.5 a 0.8
+    const hasSignificantAmplitude = Math.abs(currentValue) > this.adaptiveThreshold * 0.8;
     const isLocalMaximum = this.isLocalMax(currentValue, signalBuffer);
     const hasProminence = this.checkPeakProminence(currentValue, signalBuffer);
 
