@@ -58,7 +58,7 @@ export class BeepPlayer {
       oscillator.frequency.value = baseFrequency + (quality * 50);
       
       // Aumentar significativamente el volumen
-      const volume = Math.min(2.0, Math.max(1.0, quality * 1.5));
+      const volume = Math.min(3.0, Math.max(2.0, quality * 2.5));
 
       // Configurar la envolvente del sonido con más volumen
       gainNode.gain.setValueAtTime(0, currentTime);

@@ -15,7 +15,7 @@ const VitalChart: React.FC<VitalChartProps> = ({ data, color = "#9b87f5" }) => {
   }));
 
   return (
-    <div className="w-full h-[200px] bg-white/5 backdrop-blur-sm rounded-xl p-4">
+    <div className="w-full h-[200px] bg-black/70 backdrop-blur-sm rounded-xl p-4">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={formattedData}>
           <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
