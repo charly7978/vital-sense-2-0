@@ -41,7 +41,8 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
         <CameraView onFrame={processFrame} isActive={isStarted} />
       </div>
 
-      <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/60 z-10" />
+      {/* Fondo con gradiente más estético */}
+      <div className="absolute inset-0 bg-gradient-to-b from-[#221F26]/60 via-[#1EAEDB]/30 to-[#33C3F0]/40 z-10" />
 
       <div className="absolute inset-0 z-20">
         <div className="h-full w-full relative">
