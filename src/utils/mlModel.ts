@@ -12,6 +12,7 @@ export class MLModel {
   private readonly maxMemoryEntries = 1000;
   private memoryBuffer: TrainingData[] = [];
   private readonly defaultValues = [25, 0.5, 0.35];
+  private isTraining: boolean = false;
   private readonly modelConfig = {
     inputUnits: 16,
     hiddenUnits: 8,
@@ -26,7 +27,6 @@ export class MLModel {
   }
 
   private initializeModel() {
-    // Capa de entrada con regularización L2
     this.model.add(tf.layers.dense({ 
       inputShape: [3], 
       units: this.modelConfig.inputUnits, 
@@ -34,23 +34,19 @@ export class MLModel {
       kernelRegularizer: tf.regularizers.l2({ l2: this.modelConfig.l2Regularization })
     }));
 
-    // Capa de dropout para prevenir overfitting
     this.model.add(tf.layers.dropout({ rate: this.modelConfig.dropoutRate }));
 
-    // Capa oculta con regularización L2
     this.model.add(tf.layers.dense({ 
       units: this.modelConfig.hiddenUnits, 
       activation: "relu",
       kernelRegularizer: tf.regularizers.l2({ l2: this.modelConfig.l2Regularization })
     }));
 
-    // Capa de salida
     this.model.add(tf.layers.dense({ 
       units: 3, 
       activation: "linear" 
     }));
 
-    // Compilación del modelo con Adam optimizer y métricas
     this.model.compile({ 
       optimizer: tf.train.adam(this.modelConfig.learningRate),
       loss: "meanSquaredError",
@@ -59,13 +55,20 @@ export class MLModel {
   }
 
   async trainModel(trainingData: number[][], targetData: number[][]) {
+    if (this.isTraining) {
+      console.log("⚠ Entrenamiento en curso, ignorando nueva solicitud");
+      return;
+    }
+
     if (trainingData.length < 10) {
       console.log("⚠ Datos insuficientes para entrenar");
       return;
     }
 
     try {
-      // Agregar datos al buffer de memoria
+      this.isTraining = true;
+      console.log("✓ Iniciando entrenamiento del modelo");
+
       const newData: TrainingData[] = trainingData.map((input, index) => ({
         input,
         output: targetData[index]
@@ -73,12 +76,10 @@ export class MLModel {
 
       this.memoryBuffer.push(...newData);
 
-      // Mantener el tamaño del buffer
       if (this.memoryBuffer.length > this.maxMemoryEntries) {
         this.memoryBuffer = this.memoryBuffer.slice(-this.maxMemoryEntries);
       }
 
-      // Preparar datos para el entrenamiento con shuffle manual
       const shuffleArray = <T>(array: T[]): T[] => {
         const shuffled = [...array];
         for (let i = shuffled.length - 1; i > 0; i--) {
@@ -95,7 +96,7 @@ export class MLModel {
       const xs = tf.tensor2d(inputData);
       const ys = tf.tensor2d(outputData);
 
-      // Entrenar el modelo con early stopping
+      await tf.engine().startScope();
       const history = await this.model.fit(xs, ys, { 
         epochs: 50,
         batchSize: 32,
@@ -121,13 +122,15 @@ export class MLModel {
         finalMSE: history.history.mse[history.history.mse.length - 1]
       });
 
-      // Limpieza de memoria
       xs.dispose();
       ys.dispose();
+      await tf.engine().endScope();
 
     } catch (error) {
       console.error("Error entrenando modelo:", error);
       this.handleModelError(error);
+    } finally {
+      this.isTraining = false;
     }
   }
 
@@ -136,7 +139,8 @@ export class MLModel {
       message: error.message,
       stack: error.stack,
       modelState: this.isTrained ? "Entrenado" : "No entrenado",
-      memoryBufferSize: this.memoryBuffer.length
+      memoryBufferSize: this.memoryBuffer.length,
+      isTraining: this.isTraining
     });
   }
 
@@ -148,18 +152,18 @@ export class MLModel {
 
     try {
       const inputTensor = tf.tensor2d([inputData]);
+      await tf.engine().startScope();
       const prediction = this.model.predict(inputTensor) as tf.Tensor;
       const result = Array.from(await prediction.data());
       
-      // Limpieza de memoria
       inputTensor.dispose();
       prediction.dispose();
+      await tf.engine().endScope();
       
-      // Validación y ajuste de resultados con límites definidos
       const clampedResult = [
-        Math.max(10, Math.min(30, result[0])),    // MIN_RED_VALUE
-        Math.max(0.3, Math.min(0.7, result[1])),  // PEAK_THRESHOLD_FACTOR
-        Math.max(0.1, Math.min(0.5, result[2]))   // MIN_VALID_PIXELS_RATIO
+        Math.max(10, Math.min(30, result[0])),
+        Math.max(0.3, Math.min(0.7, result[1])),
+        Math.max(0.1, Math.min(0.5, result[2]))
       ];
 
       console.log("Predicción ML:", {
@@ -192,12 +196,14 @@ export class MLModel {
   clearMemory() {
     this.memoryBuffer = [];
     this.isTrained = false;
+    this.isTraining = false;
     console.log("Memoria del modelo limpiada");
   }
 
   getModelStats(): object {
     return {
       isTrained: this.isTrained,
+      isTraining: this.isTraining,
       memoryBufferSize: this.memoryBuffer.length,
       modelConfig: this.modelConfig,
       defaultValues: this.defaultValues
