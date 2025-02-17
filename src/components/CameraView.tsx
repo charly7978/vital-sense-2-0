@@ -26,8 +26,8 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
   const isAndroid = /android/i.test(navigator.userAgent);
 
   const getDeviceConstraints = () => ({
-    width: { ideal: 640 },
-    height: { ideal: 480 },
+    width: { ideal: 1280 },
+    height: { ideal: 720 },
     facingMode: isAndroid ? "environment" : "user",
     advanced: isAndroid ? [{ torch: isMeasuring }] : undefined,
   });
@@ -57,7 +57,6 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
       }
     } catch (error) {
       console.error("Error al procesar frame:", error);
-      // Solo mostramos el toast si el error no es por detener la medición
       if (isActive) {
         toast({
           variant: "destructive",
@@ -102,12 +101,12 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
   }
 
   return (
-    <div className="relative w-full">
+    <div className="relative w-full h-full">
       <Webcam
         ref={webcamRef}
         audio={false}
         videoConstraints={getDeviceConstraints()}
-        className="w-full h-auto rounded-lg"
+        className="absolute inset-0 w-full h-full object-cover"
       />
       <canvas 
         ref={canvasRef} 
