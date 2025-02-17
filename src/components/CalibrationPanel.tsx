@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
@@ -18,6 +19,10 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
       ...settings,
       [key]: value[0]
     });
+  };
+
+  const getValue = (key: keyof SensitivitySettings, defaultValue: number = 1) => {
+    return settings[key] ?? defaultValue;
   };
 
   return (
@@ -41,11 +46,11 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
                   </label>
                 </div>
                 <span className="text-xs text-gray-400">
-                  {settings.brightness?.toFixed(2) || "1.00"}x
+                  {getValue('brightness').toFixed(2)}x
                 </span>
               </div>
               <Slider
-                value={[settings.brightness || 1]}
+                value={[getValue('brightness')]}
                 min={0.1}
                 max={2}
                 step={0.1}
@@ -67,11 +72,11 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
                   </label>
                 </div>
                 <span className="text-xs text-gray-400">
-                  {settings.redIntensity?.toFixed(2) || "1.00"}x
+                  {getValue('redIntensity').toFixed(2)}x
                 </span>
               </div>
               <Slider
-                value={[settings.redIntensity || 1]}
+                value={[getValue('redIntensity')]}
                 min={0.1}
                 max={2}
                 step={0.1}
@@ -93,11 +98,11 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
                   </label>
                 </div>
                 <span className="text-xs text-gray-400">
-                  {settings.signalAmplification.toFixed(2)}x
+                  {getValue('signalAmplification').toFixed(2)}x
                 </span>
               </div>
               <Slider
-                value={[settings.signalAmplification]}
+                value={[getValue('signalAmplification')]}
                 min={1}
                 max={3}
                 step={0.1}
@@ -119,11 +124,11 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
                   </label>
                 </div>
                 <span className="text-xs text-gray-400">
-                  {settings.noiseReduction.toFixed(2)}x
+                  {getValue('noiseReduction').toFixed(2)}x
                 </span>
               </div>
               <Slider
-                value={[settings.noiseReduction]}
+                value={[getValue('noiseReduction')]}
                 min={0.5}
                 max={2}
                 step={0.1}
@@ -145,11 +150,11 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
                   </label>
                 </div>
                 <span className="text-xs text-gray-400">
-                  {settings.peakDetection.toFixed(2)}x
+                  {getValue('peakDetection').toFixed(2)}x
                 </span>
               </div>
               <Slider
-                value={[settings.peakDetection]}
+                value={[getValue('peakDetection')]}
                 min={0.5}
                 max={2}
                 step={0.1}
@@ -171,11 +176,11 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
                   </label>
                 </div>
                 <span className="text-xs text-gray-400">
-                  {settings.heartbeatThreshold.toFixed(2)}x
+                  {getValue('heartbeatThreshold').toFixed(2)}x
                 </span>
               </div>
               <Slider
-                value={[settings.heartbeatThreshold]}
+                value={[getValue('heartbeatThreshold')]}
                 min={0.1}
                 max={1}
                 step={0.05}
@@ -197,11 +202,11 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
                   </label>
                 </div>
                 <span className="text-xs text-gray-400">
-                  {settings.responseTime.toFixed(2)}x
+                  {getValue('responseTime').toFixed(2)}x
                 </span>
               </div>
               <Slider
-                value={[settings.responseTime]}
+                value={[getValue('responseTime')]}
                 min={0.5}
                 max={2}
                 step={0.1}
@@ -223,11 +228,11 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
                   </label>
                 </div>
                 <span className="text-xs text-gray-400">
-                  {settings.signalStability.toFixed(2)}x
+                  {getValue('signalStability').toFixed(2)}x
                 </span>
               </div>
               <Slider
-                value={[settings.signalStability]}
+                value={[getValue('signalStability')]}
                 min={0.1}
                 max={1}
                 step={0.05}
