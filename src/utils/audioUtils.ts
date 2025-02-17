@@ -2,7 +2,7 @@
 export class BeepPlayer {
   private audioContext: AudioContext | null = null;
   private lastBeepTime: number = 0;
-  private readonly minBeepInterval = 200; // Reducido para mejor respuesta
+  private readonly minBeepInterval = 300;
 
   constructor() {
     this.initAudioContext();
@@ -44,12 +44,12 @@ export class BeepPlayer {
       const currentTime = this.audioContext.currentTime;
 
       if (type === 'heartbeat') {
-        // Aumentada la frecuencia y volumen para mejor audibilidad
-        oscillator.frequency.value = 400; // Frecuencia más alta
+        // Frecuencia aumentada para mejor audibilidad
+        oscillator.frequency.value = 200;
         
         // Primer pulso (más fuerte)
         gainNode.gain.setValueAtTime(0, currentTime);
-        gainNode.gain.linearRampToValueAtTime(2.0, currentTime + 0.01); // Volumen aumentado significativamente
+        gainNode.gain.linearRampToValueAtTime(0.9, currentTime + 0.01); // Volumen aumentado
         gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.08);
         
         oscillator.start(currentTime);

@@ -10,13 +10,8 @@ interface CameraViewProps {
   isActive: boolean;
 }
 
-// Extendemos la interfaz correctamente
 declare global {
   interface MediaTrackConstraintSet {
-    torch?: boolean;
-  }
-  
-  interface MediaTrackCapabilities {
     torch?: boolean;
   }
 }
@@ -110,21 +105,8 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
         cancelAnimationFrame(animationFrameRef.current);
       }
       toggleTorch(false);
-
-      // Asegurarnos de cerrar la cámara al desmontar
-      if (webcamRef.current?.video) {
-        const stream = webcamRef.current.video.srcObject as MediaStream;
-        if (stream) {
-          stream.getTracks().forEach(track => track.stop());
-        }
-      }
     };
   }, [isActive]);
-
-  // Solo renderizar Webcam cuando isActive es true
-  if (!isActive) {
-    return null;
-  }
 
   return (
     <div className="relative">
