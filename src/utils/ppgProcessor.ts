@@ -99,18 +99,15 @@ export class PPGProcessor {
     systolic: number;
     diastolic: number;
   } {
-    const validBpm = bpm >= 40 && bpm <= 200 ? 
-      Math.max(60, Math.min(100, bpm)) : this.lastValidBpm || 75;
-    const validSystolic = systolic >= 90 && systolic <= 180 ? 
-      systolic : this.lastValidSystolic;
-    const validDiastolic = diastolic >= 60 && diastolic <= 120 ? 
-      diastolic : this.lastValidDiastolic;
-    
+    const validBpm = bpm >= 30 && bpm <= 220 ? bpm : this.lastValidBpm || 0;
+    const validSystolic = systolic >= 80 && systolic <= 200 ? systolic : this.lastValidSystolic;
+    const validDiastolic = diastolic >= 50 && diastolic <= 130 ? diastolic : this.lastValidDiastolic;
+
     if (validSystolic <= validDiastolic) {
       return {
         bpm: validBpm,
-        systolic: 120,
-        diastolic: 80
+        systolic: this.lastValidSystolic,
+        diastolic: this.lastValidDiastolic
       };
     }
 
@@ -314,7 +311,7 @@ export class PPGProcessor {
         if (validatedVitals.bpm > 0 && this.frameCount % 30 === 0) {
           console.log('🫀 Signos vitales:', {
             bpm: validatedVitals.bpm.toFixed(1),
-            spo2: Math.max(95, Math.min(100, spo2Result.spo2)) + '%',
+            spo2: spo2Result.spo2.toFixed(1) + '%',
             presion: `${validatedVitals.systolic}/${validatedVitals.diastolic}`,
             calidad: (signalQuality * 100).toFixed(1) + '%'
           });
@@ -322,7 +319,7 @@ export class PPGProcessor {
 
         return {
           bpm: validatedVitals.bpm,
-          spo2: Math.max(95, Math.min(100, spo2Result.spo2)),
+          spo2: spo2Result.spo2,
           systolic: validatedVitals.systolic,
           diastolic: validatedVitals.diastolic,
           hasArrhythmia: hrvAnalysis.hasArrhythmia,
