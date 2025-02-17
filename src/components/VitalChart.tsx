@@ -10,13 +10,23 @@ interface VitalChartProps {
 
 const VitalChart: React.FC<VitalChartProps> = ({ data, color = "#ea384c" }) => {
   const formattedData = useMemo(() => {
-    // Reducido a 150 puntos para mejor rendimiento
-    const recentData = data.slice(-150);
+    // Mostramos los últimos 100 puntos para mejor visualización de la actividad cardíaca
+    const recentData = data.slice(-100);
     return recentData.map(reading => ({
       timestamp: new Date(reading.timestamp).toISOString().substr(17, 6),
-      value: reading.value
+      value: reading.value * 2 // Amplificamos la señal para mejor visibilidad
     }));
   }, [data]);
+
+  // Calculamos el rango dinámico para el eje Y
+  const yDomain = useMemo(() => {
+    if (formattedData.length === 0) return [-1, 1];
+    const values = formattedData.map(d => d.value);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const padding = (max - min) * 0.2;
+    return [min - padding, max + padding];
+  }, [formattedData]);
 
   return (
     <div className="w-full h-[200px] bg-black/30 backdrop-blur-sm rounded-xl p-4">
@@ -30,23 +40,23 @@ const VitalChart: React.FC<VitalChartProps> = ({ data, color = "#ea384c" }) => {
             dataKey="timestamp" 
             stroke="#ffffff60"
             tick={{ fill: '#ffffff60', fontSize: 10 }}
-            interval={25}
-            minTickGap={30}
+            interval={10}
+            minTickGap={20}
           />
           <YAxis 
             stroke="#ffffff60"
             tick={{ fill: '#ffffff60', fontSize: 10 }}
-            domain={['auto', 'auto']}
+            domain={yDomain}
             scale="linear"
-            interval={1}
           />
           <Line
             type="monotone"
             dataKey="value"
             stroke={color}
-            strokeWidth={2}
+            strokeWidth={2.5}
             dot={false}
-            isAnimationActive={false}
+            isAnimationActive={true}
+            animationDuration={200}
             connectNulls={true}
           />
         </LineChart>
