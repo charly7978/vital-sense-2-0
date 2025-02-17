@@ -93,27 +93,27 @@ const HeartRateMonitor: React.FC = () => {
                     <VitalChart data={readings} color="#ea384c" />
                   </div>
                 </div>
-
-                <div className="mt-2">
-                  <TabsList className="bg-black/50 backdrop-blur-md border border-white/20 shadow-lg w-full">
-                    <TabsTrigger 
-                      value="monitor"
-                      className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-300 flex-1"
-                    >
-                      Monitor
-                    </TabsTrigger>
-                    <TabsTrigger 
-                      value="calibration" 
-                      className="gap-2 data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-300 flex-1"
-                    >
-                      <Settings className="w-4 h-4" />
-                      Calibración
-                    </TabsTrigger>
-                  </TabsList>
-                </div>
               </div>
 
               <div className="flex-grow" />
+
+              <div className="mt-auto mb-20">
+                <TabsList className="bg-black/50 backdrop-blur-md border border-white/20 shadow-lg w-full">
+                  <TabsTrigger 
+                    value="monitor"
+                    className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-300 flex-1"
+                  >
+                    Monitor
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="calibration" 
+                    className="gap-2 data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-300 flex-1"
+                  >
+                    <Settings className="w-4 h-4" />
+                    Calibración
+                  </TabsTrigger>
+                </TabsList>
+              </div>
 
               <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
                 <div className="w-40">

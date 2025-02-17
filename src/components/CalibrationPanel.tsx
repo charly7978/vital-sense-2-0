@@ -1,8 +1,7 @@
-
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
-import { Gauge, Scale, Sparkles, Heart, Zap, Activity } from 'lucide-react';
+import { Gauge, Scale, Sparkles, Heart, Zap, Activity, Sun, Palette } from 'lucide-react';
 import type { SensitivitySettings } from '@/utils/types';
 
 interface CalibrationPanelProps {
@@ -32,6 +31,58 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-4">
+            {/* Brillo */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Sun className="w-4 h-4 text-yellow-400" />
+                  <label className="text-sm font-medium text-white">
+                    Brillo
+                  </label>
+                </div>
+                <span className="text-xs text-gray-400">
+                  {settings.brightness?.toFixed(2) || "1.00"}x
+                </span>
+              </div>
+              <Slider
+                value={[settings.brightness || 1]}
+                min={0.1}
+                max={2}
+                step={0.1}
+                onValueChange={handleSettingChange('brightness')}
+                className="[&_[role=slider]]:bg-yellow-400"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Ajusta el brillo de la imagen capturada
+              </p>
+            </div>
+
+            {/* Intensidad de Rojo */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Palette className="w-4 h-4 text-red-400" />
+                  <label className="text-sm font-medium text-white">
+                    Intensidad de Rojo
+                  </label>
+                </div>
+                <span className="text-xs text-gray-400">
+                  {settings.redIntensity?.toFixed(2) || "1.00"}x
+                </span>
+              </div>
+              <Slider
+                value={[settings.redIntensity || 1]}
+                min={0.1}
+                max={2}
+                step={0.1}
+                onValueChange={handleSettingChange('redIntensity')}
+                className="[&_[role=slider]]:bg-red-400"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Ajusta la sensibilidad al color rojo
+              </p>
+            </div>
+
             {/* Amplificación de Señal */}
             <div>
               <div className="flex items-center justify-between mb-2">

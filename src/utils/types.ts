@@ -1,4 +1,3 @@
-
 export interface VitalReading {
   [key: string]: number;
   timestamp: number;
@@ -29,6 +28,11 @@ export interface SensitivitySettings {
   signalAmplification: number;
   noiseReduction: number;
   peakDetection: number;
+  heartbeatThreshold: number;
+  responseTime: number;
+  signalStability: number;
+  brightness?: number;
+  redIntensity?: number;
 }
 
 export interface ProcessingSettings {
@@ -70,4 +74,3 @@ export interface BPCalibrationData {
   notes?: string;
   environmental_conditions?: Record<string, any>;
 }
-
