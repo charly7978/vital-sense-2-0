@@ -10,6 +10,11 @@ interface CameraViewProps {
   isActive: boolean;
 }
 
+// Extendemos la interfaz MediaTrackConstraints para incluir torch
+interface ExtendedTrackConstraints extends MediaTrackConstraints {
+  advanced?: Array<{ [key: string]: any }>;
+}
+
 const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   const webcamRef = useRef<Webcam>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -26,12 +31,15 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
       if (!isActive) return;
 
       try {
-        const constraints: MediaTrackConstraints = {
+        const constraints: ExtendedTrackConstraints = {
           width: { ideal: 1280 },
           height: { ideal: 720 },
           facingMode: isAndroid ? "environment" : "user",
-          advanced: isAndroid ? [{ torch: true }] : undefined,
         };
+
+        if (isAndroid) {
+          constraints.advanced = [{ torch: true }];
+        }
 
         stream = await navigator.mediaDevices.getUserMedia({ video: constraints });
         
@@ -39,10 +47,12 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
           webcamRef.current.video.srcObject = stream;
           const track = stream.getVideoTracks()[0];
           
-          if (isAndroid && track?.getCapabilities?.()?.torch) {
+          // Usar type assertion para acceder a torch
+          const capabilities = track.getCapabilities() as any;
+          if (isAndroid && capabilities?.torch) {
             await track.applyConstraints({
               advanced: [{ torch: true }]
-            });
+            } as MediaTrackConstraints);
             console.log('✓ Linterna activada');
           }
         }
