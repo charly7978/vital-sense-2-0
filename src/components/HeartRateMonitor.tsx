@@ -40,10 +40,18 @@ const HeartRateMonitor: React.FC = () => {
 
       <div className="absolute inset-0 z-20">
         <Tabs defaultValue="monitor" className="h-full w-full">
-          <div className="absolute top-3 right-3">
-            <TabsList className="bg-black/30 backdrop-blur-md border border-white/10">
-              <TabsTrigger value="monitor">Monitor</TabsTrigger>
-              <TabsTrigger value="calibration" className="gap-2">
+          <div className="absolute top-3 left-1/2 -translate-x-1/2">
+            <TabsList className="bg-black/50 backdrop-blur-md border border-white/20 shadow-lg">
+              <TabsTrigger 
+                value="monitor"
+                className="data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-300"
+              >
+                Monitor
+              </TabsTrigger>
+              <TabsTrigger 
+                value="calibration" 
+                className="gap-2 data-[state=active]:bg-white/10 data-[state=active]:text-white text-gray-300"
+              >
                 <Settings className="w-4 h-4" />
                 Calibración
               </TabsTrigger>
