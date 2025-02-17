@@ -10,20 +10,35 @@ interface VitalChartProps {
 
 const VitalChart: React.FC<VitalChartProps> = ({ data, color = "#ea384c" }) => {
   const formattedData = useMemo(() => {
-    // Mantenemos solo los últimos 50 puntos para una visualización más fluida
-    const recentData = data.slice(-50);
+    // Mantenemos los últimos 100 puntos para una señal más suave
+    const recentData = data.slice(-100);
     
-    // Normalizamos los valores para que siempre estén en un rango visible
     if (recentData.length === 0) return [];
     
-    const values = recentData.map(r => r.value);
+    // Calculamos una media móvil para suavizar la señal
+    const smoothedData = recentData.map((reading, index) => {
+      const windowSize = 5;
+      const start = Math.max(0, index - windowSize);
+      const end = index + 1;
+      const window = recentData.slice(start, end);
+      const avgValue = window.reduce((sum, r) => sum + r.value, 0) / window.length;
+      
+      return {
+        ...reading,
+        value: avgValue
+      };
+    });
+    
+    // Normalizamos los valores después del suavizado
+    const values = smoothedData.map(r => r.value);
     const min = Math.min(...values);
     const max = Math.max(...values);
     const range = max - min || 1;
 
-    return recentData.map(reading => ({
+    return smoothedData.map(reading => ({
       timestamp: new Date(reading.timestamp).toISOString().substr(17, 6),
-      value: ((reading.value - min) / range) * 100 // Normalizado a un rango de 0-100
+      value: ((reading.value - min) / range) * 100,
+      originalValue: reading.value
     }));
   }, [data]);
 
@@ -49,10 +64,10 @@ const VitalChart: React.FC<VitalChartProps> = ({ data, color = "#ea384c" }) => {
             hide={true}
           />
           <Line
-            type="monotone"
+            type="monotoneX"
             dataKey="value"
             stroke={color}
-            strokeWidth={3}
+            strokeWidth={2.5}
             dot={false}
             isAnimationActive={false}
             connectNulls
