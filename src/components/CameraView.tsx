@@ -13,6 +13,8 @@ interface CameraViewProps {
 declare global {
   interface MediaTrackConstraintSet {
     torch?: boolean;
+    exposureMode?: string;
+    whiteBalanceMode?: string;
   }
 }
 
@@ -34,7 +36,13 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
     width: { ideal: 1280 },
     height: { ideal: 720 },
     facingMode: isAndroid ? "environment" : "user",
-    advanced: isAndroid ? [{ torch: isMeasuring }] : undefined,
+    advanced: isAndroid
+      ? [
+          { torch: isMeasuring },
+          { exposureMode: "manual", exposureCompensation: 0 },
+          { whiteBalanceMode: "manual" },
+        ]
+      : undefined,
   });
 
   const processFrame = () => {
