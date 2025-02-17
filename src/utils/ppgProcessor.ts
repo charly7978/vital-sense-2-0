@@ -14,7 +14,7 @@ export class PPGProcessor {
   private irBuffer: number[] = [];
   private peakTimes: number[] = [];
   private readonly samplingRate = 30;
-  private readonly windowSize = 300;
+  private readonly windowSize = 150;
   private readonly signalProcessor: SignalProcessor;
   private readonly signalExtractor: SignalExtractor;
   private readonly peakDetector: PeakDetector;
@@ -23,8 +23,8 @@ export class PPGProcessor {
   private readonly frequencyAnalyzer: SignalFrequencyAnalyzer;
   private beepPlayer: BeepPlayer;
   private readonly signalBuffer: number[] = [];
-  private readonly bufferSize = 30;
-  private readonly qualityThreshold = 0.2;
+  private readonly bufferSize = 15;
+  private readonly qualityThreshold = 0.15;
   private mlModel: MLModel;
   private trainingData: number[][] = [];
   private targetData: number[][] = [];
@@ -33,35 +33,35 @@ export class PPGProcessor {
   private lastValidSystolic: number = 120;
   private lastValidDiastolic: number = 80;
   private lastBeepTime: number = 0;
-  private readonly minBeepInterval = 300; // Mínimo intervalo entre beeps en ms
-  
+  private readonly minBeepInterval = 300;
+
   private sensitivitySettings: SensitivitySettings = {
-    signalAmplification: 1.5,
-    noiseReduction: 1.2,
-    peakDetection: 1.3,
-    heartbeatThreshold: 0.5,
+    signalAmplification: 2.0,
+    noiseReduction: 1.0,
+    peakDetection: 1.1,
+    heartbeatThreshold: 0.4,
     responseTime: 1.0,
     signalStability: 0.5,
     brightness: 1.0,
     redIntensity: 1.0
   };
-  
+
   private processingSettings: ProcessingSettings = {
     MEASUREMENT_DURATION: 30,
-    MIN_FRAMES_FOR_CALCULATION: 15,
-    MIN_PEAKS_FOR_VALID_HR: 2,
-    MIN_PEAK_DISTANCE: 400,
-    MAX_PEAK_DISTANCE: 1200,
-    PEAK_THRESHOLD_FACTOR: 0.4,
+    MIN_FRAMES_FOR_CALCULATION: 10,
+    MIN_PEAKS_FOR_VALID_HR: 1,
+    MIN_PEAK_DISTANCE: 300,
+    MAX_PEAK_DISTANCE: 1500,
+    PEAK_THRESHOLD_FACTOR: 0.3,
     MIN_RED_VALUE: 15,
     MIN_RED_DOMINANCE: 1.1,
-    MIN_VALID_PIXELS_RATIO: 0.2,
+    MIN_VALID_PIXELS_RATIO: 0.15,
     MIN_BRIGHTNESS: 80,
-    MIN_VALID_READINGS: 30,
+    MIN_VALID_READINGS: 15,
     FINGER_DETECTION_DELAY: 500,
     MIN_SPO2: 75
   };
-  
+
   constructor() {
     this.beepPlayer = new BeepPlayer();
     this.signalProcessor = new SignalProcessor(this.windowSize);
@@ -76,11 +76,10 @@ export class PPGProcessor {
   private async playHeartbeatBeep(quality: number) {
     const now = Date.now();
     if (now - this.lastBeepTime < this.minBeepInterval) {
-      return; // Evitar beeps demasiado frecuentes
+      return;
     }
     
     try {
-      // Volumen basado en la calidad de la señal
       const volume = Math.max(quality * 10, 3.0);
       await this.beepPlayer.playBeep('heartbeat', volume);
       this.lastBeepTime = now;
@@ -206,61 +205,39 @@ export class PPGProcessor {
     
     const { red, ir, quality, perfusionIndex } = this.signalExtractor.extractChannels(imageData);
     
-    console.log('🔍 Estado del sensor detallado:', {
-      tiempo: new Date(now).toISOString(),
-      frame: this.frameCount,
-      deteccionDedo: {
-        valorRojo: red.toFixed(2),
-        umbralMinimo: this.processingSettings.MIN_RED_VALUE,
-        detectado: red > this.processingSettings.MIN_RED_VALUE,
-        infrarrojo: ir.toFixed(2),
-        calidadBase: (quality * 100).toFixed(1) + '%',
-        indicePerfusion: perfusionIndex.toFixed(2) + '%'
-      },
-      buffersEstado: {
-        tamanoBufferRojo: this.redBuffer.length,
-        tamanoBufferIR: this.irBuffer.length,
-        tamanoBufferSenal: this.signalBuffer.length,
-        maximoBuffer: this.windowSize,
-        lecturasTotales: this.readings.length
-      },
-      configuracion: {
-        amplificacion: this.sensitivitySettings.signalAmplification,
-        reduccionRuido: this.sensitivitySettings.noiseReduction,
-        deteccionPicos: this.sensitivitySettings.peakDetection,
-        umbralLatido: this.sensitivitySettings.heartbeatThreshold
-      }
-    });
+    if (this.frameCount % 30 === 0) {
+      console.log('🔍 Estado del sensor detallado:', {
+        tiempo: new Date(now).toISOString(),
+        frame: this.frameCount,
+        deteccionDedo: {
+          valorRojo: red.toFixed(2),
+          umbralMinimo: this.processingSettings.MIN_RED_VALUE,
+          detectado: red > this.processingSettings.MIN_RED_VALUE,
+          infrarrojo: ir.toFixed(2),
+          calidadBase: (quality * 100).toFixed(1) + '%',
+          indicePerfusion: perfusionIndex.toFixed(2) + '%'
+        },
+        buffersEstado: {
+          tamanoBufferRojo: this.redBuffer.length,
+          tamanoBufferIR: this.irBuffer.length,
+          tamanoBufferSenal: this.signalBuffer.length,
+          maximoBuffer: this.windowSize
+        }
+      });
+    }
     
     if (quality < this.qualityThreshold || red < this.processingSettings.MIN_RED_VALUE) {
-      console.log('⚠️ Señal insuficiente:', { 
-        valorRojo: red.toFixed(2), 
-        calidadActual: (quality * 100).toFixed(1) + '%',
-        umbralCalidad: (this.qualityThreshold * 100).toFixed(1) + '%',
-        umbralRojo: this.processingSettings.MIN_RED_VALUE,
-        razon: quality < this.qualityThreshold ? 'Calidad baja' : 'Señal roja débil'
-      });
-      this.redBuffer = [];
-      this.irBuffer = [];
-      this.readings = [];
-      this.peakTimes = [];
+      if (this.frameCount % 30 === 0) {
+        console.log('⚠️ Señal insuficiente:', { 
+          valorRojo: red.toFixed(2), 
+          calidadActual: (quality * 100).toFixed(1) + '%'
+        });
+      }
       return null;
     }
     
     const amplifiedRed = red * this.sensitivitySettings.signalAmplification;
     const amplifiedIr = ir * this.sensitivitySettings.signalAmplification;
-    
-    console.log('📊 Preprocesamiento señal:', {
-      original: {
-        rojo: red.toFixed(2),
-        infrarrojo: ir.toFixed(2)
-      },
-      amplificada: {
-        rojo: amplifiedRed.toFixed(2),
-        infrarrojo: amplifiedIr.toFixed(2),
-        factor: this.sensitivitySettings.signalAmplification
-      }
-    });
     
     this.redBuffer.push(amplifiedRed);
     this.irBuffer.push(amplifiedIr);
@@ -271,20 +248,10 @@ export class PPGProcessor {
     }
     
     const filteredRed = this.signalFilter.lowPassFilter(this.redBuffer, 
-      5 * this.sensitivitySettings.noiseReduction);
+      3 * this.sensitivitySettings.noiseReduction);
     const normalizedValue = this.signalNormalizer.normalizeSignal(
       filteredRed[filteredRed.length - 1]
     );
-    
-    console.log('🔄 Procesamiento señal:', {
-      filtrado: {
-        original: filteredRed[filteredRed.length - 1].toFixed(4),
-        normalizado: normalizedValue.toFixed(4),
-        factorNormalizacion: this.sensitivitySettings.noiseReduction
-      },
-      tamanoVentana: this.windowSize,
-      muestrasActuales: filteredRed.length
-    });
     
     this.readings.push({ timestamp: now, value: normalizedValue });
     if (this.readings.length > this.windowSize) {
@@ -296,97 +263,77 @@ export class PPGProcessor {
       this.signalBuffer.shift();
     }
 
-    const isPeak = this.peakDetector.isRealPeak(normalizedValue, now, this.signalBuffer);
+    if (this.signalBuffer.length >= this.bufferSize) {
+      const isPeak = this.peakDetector.isRealPeak(normalizedValue, now, this.signalBuffer);
 
-    console.log('💓 Análisis de pico:', {
-      esPico: isPeak,
-      valor: normalizedValue.toFixed(4),
-      tiempo: new Date(now).toISOString(),
-      intervaloUltimoPico: now - this.peakTimes[this.peakTimes.length - 1],
-      picosTotales: this.peakTimes.length,
-      calidadSenal: (quality * 100).toFixed(1) + '%'
-    });
-
-    if (isPeak && quality > this.qualityThreshold) {
-      this.peakTimes.push(now);
-      if (this.peakTimes.length > 10) {
-        this.peakTimes.shift();
+      if (isPeak) {
+        this.peakTimes.push(now);
+        if (this.peakTimes.length > 10) {
+          this.peakTimes.shift();
+        }
+        await this.playHeartbeatBeep(quality);
+        
+        console.log('💓 Pico detectado:', {
+          tiempo: new Date(now).toISOString(),
+          valor: normalizedValue.toFixed(4),
+          calidad: (quality * 100).toFixed(1) + '%',
+          picosTotales: this.peakTimes.length
+        });
       }
-      await this.playHeartbeatBeep(quality);
+
+      if (filteredRed.length >= this.processingSettings.MIN_FRAMES_FOR_CALCULATION) {
+        const { frequencies, magnitudes } = this.frequencyAnalyzer.performFFT(filteredRed);
+        const dominantFreqIndex = magnitudes.indexOf(Math.max(...magnitudes));
+        const dominantFreq = frequencies[dominantFreqIndex];
+        const calculatedBpm = dominantFreq * 60;
+        
+        if (this.frameCount % 30 === 0) {
+          console.log('📈 FFT:', {
+            bpm: calculatedBpm.toFixed(1),
+            frecuencia: dominantFreq.toFixed(3) + 'Hz',
+            muestras: filteredRed.length
+          });
+        }
+
+        const intervals = this.peakTimes.slice(1).map((time, i) => time - this.peakTimes[i]);
+        const hrvAnalysis = this.signalProcessor.analyzeHRV(intervals);
+        const spo2Result = this.signalProcessor.calculateSpO2(this.redBuffer, this.irBuffer);
+        const bp = this.signalProcessor.estimateBloodPressure(filteredRed, this.peakTimes);
+        const signalQuality = this.signalProcessor.analyzeSignalQuality(filteredRed);
+        
+        const validatedVitals = this.validateVitalSigns(calculatedBpm, bp.systolic, bp.diastolic);
+
+        if (validatedVitals.bpm > 0 && this.frameCount % 30 === 0) {
+          console.log('🫀 Signos vitales:', {
+            bpm: validatedVitals.bpm.toFixed(1),
+            spo2: spo2Result.spo2.toFixed(1) + '%',
+            presion: `${validatedVitals.systolic}/${validatedVitals.diastolic}`,
+            calidad: (signalQuality * 100).toFixed(1) + '%'
+          });
+        }
+
+        return {
+          bpm: validatedVitals.bpm,
+          spo2: Math.min(100, Math.max(75, spo2Result.spo2)),
+          systolic: validatedVitals.systolic,
+          diastolic: validatedVitals.diastolic,
+          hasArrhythmia: hrvAnalysis.hasArrhythmia,
+          arrhythmiaType: hrvAnalysis.type,
+          signalQuality,
+          confidence: spo2Result.confidence,
+          readings: this.readings,
+          isPeak,
+          hrvMetrics: {
+            sdnn: hrvAnalysis.sdnn,
+            rmssd: hrvAnalysis.rmssd,
+            pnn50: hrvAnalysis.pnn50,
+            lfhf: hrvAnalysis.lfhf
+          }
+        };
+      }
     }
 
-    const { frequencies, magnitudes } = this.frequencyAnalyzer.performFFT(filteredRed);
-    const dominantFreqIndex = magnitudes.indexOf(Math.max(...magnitudes));
-    const dominantFreq = frequencies[dominantFreqIndex];
-    const calculatedBpm = dominantFreq * 60;
-    
-    console.log('📈 Análisis frecuencial:', {
-      frecuenciaDominante: dominantFreq.toFixed(3) + 'Hz',
-      bpmCalculado: calculatedBpm.toFixed(1),
-      intensidadSenal: Math.max(...magnitudes).toFixed(2),
-      frecuencias: frequencies.length,
-      magnitudes: magnitudes.length
-    });
-    
-    const intervals = this.peakTimes.slice(1).map((time, i) => time - this.peakTimes[i]);
-    const hrvAnalysis = this.signalProcessor.analyzeHRV(intervals);
-    const spo2Result = this.signalProcessor.calculateSpO2(this.redBuffer, this.irBuffer);
-    const bp = this.signalProcessor.estimateBloodPressure(filteredRed, this.peakTimes);
-    const signalQuality = this.signalProcessor.analyzeSignalQuality(filteredRed);
-    
-    console.log('📊 Análisis HRV:', {
-      intervalos: intervals.map(i => i.toFixed(0)),
-      metricas: {
-        sdnn: hrvAnalysis.sdnn.toFixed(2),
-        rmssd: hrvAnalysis.rmssd.toFixed(2),
-        pnn50: hrvAnalysis.pnn50.toFixed(2) + '%',
-        lfhf: hrvAnalysis.lfhf.toFixed(2)
-      },
-      arritmia: {
-        detectada: hrvAnalysis.hasArrhythmia,
-        tipo: hrvAnalysis.type
-      }
-    });
-
-    console.log('🫁 Resultados SpO2:', {
-      valor: spo2Result.spo2.toFixed(1) + '%',
-      confianza: (spo2Result.confidence * 100).toFixed(1) + '%',
-      calidadSenal: (signalQuality * 100).toFixed(1) + '%'
-    });
-
-    console.log('🩺 Presión arterial:', {
-      sistolica: bp.systolic,
-      diastolica: bp.diastolic,
-      pulso: calculatedBpm.toFixed(1),
-      confianza: (signalQuality * 100).toFixed(1) + '%'
-    });
-
-    const validatedVitals = this.validateVitalSigns(calculatedBpm, bp.systolic, bp.diastolic);
-
-    if (this.frameCount % 30 === 0 && validatedVitals.bpm > 0) {
-      this.saveTrainingData(validatedVitals.bpm, spo2Result.spo2, signalQuality);
-      await this.trainMLModel();
-      await this.updateSettingsWithML(validatedVitals.bpm, spo2Result.spo2, signalQuality);
-    }
-
-    return {
-      bpm: validatedVitals.bpm,
-      spo2: Math.min(100, Math.max(75, spo2Result.spo2)),
-      systolic: validatedVitals.systolic,
-      diastolic: validatedVitals.diastolic,
-      hasArrhythmia: hrvAnalysis.hasArrhythmia,
-      arrhythmiaType: hrvAnalysis.type,
-      signalQuality,
-      confidence: spo2Result.confidence,
-      readings: this.readings,
-      isPeak,
-      hrvMetrics: {
-        sdnn: hrvAnalysis.sdnn,
-        rmssd: hrvAnalysis.rmssd,
-        pnn50: hrvAnalysis.pnn50,
-        lfhf: hrvAnalysis.lfhf
-      }
-    };
+    return null;
   }
 
   getReadings(): VitalReading[] {
