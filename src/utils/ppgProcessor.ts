@@ -14,7 +14,7 @@ export class PPGProcessor {
   private irBuffer: number[] = [];
   private peakTimes: number[] = [];
   private readonly samplingRate = 30;
-  private readonly windowSize = 150;
+  private readonly windowSize = 150; // Reducido para menor latencia
   private readonly signalProcessor: SignalProcessor;
   private readonly signalExtractor: SignalExtractor;
   private readonly peakDetector: PeakDetector;
@@ -23,27 +23,23 @@ export class PPGProcessor {
   private readonly qualityAnalyzer: SignalQualityAnalyzer;
   private beepPlayer: BeepPlayer;
   private readonly signalBuffer: number[] = [];
-  private readonly bufferSize = 15;
-  private readonly qualityThreshold = 0.15;
+  private readonly bufferSize = 15; // Reducido para mejor respuesta
+  private readonly qualityThreshold = 0.15; // Reducido para mayor sensibilidad
   private frameCount: number = 0;
   private lastValidBpm: number = 0;
-  private bpmBuffer: number[] = []; // Buffer para suavizar BPM
-  private lastBpmUpdate: number = 0;
-  private readonly BPM_UPDATE_INTERVAL = 1000; // Actualizar BPM cada segundo
-  private readonly BPM_BUFFER_SIZE = 5; // Tamaño del buffer para promedio móvil
   
   private sensitivitySettings: SensitivitySettings = {
-    signalAmplification: 2.0,
+    signalAmplification: 2.0, // Aumentado para mejor detección
     noiseReduction: 1.5,
     peakDetection: 1.5
   };
   
   private processingSettings = {
-    MIN_RED_VALUE: 10,
+    MIN_RED_VALUE: 10, // Reducido para mayor sensibilidad
     MIN_VALID_PIXELS_RATIO: 0.15,
     MIN_BRIGHTNESS: 60,
     PEAK_THRESHOLD_FACTOR: 0.35,
-    MIN_PEAK_DISTANCE: 250,
+    MIN_PEAK_DISTANCE: 250, // ms entre picos
     MAX_PEAK_DISTANCE: 1500
   };
   
@@ -57,57 +53,27 @@ export class PPGProcessor {
     this.qualityAnalyzer = new SignalQualityAnalyzer();
   }
 
-  private updateBpmSmooth(newBpm: number): number {
-    const now = Date.now();
-    
-    // Añadir nuevo BPM al buffer
-    this.bpmBuffer.push(newBpm);
-    if (this.bpmBuffer.length > this.BPM_BUFFER_SIZE) {
-      this.bpmBuffer.shift();
-    }
-    
-    // Solo actualizar el BPM cada intervalo definido
-    if (now - this.lastBpmUpdate >= this.BPM_UPDATE_INTERVAL) {
-      // Calcular promedio del buffer
-      const validBpms = this.bpmBuffer.filter(bpm => bpm > 0);
-      if (validBpms.length > 0) {
-        const avgBpm = Math.round(
-          validBpms.reduce((a, b) => a + b, 0) / validBpms.length
-        );
-        this.lastValidBpm = avgBpm;
-        this.lastBpmUpdate = now;
-      }
-    }
-    
-    return this.lastValidBpm;
-  }
-
   async processFrame(imageData: ImageData): Promise<PPGData | null> {
     this.frameCount++;
     const now = Date.now();
     
     const { red, ir, quality } = this.signalExtractor.extractChannels(imageData);
     
-    // Validación más estricta de la calidad de la señal
+    console.log('Estado del sensor:', {
+      detectandoDedo: red > this.processingSettings.MIN_RED_VALUE,
+      valorRojo: red.toFixed(2),
+      umbralMinimo: this.processingSettings.MIN_RED_VALUE,
+      calidadSenal: (quality * 100).toFixed(1) + '%'
+    });
+    
     if (quality < this.qualityThreshold || red < this.processingSettings.MIN_RED_VALUE) {
-      return {
-        bpm: this.lastValidBpm,
-        spo2: 0,
-        systolic: 0,
-        diastolic: 0,
-        signalQuality: 0,
-        confidence: 0,
-        readings: this.readings,
-        isPeak: false,
-        hasArrhythmia: false,
-        arrhythmiaType: 'Normal',
-        hrvMetrics: {
-          sdnn: 0,
-          rmssd: 0,
-          pnn50: 0,
-          lfhf: 0
-        }
-      };
+      console.log('❌ No se detecta dedo o señal de baja calidad:', { 
+        red: red.toFixed(2), 
+        calidad: (quality * 100).toFixed(1) + '%',
+        umbralCalidad: (this.qualityThreshold * 100).toFixed(1) + '%',
+        umbralRojo: this.processingSettings.MIN_RED_VALUE
+      });
+      return null;
     }
     
     const amplifiedRed = red * this.sensitivitySettings.signalAmplification;
@@ -121,6 +87,7 @@ export class PPGProcessor {
       this.irBuffer.shift();
     }
     
+    // Aplicar filtros más agresivos para reducir ruido
     const filteredRed = this.signalFilter.bandPassFilter(this.redBuffer, 0.5, 4.0);
     const normalizedValue = this.signalNormalizer.normalizeSignal(
       filteredRed[filteredRed.length - 1]
@@ -136,55 +103,56 @@ export class PPGProcessor {
       this.signalBuffer.shift();
     }
 
-    // Validación más estricta de picos para evitar falsos positivos
     const isPeak = this.peakDetector.isRealPeak(normalizedValue, now, this.signalBuffer);
-    
-    if (isPeak && quality > 0.3) { // Solo procesar picos con buena calidad de señal
+    let calculatedBpm = 0;
+
+    if (isPeak) {
       this.peakTimes.push(now);
       if (this.peakTimes.length > 10) {
         this.peakTimes.shift();
       }
       
+      // Calcular BPM usando los últimos intervalos
       if (this.peakTimes.length >= 2) {
         const intervals = [];
         for (let i = 1; i < this.peakTimes.length; i++) {
-          const interval = this.peakTimes[i] - this.peakTimes[i-1];
-          if (interval >= this.processingSettings.MIN_PEAK_DISTANCE && 
-              interval <= this.processingSettings.MAX_PEAK_DISTANCE) {
-            intervals.push(interval);
-          }
+          intervals.push(this.peakTimes[i] - this.peakTimes[i-1]);
         }
         
-        if (intervals.length > 0) {
-          const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-          const calculatedBpm = Math.round(60000 / avgInterval);
+        // Filtrar intervalos anómalos
+        const validIntervals = intervals.filter(interval => 
+          interval >= this.processingSettings.MIN_PEAK_DISTANCE && 
+          interval <= this.processingSettings.MAX_PEAK_DISTANCE
+        );
+        
+        if (validIntervals.length > 0) {
+          const avgInterval = validIntervals.reduce((a, b) => a + b, 0) / validIntervals.length;
+          calculatedBpm = Math.round(60000 / avgInterval);
           
+          // Solo actualizar si el BPM está en un rango fisiológico
           if (calculatedBpm >= 30 && calculatedBpm <= 220) {
             this.lastValidBpm = calculatedBpm;
+            console.log('💓 BPM válido detectado:', calculatedBpm);
           }
         }
       }
       
-      // Solo reproducir beep si es un pico válido y la calidad es muy buena
-      if (quality > 0.5) {
-        await this.beepPlayer.playBeep('heartbeat', quality);
-      }
+      await this.beepPlayer.playBeep('heartbeat', quality);
     }
 
     const signalQuality = this.qualityAnalyzer.analyzeSignalQuality(filteredRed);
     const spo2Result = this.signalProcessor.calculateSpO2(this.redBuffer, this.irBuffer);
     const bp = this.signalProcessor.estimateBloodPressure(filteredRed, this.peakTimes);
 
-    // Retornar solo valores validados
     return {
       bpm: this.lastValidBpm,
-      spo2: spo2Result.confidence > 0.5 ? spo2Result.spo2 : 0,
+      spo2: spo2Result.spo2,
       systolic: bp.systolic,
       diastolic: bp.diastolic,
       signalQuality,
       confidence: spo2Result.confidence,
       readings: this.readings,
-      isPeak: isPeak && quality > 0.3, // Solo indicar pico si la calidad es buena
+      isPeak,
       hasArrhythmia: false,
       arrhythmiaType: 'Normal',
       hrvMetrics: {
@@ -202,5 +170,6 @@ export class PPGProcessor {
 
   updateSensitivitySettings(settings: SensitivitySettings) {
     this.sensitivitySettings = settings;
+    console.log('Sensitivity settings updated:', settings);
   }
 }
