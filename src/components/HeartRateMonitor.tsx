@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings } from 'lucide-react';
+import { Settings, ArrowLeft } from 'lucide-react';
 import CameraView from './CameraView';
 import VitalChart from './VitalChart';
 import VitalSignsDisplay from './vitals/VitalSignsDisplay';
@@ -9,8 +9,10 @@ import SignalQualityIndicator from './vitals/SignalQualityIndicator';
 import MeasurementControls from './vitals/MeasurementControls';
 import CalibrationPanel from './CalibrationPanel';
 import { useVitals } from '@/contexts/VitalsContext';
+import { useNavigate } from 'react-router-dom';
 
 const HeartRateMonitor: React.FC = () => {
+  const navigate = useNavigate();
   const { 
     bpm, 
     spo2, 
@@ -32,6 +34,14 @@ const HeartRateMonitor: React.FC = () => {
 
   return (
     <div className="relative h-screen w-screen overflow-hidden">
+      {/* Botón de retorno */}
+      <button 
+        onClick={() => navigate(-1)}
+        className="absolute top-3 left-3 z-30 p-2 rounded-full bg-black/30 backdrop-blur-sm border border-white/10 text-white/80 hover:bg-black/40 transition-colors"
+      >
+        <ArrowLeft className="w-5 h-5" />
+      </button>
+
       <div className="absolute inset-0 z-0">
         <CameraView onFrame={processFrame} isActive={isStarted} />
       </div>
@@ -40,7 +50,7 @@ const HeartRateMonitor: React.FC = () => {
 
       <div className="absolute inset-0 z-20">
         <Tabs defaultValue="monitor" className="h-full w-full">
-          <div className="absolute top-3 left-1/2 -translate-x-1/2">
+          <div className="absolute top-14 left-1/2 -translate-x-1/2">
             <TabsList className="bg-black/50 backdrop-blur-md border border-white/20 shadow-lg">
               <TabsTrigger 
                 value="monitor"
@@ -60,7 +70,7 @@ const HeartRateMonitor: React.FC = () => {
 
           <TabsContent value="monitor" className="h-full m-0">
             <div className="h-full w-full p-3 flex flex-col">
-              <div className="space-y-2">
+              <div className="mt-14 space-y-2">
                 {isStarted && (
                   <div className="bg-black/30 backdrop-blur-md rounded-lg p-2 border border-white/10">
                     <SignalQualityIndicator
@@ -117,10 +127,12 @@ const HeartRateMonitor: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="calibration" className="h-full m-0 p-3">
-            <CalibrationPanel 
-              settings={sensitivitySettings}
-              onUpdateSettings={updateSensitivitySettings}
-            />
+            <div className="mt-14">
+              <CalibrationPanel 
+                settings={sensitivitySettings}
+                onUpdateSettings={updateSensitivitySettings}
+              />
+            </div>
           </TabsContent>
         </Tabs>
       </div>
