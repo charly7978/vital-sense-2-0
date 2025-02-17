@@ -14,9 +14,6 @@
     "skipLibCheck": true,
     "allowJs": true,
     "noUnusedLocals": false,
-    "strictNullChecks": false,
-    "jsx": "react-jsx",
-    "esModuleInterop": true,
-    "lib": ["DOM", "DOM.Iterable", "ESNext"]
+    "strictNullChecks": false
   }
 }
