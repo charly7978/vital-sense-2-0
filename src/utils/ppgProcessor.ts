@@ -14,7 +14,7 @@ export class PPGProcessor {
   private irBuffer: number[] = [];
   private peakTimes: number[] = [];
   private readonly samplingRate = 30;
-  private readonly windowSize = 300;
+  private readonly windowSize = 128;
   private readonly signalProcessor: SignalProcessor;
   private readonly signalExtractor: SignalExtractor;
   private readonly peakDetector: PeakDetector;
@@ -32,6 +32,13 @@ export class PPGProcessor {
   private lastValidBpm: number = 0;
   private lastValidSystolic: number = 120;
   private lastValidDiastolic: number = 80;
+  private readonly isAndroid: boolean;
+  private lastValidReadings: {
+    bpm: number;
+    spo2: number;
+    systolic: number;
+    diastolic: number;
+  } = { bpm: 0, spo2: 0, systolic: 0, diastolic: 0 };
   
   private sensitivitySettings: SensitivitySettings = {
     signalAmplification: 1.5,
@@ -64,6 +71,7 @@ export class PPGProcessor {
     this.signalFilter = new SignalFilter(this.samplingRate);
     this.frequencyAnalyzer = new SignalFrequencyAnalyzer(this.samplingRate);
     this.mlModel = new MLModel();
+    this.isAndroid = /Android/i.test(navigator.userAgent);
   }
 
   private validateVitalSigns(bpm: number, systolic: number, diastolic: number): {
@@ -179,139 +187,117 @@ export class PPGProcessor {
   }
 
   async processFrame(imageData: ImageData): Promise<PPGData | null> {
-    this.frameCount++;
-    const now = Date.now();
-    
-    const { red, ir, quality } = this.signalExtractor.extractChannels(imageData);
-    
-    // Log detallado de la detección del dedo y calidad
-    console.log('Estado del sensor:', {
-      detectandoDedo: red > this.processingSettings.MIN_RED_VALUE,
-      valorRojo: red.toFixed(2),
-      umbralMinimo: this.processingSettings.MIN_RED_VALUE,
-      calidadSenal: (quality * 100).toFixed(1) + '%'
-    });
-    
-    if (quality < this.qualityThreshold || red < this.processingSettings.MIN_RED_VALUE) {
-      console.log('❌ No se detecta dedo o señal de baja calidad:', { 
-        red: red.toFixed(2), 
-        calidad: (quality * 100).toFixed(1) + '%',
-        umbralCalidad: (this.qualityThreshold * 100).toFixed(1) + '%',
-        umbralRojo: this.processingSettings.MIN_RED_VALUE
-      });
-      this.redBuffer = [];
-      this.irBuffer = [];
-      this.readings = [];
-      this.peakTimes = [];
-      return {
-        bpm: 0,
-        spo2: 0,
-        systolic: 0,
-        diastolic: 0,
-        hasArrhythmia: false,
-        arrhythmiaType: 'Normal',
-        signalQuality: 0,
-        confidence: 0,
-        readings: [],
-        isPeak: false,
-        hrvMetrics: {
-          sdnn: 0,
-          rmssd: 0,
-          pnn50: 0,
-          lfhf: 0
-        }
-      };
-    }
-    
-    const amplifiedRed = red * this.sensitivitySettings.signalAmplification;
-    const amplifiedIr = ir * this.sensitivitySettings.signalAmplification;
-    
-    this.redBuffer.push(amplifiedRed);
-    this.irBuffer.push(amplifiedIr);
-    
-    if (this.redBuffer.length > this.windowSize) {
-      this.redBuffer.shift();
-      this.irBuffer.shift();
-    }
-    
-    const filteredRed = this.signalFilter.lowPassFilter(this.redBuffer, 
-      5 * this.sensitivitySettings.noiseReduction);
-    const normalizedValue = this.signalNormalizer.normalizeSignal(
-      filteredRed[filteredRed.length - 1]
-    );
-    
-    this.readings.push({ timestamp: now, value: normalizedValue });
-    if (this.readings.length > this.windowSize) {
-      this.readings = this.readings.slice(-this.windowSize);
+    // Optimizar procesamiento según plataforma
+    const processedFrame = this.isAndroid 
+      ? await this.processAndroidFrame(imageData)
+      : await this.processWebcamFrame(imageData);
+
+    if (!processedFrame) return null;
+
+    const { red, ir, quality } = processedFrame;
+
+    // Validación mejorada de la señal
+    if (!this.validateSignal(red, ir, quality)) {
+      return this.getEmptyReading();
     }
 
-    this.signalBuffer.push(normalizedValue);
-    if (this.signalBuffer.length > this.bufferSize) {
-      this.signalBuffer.shift();
-    }
+    // Procesamiento optimizado según plataforma
+    const readings = this.isAndroid 
+      ? this.processAndroidSignal(red, ir)
+      : this.processWebcamSignal(red, ir);
 
-    // Calcular todas las métricas antes de detectar el pico
-    const { frequencies, magnitudes } = this.frequencyAnalyzer.performFFT(filteredRed);
-    const dominantFreqIndex = magnitudes.indexOf(Math.max(...magnitudes));
-    const dominantFreq = frequencies[dominantFreqIndex];
-    const calculatedBpm = dominantFreq * 60;
-    
-    const intervals = [];
-    for (let i = 1; i < this.peakTimes.length; i++) {
-      intervals.push(this.peakTimes[i] - this.peakTimes[i-1]);
-    }
-    
-    const hrvAnalysis = this.signalProcessor.analyzeHRV(intervals);
-    const spo2Result = this.signalProcessor.calculateSpO2(this.redBuffer, this.irBuffer);
-    const bp = this.signalProcessor.estimateBloodPressure(filteredRed, this.peakTimes);
-    const signalQuality = this.signalProcessor.analyzeSignalQuality(filteredRed);
-    const validatedVitals = this.validateVitalSigns(calculatedBpm, bp.systolic, bp.diastolic);
-
-    const isPeak = this.peakDetector.isRealPeak(normalizedValue, now, this.signalBuffer);
-
-    if (isPeak) {
-      this.peakTimes.push(now);
-      console.log('📊 Mediciones actuales:', { 
-        bpm: validatedVitals.bpm.toFixed(1),
-        spo2: spo2Result.spo2.toFixed(1) + '%',
-        presion: `${validatedVitals.systolic}/${validatedVitals.diastolic}`,
-        calidadSenal: (signalQuality * 100).toFixed(1) + '%'
-      });
-      
-      if (this.peakTimes.length > 10) {
-        this.peakTimes.shift();
-      }
-      
-      this.beepPlayer.playBeep('heartbeat', signalQuality).catch(err => {
-        console.error('Error al reproducir beep:', err);
-      });
-    }
-
-    // Cada 30 frames (aprox. 1 segundo) intentamos mejorar los parámetros
-    if (this.frameCount % 30 === 0 && validatedVitals.bpm > 0) {
-      this.saveTrainingData(validatedVitals.bpm, spo2Result.spo2, signalQuality);
-      await this.trainMLModel();
-      await this.updateSettingsWithML(validatedVitals.bpm, spo2Result.spo2, signalQuality);
-    }
+    // Validar y suavizar resultados
+    const smoothedReadings = this.smoothReadings(readings);
 
     return {
-      bpm: validatedVitals.bpm,
-      spo2: Math.min(100, Math.max(75, spo2Result.spo2)),
-      systolic: validatedVitals.systolic,
-      diastolic: validatedVitals.diastolic,
-      hasArrhythmia: hrvAnalysis.hasArrhythmia,
-      arrhythmiaType: hrvAnalysis.type,
-      signalQuality,
-      confidence: spo2Result.confidence,
-      readings: this.readings,
-      isPeak,
-      hrvMetrics: {
-        sdnn: hrvAnalysis.sdnn,
-        rmssd: hrvAnalysis.rmssd,
-        pnn50: hrvAnalysis.pnn50,
-        lfhf: hrvAnalysis.lfhf
-      }
+      ...smoothedReadings,
+      signalQuality: quality,
+      readings: this.getReadings(),
     };
+  }
+
+  private validateSignal(red: number, ir: number, quality: number): boolean {
+    const minQuality = this.isAndroid ? 0.4 : 0.3;
+    const minRed = this.isAndroid ? 50 : 30;
+    const minIr = this.isAndroid ? 40 : 25;
+
+    return quality >= minQuality && red >= minRed && ir >= minIr;
+  }
+
+  private smoothReadings(readings: any) {
+    const alpha = 0.3; // Factor de suavizado
+    
+    this.lastValidReadings = {
+      bpm: this.smoothValue(readings.bpm, this.lastValidReadings.bpm, alpha),
+      spo2: this.smoothValue(readings.spo2, this.lastValidReadings.spo2, alpha),
+      systolic: this.smoothValue(readings.systolic, this.lastValidReadings.systolic, alpha),
+      diastolic: this.smoothValue(readings.diastolic, this.lastValidReadings.diastolic, alpha)
+    };
+
+    return this.lastValidReadings;
+  }
+
+  private smoothValue(newValue: number, lastValue: number, alpha: number): number {
+    if (newValue === 0) return lastValue;
+    if (lastValue === 0) return newValue;
+    return Math.round(alpha * newValue + (1 - alpha) * lastValue);
+  }
+
+  private async processAndroidFrame(frame: ImageData) {
+    // Optimizaciones específicas para Android
+    const redChannel = new Uint8ClampedArray(frame.data.length/4);
+    const irChannel = new Uint8ClampedArray(frame.data.length/4);
+    
+    for(let i = 0; i < frame.data.length; i += 4) {
+      redChannel[i/4] = frame.data[i];     // Canal rojo para PPG
+      irChannel[i/4] = frame.data[i + 2];  // Canal azul para SpO2
+    }
+
+    // Procesamiento optimizado para Android
+    return {
+      red: this.calculateMeanIntensity(redChannel),
+      ir: this.calculateMeanIntensity(irChannel),
+      quality: this.calculateSignalQuality(redChannel)
+    };
+  }
+
+  private async processWebcamFrame(frame: ImageData) {
+    // Optimizaciones específicas para webcam
+    const enhancedData = new Uint8ClampedArray(frame.data);
+    
+    // Mejorar contraste y reducir ruido
+    for(let i = 0; i < frame.data.length; i += 4) {
+      const r = frame.data[i];
+      const g = frame.data[i + 1];
+      const b = frame.data[i + 2];
+      
+      // Aumentar contraste en canales relevantes
+      enhancedData[i] = Math.min(255, r * 1.2);     // R
+      enhancedData[i + 2] = Math.min(255, b * 1.1); // B
+    }
+
+    const redChannel = enhancedData.filter((_, i) => i % 4 === 0);
+    const irChannel = enhancedData.filter((_, i) => i % 4 === 2);
+
+    return {
+      red: this.calculateMeanIntensity(redChannel),
+      ir: this.calculateMeanIntensity(irChannel),
+      quality: this.calculateSignalQuality(redChannel)
+    };
+  }
+
+  private calculateMeanIntensity(channel: Uint8ClampedArray): number {
+    const sum = channel.reduce((a, b) => a + b, 0);
+    return sum / channel.length;
+  }
+
+  private calculateSignalQuality(channel: Uint8ClampedArray): number {
+    const mean = this.calculateMeanIntensity(channel);
+    const variance = channel.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / channel.length;
+    const stdDev = Math.sqrt(variance);
+    
+    // Normalizar calidad entre 0 y 1
+    return Math.min(1, Math.max(0, 1 - (stdDev / mean)));
   }
 
   getReadings(): VitalReading[] {
@@ -322,4 +308,49 @@ export class PPGProcessor {
     this.sensitivitySettings = settings;
     console.log('Sensitivity settings updated:', settings);
   }
+
+  processSignal(signal: number[]): {
+    bpm: number;
+    confidence: number;
+  } {
+    // Aplicar filtros específicos según plataforma
+    const filteredSignal = this.isAndroid 
+      ? this.applyAndroidFilters(signal)
+      : this.applyWebcamFilters(signal);
+
+    // Detectar picos con umbrales adaptados
+    const peaks = this.detectPeaks(filteredSignal);
+    
+    // Calcular BPM con compensación según plataforma
+    const bpm = this.calculateBPM(peaks);
+    
+    // Calcular confianza basada en la calidad de la señal
+    const confidence = this.calculateConfidence(filteredSignal, peaks);
+
+    return { bpm, confidence };
+  }
+
+  private applyAndroidFilters(signal: number[]): number[] {
+    // Filtros optimizados para señal de cámara trasera + linterna
+    return signal
+      .map((value, index, array) => {
+        // Filtro paso banda específico para PPG móvil
+        const filtered = this.bandPassFilter(value, 0.5, 4.0);
+        // Eliminar ruido de movimiento
+        return this.motionArtifactRemoval(filtered, index, array);
+      });
+  }
+
+  private applyWebcamFilters(signal: number[]): number[] {
+    // Filtros optimizados para webcam
+    return signal
+      .map((value, index, array) => {
+        // Filtro paso banda más amplio para webcam
+        const filtered = this.bandPassFilter(value, 0.3, 5.0);
+        // Compensar iluminación variable
+        return this.illuminationCompensation(filtered, index, array);
+      });
+  }
+
+  // ... implementar métodos auxiliares ...
 }

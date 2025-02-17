@@ -1,4 +1,3 @@
-
 import { PTTProcessor } from './pttProcessor';
 import { PPGFeatureExtractor } from './ppgFeatureExtractor';
 import { SignalFilter } from './signalFilter';
@@ -6,8 +5,10 @@ import { SignalFrequencyAnalyzer } from './signalFrequencyAnalyzer';
 import { SignalQualityAnalyzer } from './signalQualityAnalyzer';
 
 export class SignalProcessor {
-  private readonly windowSize: number;
-  private readonly sampleRate = 30;
+  private readonly sampleRate: number = 30; // fps
+  private readonly windowSize: number = 128;
+  private buffer: number[] = [];
+
   private readonly spO2CalibrationCoefficients = {
     a: 110,
     b: 25,
@@ -21,8 +22,7 @@ export class SignalProcessor {
   private readonly frequencyAnalyzer: SignalFrequencyAnalyzer;
   private readonly qualityAnalyzer: SignalQualityAnalyzer;
   
-  constructor(windowSize: number) {
-    this.windowSize = windowSize;
+  constructor() {
     this.pttProcessor = new PTTProcessor();
     this.featureExtractor = new PPGFeatureExtractor();
     this.signalFilter = new SignalFilter(this.sampleRate);
@@ -239,5 +239,77 @@ export class SignalProcessor {
 
   analyzeSignalQuality(signal: number[]): number {
     return this.qualityAnalyzer.analyzeSignalQuality(signal);
+  }
+
+  // Filtro paso bajo para reducir ruido
+  public lowPassFilter(data: number[]): number[] {
+    const alpha = 0.1;
+    return data.map((value, index) => {
+      if (index === 0) return value;
+      return alpha * value + (1 - alpha) * data[index - 1];
+    });
+  }
+
+  // Detección de picos mejorada
+  public detectPeaks(data: number[]): number[] {
+    const peaks: number[] = [];
+    const threshold = this.calculateThreshold(data);
+
+    for (let i = 1; i < data.length - 1; i++) {
+      if (
+        data[i] > data[i - 1] &&
+        data[i] > data[i + 1] &&
+        data[i] > threshold
+      ) {
+        peaks.push(i);
+      }
+    }
+
+    return peaks;
+  }
+
+  // Cálculo adaptativo del umbral
+  private calculateThreshold(data: number[]): number {
+    const mean = data.reduce((a, b) => a + b, 0) / data.length;
+    const std = Math.sqrt(
+      data.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / data.length
+    );
+    return mean + 0.5 * std;
+  }
+
+  // Estimación de frecuencia cardíaca mejorada
+  public calculateHeartRate(peaks: number[]): number {
+    if (peaks.length < 2) return 0;
+
+    const intervals = [];
+    for (let i = 1; i < peaks.length; i++) {
+      intervals.push(peaks[i] - peaks[i - 1]);
+    }
+
+    // Filtrar intervalos anómalos
+    const validIntervals = this.removeOutliers(intervals);
+    if (validIntervals.length === 0) return 0;
+
+    const averageInterval = validIntervals.reduce((a, b) => a + b, 0) / validIntervals.length;
+    return Math.round((60 * this.sampleRate) / averageInterval);
+  }
+
+  // Eliminar valores atípicos
+  private removeOutliers(data: number[]): number[] {
+    const q1 = this.percentile(data, 25);
+    const q3 = this.percentile(data, 75);
+    const iqr = q3 - q1;
+    const lower = q1 - 1.5 * iqr;
+    const upper = q3 + 1.5 * iqr;
+    return data.filter(x => x >= lower && x <= upper);
+  }
+
+  private percentile(data: number[], p: number): number {
+    const sorted = [...data].sort((a, b) => a - b);
+    const index = (p / 100) * (sorted.length - 1);
+    const lower = Math.floor(index);
+    const upper = Math.ceil(index);
+    const weight = index % 1;
+    return sorted[lower] * (1 - weight) + sorted[upper] * weight;
   }
 }
