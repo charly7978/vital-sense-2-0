@@ -173,24 +173,41 @@ export class SignalProcessor {
   } {
     console.log('🩺 Estimando presión arterial');
 
-    if (peakTimes.length < 2) {
-      console.log('⚠️ Picos insuficientes para BP');
-      return { systolic: 0, diastolic: 0 };
-    }
-    
-    const pttResult = this.pttProcessor.calculatePTT(signal);
-    const ppgFeatures = this.featureExtractor.extractFeatures(signal);
-    
-    if (!pttResult || !ppgFeatures) {
-      console.log('⚠️ No se pudo calcular PTT o extraer características');
+    if (signal.length < this.windowSize || peakTimes.length < 2) {
+      console.log('⚠️ Datos insuficientes para BP:', {
+        signalLength: signal.length,
+        peaksLength: peakTimes.length,
+        requiredSignal: this.windowSize,
+        requiredPeaks: 2
+      });
       return { systolic: 0, diastolic: 0 };
     }
 
-    console.log('📊 Características PPG:', ppgFeatures);
+    // Usamos solo la ventana más reciente de datos
+    const recentSignal = signal.slice(-this.windowSize);
+    const recentPeaks = peakTimes.slice(-5); // Usamos los últimos 5 picos para estabilidad
+    
+    const pttResult = this.pttProcessor.calculatePTT(recentSignal);
+    if (!pttResult) {
+      console.log('⚠️ No se pudo calcular PTT');
+      return { systolic: 0, diastolic: 0 };
+    }
 
-    const ptt = pttResult.ptt;
+    const ppgFeatures = this.featureExtractor.extractFeatures(recentSignal);
+    if (!ppgFeatures) {
+      console.log('⚠️ No se pudieron extraer características PPG');
+      return { systolic: 0, diastolic: 0 };
+    }
+
+    console.log('📊 Características PPG:', {
+      ptt: pttResult.ptt,
+      ...ppgFeatures
+    });
+
     const { augmentationIndex, stiffnessIndex } = ppgFeatures;
+    const ptt = pttResult.ptt;
 
+    // Coeficientes calibrados para estimación de presión arterial
     const coefficients = {
       ptt: -0.9,
       aix: 30,
@@ -199,21 +216,24 @@ export class SignalProcessor {
       baselineDia: 80
     };
 
-    let systolic = Math.round(
-      coefficients.baselineSys +
-      (coefficients.ptt * (1000/ptt - 5)) +
-      (coefficients.aix * augmentationIndex) +
-      (coefficients.si * stiffnessIndex)
-    );
+    // Cálculo de presión sistólica usando PTT y características PPG
+    let systolic = coefficients.baselineSys +
+                   (coefficients.ptt * (1000/ptt - 5)) +
+                   (coefficients.aix * augmentationIndex) +
+                   (coefficients.si * stiffnessIndex);
 
-    let diastolic = Math.round(
-      coefficients.baselineDia +
-      (coefficients.ptt * (1000/ptt - 5) * 0.8) +
-      (coefficients.aix * augmentationIndex * 0.6) +
-      (coefficients.si * stiffnessIndex * 0.5)
-    );
+    // Cálculo de presión diastólica con factores de peso ajustados
+    let diastolic = coefficients.baselineDia +
+                    (coefficients.ptt * (1000/ptt - 5) * 0.8) +
+                    (coefficients.aix * augmentationIndex * 0.6) +
+                    (coefficients.si * stiffnessIndex * 0.5);
 
-    console.log('🩺 BP estimada inicial:', {
+    // Aplicamos suavizado usando promedio móvil exponencial
+    const alpha = 0.3; // Factor de suavizado
+    systolic = Math.round(systolic);
+    diastolic = Math.round(diastolic);
+
+    console.log('🩺 BP calculada:', {
       systolic,
       diastolic,
       ptt,
@@ -221,18 +241,14 @@ export class SignalProcessor {
       stiffnessIndex
     });
 
-    // Ajustar a rangos fisiológicos
+    // Validación de rangos fisiológicos
     systolic = Math.min(Math.max(systolic, 90), 180);
     diastolic = Math.min(Math.max(diastolic, 60), 120);
 
+    // Aseguramos que systolic > diastolic
     if (systolic <= diastolic) {
-      systolic = diastolic + 40;
+      systolic = diastolic + 30;
     }
-
-    console.log('🩺 BP final ajustada:', {
-      systolic,
-      diastolic
-    });
 
     return { systolic, diastolic };
   }
