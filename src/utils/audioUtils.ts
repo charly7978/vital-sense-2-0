@@ -38,8 +38,18 @@ export class BeepPlayer {
       const oscillator = this.audioContext.createOscillator();
       const gainNode = this.audioContext.createGain();
 
+      // Crear un nodo de compresión para aumentar la ganancia
+      const compressor = this.audioContext.createDynamicsCompressor();
+      compressor.threshold.setValueAtTime(-50, this.audioContext.currentTime);
+      compressor.knee.setValueAtTime(40, this.audioContext.currentTime);
+      compressor.ratio.setValueAtTime(12, this.audioContext.currentTime);
+      compressor.attack.setValueAtTime(0, this.audioContext.currentTime);
+      compressor.release.setValueAtTime(0.25, this.audioContext.currentTime);
+
+      // Conectar los nodos en cadena
       oscillator.connect(gainNode);
-      gainNode.connect(this.audioContext.destination);
+      gainNode.connect(compressor);
+      compressor.connect(this.audioContext.destination);
 
       const currentTime = this.audioContext.currentTime;
 
@@ -47,10 +57,10 @@ export class BeepPlayer {
       const baseFrequency = 150;
       oscillator.frequency.value = baseFrequency + (quality * 50);
       
-      // Aumentar el volumen significativamente
-      const volume = Math.min(1.0, Math.max(0.6, quality));
+      // Aumentar significativamente el volumen
+      const volume = Math.min(2.0, Math.max(1.0, quality * 1.5));
 
-      // Configurar la envolvente del sonido
+      // Configurar la envolvente del sonido con más volumen
       gainNode.gain.setValueAtTime(0, currentTime);
       gainNode.gain.linearRampToValueAtTime(volume, currentTime + 0.01);
       gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.05);
@@ -70,6 +80,7 @@ export class BeepPlayer {
       setTimeout(() => {
         oscillator.disconnect();
         gainNode.disconnect();
+        compressor.disconnect();
       }, 100);
 
     } catch (error) {

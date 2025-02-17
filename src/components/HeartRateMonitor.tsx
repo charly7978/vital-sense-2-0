@@ -76,7 +76,7 @@ const HeartRateMonitor: React.FC = () => {
               />
             </div>
 
-            <div className="bg-black rounded-lg p-2 border border-white/10">
+            <div className="bg-black/50 backdrop-blur-md rounded-lg p-2 border border-white/10">
               <h3 className="text-xs font-medium mb-1 text-gray-100">PPG en Tiempo Real</h3>
               <div className="h-[80px]">
                 <VitalChart data={readings} color="#ea384c" />
