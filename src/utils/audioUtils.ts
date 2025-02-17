@@ -2,7 +2,7 @@
 export class BeepPlayer {
   private audioContext: AudioContext | null = null;
   private lastBeepTime: number = 0;
-  private readonly minBeepInterval = 300;
+  private readonly minBeepInterval = 300; // Mínimo intervalo entre beeps en ms
 
   constructor() {
     this.initAudioContext();
@@ -43,21 +43,32 @@ export class BeepPlayer {
 
       const currentTime = this.audioContext.currentTime;
 
-      if (type === 'heartbeat') {
-        // Frecuencia aumentada para mejor audibilidad
-        oscillator.frequency.value = 200;
-        
-        // Primer pulso (más fuerte)
-        gainNode.gain.setValueAtTime(0, currentTime);
-        gainNode.gain.linearRampToValueAtTime(0.9, currentTime + 0.01); // Volumen aumentado
-        gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.08);
-        
-        oscillator.start(currentTime);
-        oscillator.stop(currentTime + 0.08);
+      // Ajustar frecuencia y volumen según la calidad de la señal
+      const baseFrequency = 150;
+      oscillator.frequency.value = baseFrequency + (quality * 50);
+      const volume = Math.min(0.5, Math.max(0.1, quality));
 
-        console.log('♥ Beep de latido reproducido');
-        this.lastBeepTime = now;
-      }
+      // Configurar la envolvente del sonido
+      gainNode.gain.setValueAtTime(0, currentTime);
+      gainNode.gain.linearRampToValueAtTime(volume, currentTime + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.05);
+
+      oscillator.start(currentTime);
+      oscillator.stop(currentTime + 0.05);
+
+      this.lastBeepTime = now;
+      console.log('♥ Beep reproducido:', {
+        tiempo: now,
+        frecuencia: oscillator.frequency.value,
+        volumen: volume,
+        calidad: quality
+      });
+
+      // Limpiar después de que el sonido termine
+      setTimeout(() => {
+        oscillator.disconnect();
+        gainNode.disconnect();
+      }, 100);
 
     } catch (error) {
       console.error('✗ Error reproduciendo beep:', error);

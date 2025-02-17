@@ -1,3 +1,4 @@
+
 import { VitalReading, PPGData, SensitivitySettings, ProcessingSettings } from './types';
 import { BeepPlayer } from './audioUtils';
 import { SignalProcessor } from './signalProcessing';
@@ -184,7 +185,6 @@ export class PPGProcessor {
     
     const { red, ir, quality } = this.signalExtractor.extractChannels(imageData);
     
-    // Log detallado de la detección del dedo y calidad
     console.log('Estado del sensor:', {
       detectandoDedo: red > this.processingSettings.MIN_RED_VALUE,
       valorRojo: red.toFixed(2),
@@ -240,6 +240,7 @@ export class PPGProcessor {
       filteredRed[filteredRed.length - 1]
     );
     
+    // Actualizar lecturas y gráfico primero
     this.readings.push({ timestamp: now, value: normalizedValue });
     if (this.readings.length > this.windowSize) {
       this.readings = this.readings.slice(-this.windowSize);
@@ -250,44 +251,44 @@ export class PPGProcessor {
       this.signalBuffer.shift();
     }
 
-    // Calcular todas las métricas antes de detectar el pico
+    // Detectar pico y reproducir beep de manera sincronizada
+    const isPeak = this.peakDetector.isRealPeak(normalizedValue, now, this.signalBuffer);
+
+    if (isPeak) {
+      this.peakTimes.push(now);
+      
+      // Asegurar que solo mantenemos los últimos 10 picos
+      if (this.peakTimes.length > 10) {
+        this.peakTimes.shift();
+      }
+      
+      // Reproducir beep inmediatamente después de detectar el pico
+      try {
+        await this.beepPlayer.playBeep('heartbeat', quality);
+        console.log('🫀 Pico detectado + Beep reproducido:', {
+          tiempo: now,
+          valorPico: normalizedValue,
+          calidadSenal: quality
+        });
+      } catch (err) {
+        console.error('Error al reproducir beep:', err);
+      }
+    }
+
+    // Calcular métricas
     const { frequencies, magnitudes } = this.frequencyAnalyzer.performFFT(filteredRed);
     const dominantFreqIndex = magnitudes.indexOf(Math.max(...magnitudes));
     const dominantFreq = frequencies[dominantFreqIndex];
     const calculatedBpm = dominantFreq * 60;
     
-    const intervals = [];
-    for (let i = 1; i < this.peakTimes.length; i++) {
-      intervals.push(this.peakTimes[i] - this.peakTimes[i-1]);
-    }
-    
+    const intervals = this.peakTimes.slice(1).map((time, i) => time - this.peakTimes[i]);
     const hrvAnalysis = this.signalProcessor.analyzeHRV(intervals);
     const spo2Result = this.signalProcessor.calculateSpO2(this.redBuffer, this.irBuffer);
     const bp = this.signalProcessor.estimateBloodPressure(filteredRed, this.peakTimes);
     const signalQuality = this.signalProcessor.analyzeSignalQuality(filteredRed);
     const validatedVitals = this.validateVitalSigns(calculatedBpm, bp.systolic, bp.diastolic);
 
-    const isPeak = this.peakDetector.isRealPeak(normalizedValue, now, this.signalBuffer);
-
-    if (isPeak) {
-      this.peakTimes.push(now);
-      console.log('📊 Mediciones actuales:', { 
-        bpm: validatedVitals.bpm.toFixed(1),
-        spo2: spo2Result.spo2.toFixed(1) + '%',
-        presion: `${validatedVitals.systolic}/${validatedVitals.diastolic}`,
-        calidadSenal: (signalQuality * 100).toFixed(1) + '%'
-      });
-      
-      if (this.peakTimes.length > 10) {
-        this.peakTimes.shift();
-      }
-      
-      this.beepPlayer.playBeep('heartbeat', signalQuality).catch(err => {
-        console.error('Error al reproducir beep:', err);
-      });
-    }
-
-    // Cada 30 frames (aprox. 1 segundo) intentamos mejorar los parámetros
+    // Actualización de ML cada 30 frames
     if (this.frameCount % 30 === 0 && validatedVitals.bpm > 0) {
       this.saveTrainingData(validatedVitals.bpm, spo2Result.spo2, signalQuality);
       await this.trainMLModel();
