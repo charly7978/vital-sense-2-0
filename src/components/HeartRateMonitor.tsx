@@ -85,7 +85,7 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
 
                 <div className="rounded-lg p-2">
                   <h3 className="text-xs font-medium mb-1 text-gray-100">PPG en Tiempo Real</h3>
-                  <div className="h-[80px]">
+                  <div className="h-[50px]">
                     <VitalChart data={readings} color="#ea384c" />
                   </div>
                 </div>
@@ -108,17 +108,17 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
             <div className="flex gap-2 justify-center mb-4">
               <Button
                 variant={currentView === 'monitor' ? 'default' : 'secondary'}
-                className="flex-1 max-w-40"
+                className="h-8 flex-1 max-w-32 text-sm"
                 onClick={() => setCurrentView('monitor')}
               >
                 Monitor
               </Button>
               <Button
                 variant={currentView === 'calibration' ? 'default' : 'secondary'}
-                className="flex-1 max-w-40 gap-2"
+                className="h-8 flex-1 max-w-32 gap-2 text-sm"
                 onClick={() => setCurrentView('calibration')}
               >
-                <Settings className="w-4 h-4" />
+                <Settings className="w-3.5 h-3.5" />
                 Calibración
               </Button>
             </div>
