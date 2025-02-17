@@ -6,7 +6,7 @@ export class SignalFilter {
 
   constructor(sampleRate: number = 30) {
     this.sampleRate = sampleRate;
-    this.alpha = 1 / (1 + 2 * Math.PI * (5 / sampleRate)); // Filtro paso bajo a 5Hz
+    this.alpha = 1 / (1 + 2 * Math.PI * (3 / sampleRate)); // Reducido a 3Hz para mejor señal
   }
 
   lowPassFilter(signal: number[], cutoffFreq: number): number[] {
@@ -15,7 +15,7 @@ export class SignalFilter {
     const rc = 1.0 / (cutoffFreq * 2 * Math.PI);
     const alpha = dt / (rc + dt);
     
-    // Aplicar filtro paso bajo
+    // Aplicar filtro paso bajo con doble pasada
     for (let i = 0; i < signal.length; i++) {
       if (i === 0) {
         filtered[i] = signal[i];
@@ -24,14 +24,15 @@ export class SignalFilter {
       }
     }
     
-    // Aplicar suavizado adicional
+    // Segunda pasada para mejor suavizado
     const smoothed = this.smoothSignal(filtered);
+    const doubleSmoothed = this.smoothSignal(smoothed);
     
-    return smoothed;
+    return doubleSmoothed;
   }
 
   private smoothSignal(signal: number[]): number[] {
-    const windowSize = 5;
+    const windowSize = 3; // Reducido para menor latencia
     const smoothed: number[] = [];
     
     for (let i = 0; i < signal.length; i++) {

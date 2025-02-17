@@ -6,15 +6,15 @@ export class SignalExtractor {
   private lastRedValues: number[] = [];
   private lastIrValues: number[] = [];
   private frameCount = 0;
-  private readonly minValidPixels = 100; // Aumentado para mayor confiabilidad
-  private readonly redDominanceThreshold = 1.2; // Aumentado para mejor detección
+  private readonly minValidPixels = 50; // Reducido para mejor sensibilidad
+  private readonly redDominanceThreshold = 1.1; // Reducido para mejor detección
   private readonly stabilityThreshold = 0.1;
   private lastStabilityValues: number[] = [];
   private readonly pixelStep = 2;
 
   private kalmanState = {
-    red: { q: 0.05, r: 1.2, p: 1, x: 0, k: 0 },
-    ir: { q: 0.05, r: 1.2, p: 1, x: 0, k: 0 }
+    red: { q: 0.1, r: 0.8, p: 1, x: 0, k: 0 }, // Ajustados para mejor respuesta
+    ir: { q: 0.1, r: 0.8, p: 1, x: 0, k: 0 }
   };
 
   private applyKalmanFilter(measurement: number, state: typeof this.kalmanState.red) {
