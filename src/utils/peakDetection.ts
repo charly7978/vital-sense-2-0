@@ -1,3 +1,4 @@
+
 export class PeakDetector {
   private adaptiveThreshold = 0;
   private readonly minPeakDistance = 300;
@@ -105,9 +106,11 @@ export class PeakDetector {
   }
 
   private isLocalMax(currentValue: number, signalBuffer: number[]): boolean {
-    const window = 5;
+    const window = 5; // Ventana más pequeña para mayor precisión
     const recent = signalBuffer.slice(-window);
-    return Math.abs(currentValue) >= Math.max(...recent.map(Math.abs));
+    const threshold = 0.85; // Solo 85% del máximo para ser más sensible
+    const maxValue = Math.max(...recent.map(Math.abs));
+    return Math.abs(currentValue) >= maxValue * threshold;
   }
 
   private validatePeakShape(currentValue: number, signalBuffer: number[]): boolean {
@@ -115,15 +118,20 @@ export class PeakDetector {
 
     const last6Values = [...signalBuffer.slice(-5), currentValue];
     
-    // Verificar tendencia creciente
+    // Análisis de forma mejorado
     let increasing = 0;
+    let decreasing = 0;
+    
     for (let i = 1; i < last6Values.length; i++) {
       if (Math.abs(last6Values[i]) > Math.abs(last6Values[i-1])) {
         increasing++;
+      } else if (Math.abs(last6Values[i]) < Math.abs(last6Values[i-1])) {
+        decreasing++;
       }
     }
     
-    return increasing >= 3; // Al menos 3 incrementos en los últimos 6 valores
+    // Debe tener un patrón de subida seguido de bajada
+    return increasing >= 2 && decreasing >= 1;
   }
 
   private validatePeakInterval(currentInterval: number): boolean {
@@ -134,17 +142,18 @@ export class PeakDetector {
     const recentIntervals = this.timeBuffer.slice(-3);
     const avgInterval = recentIntervals.reduce((a, b) => a + b, 0) / recentIntervals.length;
     
-    const maxVariation = 0.4; // 40% de variación máxima
+    // Permitimos una variación más pequeña para mayor precisión
+    const maxVariation = 0.3; // 30% de variación máxima
     const isWithinRange = Math.abs(currentInterval - avgInterval) <= avgInterval * maxVariation;
     const isPhysiologicallyValid = currentInterval >= this.minPeakDistance && 
                                   currentInterval <= (60 / this.MIN_BPM) * 1000;
 
-    return isPhysiologicallyValid || isWithinRange;
+    return isPhysiologicallyValid && isWithinRange;
   }
 
   private calculatePeakQuality(peakValue: number, mean: number, stdDev: number): number {
-    const snr = (peakValue - mean) / stdDev; // Signal-to-noise ratio
-    const normalizedQuality = Math.min(Math.max(snr / 4, 0), 1); // Normalizar entre 0 y 1
+    const snr = Math.abs(peakValue - mean) / (stdDev || 1); // Evitar división por cero
+    const normalizedQuality = Math.min(Math.max(snr / 4, 0), 1);
     return normalizedQuality;
   }
 
