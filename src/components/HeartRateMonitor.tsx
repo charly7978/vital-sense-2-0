@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, ArrowLeft } from 'lucide-react';
+import { Settings, ArrowRight } from 'lucide-react';
 import CameraView from './CameraView';
 import VitalChart from './VitalChart';
 import VitalSignsDisplay from './vitals/VitalSignsDisplay';
@@ -10,10 +10,10 @@ import CalibrationPanel from './CalibrationPanel';
 import { useVitals } from '@/contexts/VitalsContext';
 
 interface HeartRateMonitorProps {
-  onClose: () => void;
+  onShowControls: () => void;
 }
 
-const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onClose }) => {
+const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) => {
   const { 
     bpm, 
     spo2, 
@@ -31,22 +31,15 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onClose }) => {
     updateSensitivitySettings
   } = useVitals();
 
-  const handleClose = () => {
-    if (isStarted) {
-      toggleMeasurement(); // Detener medición antes de cerrar
-    }
-    onClose();
-  };
-
   const showFingerIndicator = isStarted && measurementQuality < 0.2;
 
   return (
     <div className="relative h-screen w-screen overflow-hidden">
       <button 
-        onClick={handleClose}
-        className="absolute top-3 left-3 z-30 p-2 rounded-full bg-black/30 backdrop-blur-sm border border-white/10 text-white/80 hover:bg-black/40 transition-colors cursor-pointer"
+        onClick={onShowControls}
+        className="absolute top-3 right-3 z-30 p-2 rounded-full bg-black/30 backdrop-blur-sm border border-white/10 text-white/80 hover:bg-black/40 transition-colors cursor-pointer"
       >
-        <ArrowLeft className="w-5 h-5" />
+        <ArrowRight className="w-5 h-5" />
       </button>
 
       <div className="absolute inset-0 z-0">

@@ -11,7 +11,7 @@ import HeartRateMonitor from "./components/HeartRateMonitor";
 const queryClient = new QueryClient();
 
 const App = () => {
-  const [showMonitor, setShowMonitor] = useState(false);
+  const [showControls, setShowControls] = useState(false);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -20,17 +20,17 @@ const App = () => {
           <Toaster />
           <Sonner />
           <div className="relative w-screen h-screen overflow-hidden">
-            {/* Contenido principal */}
-            <div className={`transition-transform duration-500 ${showMonitor ? 'translate-x-full' : 'translate-x-0'}`}>
-              <Index onOpenMonitor={() => setShowMonitor(true)} />
+            {/* Monitor de ritmo cardíaco (principal) */}
+            <div className="fixed inset-0">
+              <HeartRateMonitor onShowControls={() => setShowControls(true)} />
             </div>
 
-            {/* Monitor de ritmo cardíaco */}
+            {/* Panel de controles (deslizable) */}
             <div 
-              className={`fixed inset-0 transition-transform duration-500 ${showMonitor ? 'translate-x-0' : '-translate-x-full'}`}
+              className={`fixed inset-0 transition-transform duration-500 ${showControls ? 'translate-x-0' : 'translate-x-full'}`}
             >
-              {showMonitor && (
-                <HeartRateMonitor onClose={() => setShowMonitor(false)} />
+              {showControls && (
+                <Index onClose={() => setShowControls(false)} />
               )}
             </div>
           </div>

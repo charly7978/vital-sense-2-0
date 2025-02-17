@@ -1,21 +1,25 @@
+
 import React from 'react';
-import HeartRateMonitor from '@/components/HeartRateMonitor';
 import { VitalsProvider } from '@/contexts/VitalsContext';
+import { ArrowLeft } from 'lucide-react';
 
 interface IndexProps {
-  onOpenMonitor: () => void;
+  onClose: () => void;
 }
 
-const Index: React.FC<IndexProps> = ({ onOpenMonitor }) => {
+const Index: React.FC<IndexProps> = ({ onClose }) => {
   return (
     <VitalsProvider>
-      <div className="h-screen w-screen overflow-hidden bg-black">
+      <div className="h-screen w-screen overflow-hidden bg-black/80 backdrop-blur-sm">
         <button 
-          onClick={onOpenMonitor}
-          className="bg-primary text-white px-4 py-2 rounded-lg"
+          onClick={onClose}
+          className="absolute top-3 left-3 z-30 p-2 rounded-full bg-black/30 backdrop-blur-sm border border-white/10 text-white/80 hover:bg-black/40 transition-colors cursor-pointer"
         >
-          Abrir Monitor
+          <ArrowLeft className="w-5 h-5" />
         </button>
+        <div className="p-4">
+          {/* Aquí irían los controles y configuraciones */}
+        </div>
       </div>
     </VitalsProvider>
   );
