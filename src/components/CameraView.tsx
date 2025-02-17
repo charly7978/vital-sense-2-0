@@ -1,6 +1,8 @@
 import React, { useRef, useEffect, useState } from "react";
 import Webcam from "react-webcam";
 import { useToast } from "@/hooks/use-toast";
+import { Camera } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface CameraViewProps {
   onFrame: (imageData: ImageData) => void;
@@ -16,6 +18,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
   const [bpm, setBpm] = useState(0);
   const [spo2, setSpo2] = useState(98);
   const [quality, setQuality] = useState(0);
+  const isMobile = useIsMobile();
   const beepAudio = useRef(new Audio("/beep.mp3"));
 
   useEffect(() => {
@@ -74,32 +77,30 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
 
   return (
     <div className="relative w-full h-screen">
-      {/* 🔹 Cámara a pantalla completa, aseguramos que no se vea borrosa */}
+      {/* 🔹 Cámara a pantalla completa */}
       {isActive && (
         <Webcam
           ref={webcamRef}
           audio={false}
           videoConstraints={{ width: 1280, height: 720, facingMode: "environment" }}
-          className="absolute w-full h-full object-cover z-0"
+          className="absolute w-full h-full object-cover"
         />
       )}
       <canvas ref={canvasRef} style={{ display: "none" }} />
 
-      {/* 🔹 Contenedor de datos sobre la cámara, ajustado para mejor visibilidad */}
-      <div className="absolute top-0 left-0 w-full h-full flex flex-col items-center justify-center bg-black/10 backdrop-blur-sm text-white p-4 z-10">
-        <div className="bg-black/40 rounded-lg p-3 w-3/4 text-center">
-          {/* 🔹 BPM */}
-          <div className="text-4xl font-bold">BPM: {bpm}</div>
+      {/* 🔹 Contenedor de datos sobre la cámara */}
+      <div className="absolute top-0 left-0 w-full h-full flex flex-col items-center justify-center bg-black/20 backdrop-blur-md text-white p-4">
+        {/* 🔹 BPM */}
+        <div className="text-4xl font-bold">BPM: {bpm}</div>
 
-          {/* 🔹 SpO2 */}
-          <div className="text-2xl mt-2">SpO2: {spo2}%</div>
+        {/* 🔹 SpO2 */}
+        <div className="text-2xl mt-2">SpO2: {spo2}%</div>
 
-          {/* 🔹 Calidad de la señal */}
-          <div className="text-lg mt-2">Señal: {quality}%</div>
-        </div>
+        {/* 🔹 Calidad de la señal */}
+        <div className="text-lg mt-2">Señal: {quality}%</div>
 
-        {/* 🔹 Gráfico de señal PPG, ahora más visible */}
-        <div className="absolute bottom-5 left-1/2 transform -translate-x-1/2 bg-black/30 p-3 rounded-xl text-sm">
+        {/* 🔹 Gráfico de señal PPG */}
+        <div className="absolute bottom-5 left-1/2 transform -translate-x-1/2 bg-white/20 p-3 rounded-xl">
           📊 Gráfico PPG (Placeholder)
         </div>
       </div>
