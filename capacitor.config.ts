@@ -10,7 +10,11 @@ const config: CapacitorConfig = {
     cleartext: true
   },
   android: {
-    allowMixedContent: true
+    allowMixedContent: true,
+    permissions: [
+      "android.permission.CAMERA",
+      "android.permission.FLASHLIGHT"
+    ]
   },
   plugins: {
     Camera: {
@@ -18,11 +22,7 @@ const config: CapacitorConfig = {
         usageDescription: "La aplicación necesita acceso a la cámara para medir el ritmo cardíaco"
       },
       android: {
-        usageDescription: "La aplicación necesita acceso a la cámara para medir el ritmo cardíaco",
-        permissions: [
-          "android.permission.CAMERA",
-          "android.permission.FLASHLIGHT"
-        ]
+        usageDescription: "La aplicación necesita acceso a la cámara para medir el ritmo cardíaco"
       }
     }
   }

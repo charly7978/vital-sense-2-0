@@ -10,6 +10,7 @@ interface CameraViewProps {
   isActive: boolean;
 }
 
+// Extendemos la interfaz correctamente
 declare global {
   interface MediaTrackConstraintSet {
     torch?: boolean;
@@ -24,20 +25,19 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
   const webcamRef = useRef<Webcam>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const lastProcessTime = useRef<number>(0);
-  const processingInterval = 33; // ~30fps máximo para evitar sobrecarga
   const { toast } = useToast();
   const [videoInitialized, setVideoInitialized] = useState(false);
   const isMobile = useIsMobile();
   const isAndroid = /android/i.test(navigator.userAgent);
 
   const getDeviceConstraints = () => {
-    return {
-      width: { ideal: 640 }, // Reducido para mejor rendimiento
-      height: { ideal: 480 }, // Reducido para mejor rendimiento
+    const constraints: MediaTrackConstraints = {
+      width: { ideal: 1280 },
+      height: { ideal: 720 },
       facingMode: isAndroid ? "environment" : "user",
       advanced: isAndroid ? [{ torch: true }] : undefined,
     };
+    return constraints;
   };
 
   const toggleTorch = async (enable: boolean) => {
@@ -51,6 +51,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
         await track.applyConstraints({
           advanced: [{ torch: enable }],
         });
+        console.log(`Linterna ${enable ? 'activada' : 'desactivada'}`);
       }
     } catch (error) {
       console.error('Error al controlar la linterna:', error);
@@ -63,31 +64,24 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
         return;
       }
 
-      const now = performance.now();
-      const timeSinceLastProcess = now - lastProcessTime.current;
+      const video = webcamRef.current.video;
+      const canvas = canvasRef.current;
+      const context = canvas.getContext("2d");
 
-      if (timeSinceLastProcess >= processingInterval) {
-        const video = webcamRef.current.video;
-        const canvas = canvasRef.current;
-        const context = canvas.getContext('2d', { willReadFrequently: true });
-
-        if (!context || video.readyState !== video.HAVE_ENOUGH_DATA) {
-          animationFrameRef.current = requestAnimationFrame(processFrame);
-          return;
-        }
-
-        // Redimensionar el canvas solo si es necesario
-        if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          setVideoInitialized(true);
-        }
-
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const frameData = context.getImageData(0, 0, canvas.width, canvas.height);
-        onFrame(frameData);
-        lastProcessTime.current = now;
+      if (!context || video.readyState !== video.HAVE_ENOUGH_DATA) {
+        animationFrameRef.current = requestAnimationFrame(processFrame);
+        return;
       }
+
+      if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        setVideoInitialized(true);
+      }
+
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const frameData = context.getImageData(0, 0, canvas.width, canvas.height);
+      onFrame(frameData);
 
       animationFrameRef.current = requestAnimationFrame(processFrame);
     };
@@ -102,6 +96,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
       }
       toggleTorch(false);
 
+      // Cerrar la cámara cuando se desactiva
       if (webcamRef.current?.video) {
         const stream = webcamRef.current.video.srcObject as MediaStream;
         if (stream) {
@@ -116,6 +111,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
       }
       toggleTorch(false);
 
+      // Asegurarnos de cerrar la cámara al desmontar
       if (webcamRef.current?.video) {
         const stream = webcamRef.current.video.srcObject as MediaStream;
         if (stream) {
@@ -125,6 +121,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
     };
   }, [isActive]);
 
+  // Solo renderizar Webcam cuando isActive es true
   if (!isActive) {
     return null;
   }
