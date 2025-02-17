@@ -45,13 +45,13 @@ const HeartRateMonitor: React.FC = () => {
           {/* Área superior - Vitales */}
           <div className="mb-1">
             {isStarted && bpm === 0 && (
-              <div className="mb-1 px-2 py-1 bg-yellow-500/10 border border-yellow-500/20 backdrop-blur-md rounded">
+              <div className="mb-1 px-2 py-0.5 bg-yellow-500/10 border border-yellow-500/20 backdrop-blur-md rounded">
                 <p className="text-yellow-300 text-[10px] text-center">
                   Coloque su dedo sobre el lente de la cámara
                 </p>
               </div>
             )}
-            <div className="bg-black/30 backdrop-blur-md rounded p-1.5 border border-white/10">
+            <div className="bg-black/30 backdrop-blur-md rounded p-1 border border-white/10">
               <VitalSignsDisplay
                 bpm={bpm}
                 spo2={spo2}
@@ -63,13 +63,20 @@ const HeartRateMonitor: React.FC = () => {
             </div>
           </div>
 
-          {/* Espacio flexible en el medio */}
-          <div className="flex-grow" />
+          {/* Espacio flexible y botón centrado */}
+          <div className="flex-grow flex flex-col justify-center items-center">
+            <div className="w-32">
+              <MeasurementControls
+                isStarted={isStarted}
+                onToggleMeasurement={toggleMeasurement}
+              />
+            </div>
+          </div>
 
-          {/* Área inferior - Controles y gráfico */}
+          {/* Área inferior - Indicadores y gráfico */}
           <div className="space-y-1">
             {isStarted && (
-              <div className="bg-black/30 backdrop-blur-md rounded p-1.5 border border-white/10">
+              <div className="bg-black/30 backdrop-blur-md rounded p-1 border border-white/10">
                 <SignalQualityIndicator
                   isStarted={isStarted}
                   measurementQuality={measurementQuality}
@@ -78,18 +85,11 @@ const HeartRateMonitor: React.FC = () => {
               </div>
             )}
 
-            <div className="bg-black/30 backdrop-blur-md rounded p-1.5 border border-white/10">
-              <h3 className="text-[10px] font-medium mb-0.5 text-gray-100">PPG en Tiempo Real</h3>
-              <div className="h-[80px]">
+            <div className="bg-black/30 backdrop-blur-md rounded p-1 border border-white/10">
+              <h3 className="text-[9px] font-medium mb-0.5 text-gray-100">PPG en Tiempo Real</h3>
+              <div className="h-[60px]">
                 <VitalChart data={readings} color="#ea384c" />
               </div>
-            </div>
-
-            <div className="bg-black/30 backdrop-blur-md rounded p-1.5 border border-white/10">
-              <MeasurementControls
-                isStarted={isStarted}
-                onToggleMeasurement={toggleMeasurement}
-              />
             </div>
           </div>
         </div>
