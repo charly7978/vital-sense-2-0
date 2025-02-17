@@ -7,41 +7,54 @@ export class SignalQualityAnalyzer {
     const variance = signal.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / signal.length;
     const standardDeviation = Math.sqrt(variance);
     
-    // Calcular la amplitud pico a pico con un umbral mínimo más bajo
+    // Análisis de amplitud
     const peakToPeak = Math.max(...signal) - Math.min(...signal);
-    if (peakToPeak < 10) return 0.1; // Umbral más bajo para la amplitud mínima
+    if (peakToPeak < 5) return 0.2; // Reducido el umbral mínimo
     
-    // Calcular el ruido de alta frecuencia
+    // Análisis de ruido
     const noiseLevel = this.calculateNoiseLevel(signal);
     
-    // Calcular la estabilidad de la línea base
+    // Análisis de estabilidad
     const baselineStability = this.calculateBaselineStability(signal);
     
-    // Evaluar si hay suficiente variación en la señal (umbral más bajo)
+    // Análisis de variación
     const signalVariation = standardDeviation / mean;
-    if (signalVariation < 0.02) return 0.1; // Umbral más bajo para la variación mínima
+    if (signalVariation < 0.01) return 0.2; // Reducido el umbral mínimo
     
-    // Pesos ajustados para cada métrica
+    // Pesos reajustados para ser menos estrictos
     const weights = {
-      amplitude: 0.4,
+      amplitude: 0.35,
       noise: 0.3,
-      baseline: 0.3
+      baseline: 0.35
     };
     
-    // Normalizar y combinar métricas con umbrales más bajos
-    const amplitudeQuality = Math.min(peakToPeak / 100, 1); // Umbral más bajo para amplitud
-    const noiseQuality = 1 - Math.min(noiseLevel * 1.2, 1);
-    const baselineQuality = Math.min(baselineStability, 1);
+    // Normalización más generosa
+    const amplitudeQuality = Math.min((peakToPeak / 50), 1); // Reducido el denominador
+    const noiseQuality = 1 - Math.min(noiseLevel, 0.8); // Más tolerante al ruido
+    const baselineQuality = Math.min(baselineStability * 1.5, 1); // Amplificado
     
-    const quality = 
+    // Cálculo de calidad final
+    const rawQuality = 
       amplitudeQuality * weights.amplitude +
       noiseQuality * weights.noise +
       baselineQuality * weights.baseline;
     
-    // Ajuste menos agresivo para hacer el indicador más sensible
-    const adjustedQuality = Math.pow(quality, 1.2);
+    // Ajuste más generoso de la calidad final
+    const adjustedQuality = Math.pow(rawQuality, 0.8); // Exponente reducido para aumentar valores
     
-    return Math.min(Math.max(adjustedQuality, 0), 1);
+    const finalQuality = Math.min(Math.max(adjustedQuality, 0), 1);
+    
+    // Logging detallado de las métricas
+    console.log('Métricas de calidad:', {
+      pixel: noiseQuality,
+      stability: baselineQuality,
+      red: amplitudeQuality,
+      perfusion: finalQuality,
+      finalQuality: finalQuality,
+      perfusionIndex: (peakToPeak / mean) * 100
+    });
+    
+    return finalQuality;
   }
 
   private calculateNoiseLevel(signal: number[]): number {
@@ -57,8 +70,8 @@ export class SignalQualityAnalyzer {
     
     if (maxSignal === 0) return 1;
     
-    // Ajuste menos sensible al ruido
-    return Math.pow(meanDiff / maxSignal, 0.5);
+    // Menos sensible al ruido
+    return Math.pow(meanDiff / maxSignal, 0.7); // Exponente aumentado para reducir penalización
   }
 
   private calculateBaselineStability(signal: number[]): number {
@@ -76,8 +89,8 @@ export class SignalQualityAnalyzer {
       baseline.reduce((acc, val) => acc + Math.pow(val - baseline[0], 2), 0) / baseline.length
     );
     
-    // Normalizar la estabilidad con un factor menos estricto
-    return Math.exp(-baselineVariation / 12);
+    // Más tolerante a variaciones en la línea base
+    return Math.exp(-baselineVariation / 20); // Aumentado denominador para ser menos estricto
   }
 
   calculateSignalStability(redSignal: number[], irSignal: number[]): number {
@@ -86,7 +99,7 @@ export class SignalQualityAnalyzer {
     const redQuality = this.analyzeSignalQuality(redSignal);
     const irQuality = this.analyzeSignalQuality(irSignal);
     
-    // Usar un promedio ponderado en lugar del mínimo
-    return (redQuality * 0.7 + irQuality * 0.3);
+    // Promedio ponderado ajustado
+    return Math.pow((redQuality * 0.6 + irQuality * 0.4), 0.8);
   }
 }
