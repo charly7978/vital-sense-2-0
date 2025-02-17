@@ -1,8 +1,6 @@
-
 import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Settings, ArrowLeft } from 'lucide-react';
-import { useNavigate, Link, useLocation } from 'react-router-dom';
 import CameraView from './CameraView';
 import VitalChart from './VitalChart';
 import VitalSignsDisplay from './vitals/VitalSignsDisplay';
@@ -10,30 +8,12 @@ import SignalQualityIndicator from './vitals/SignalQualityIndicator';
 import MeasurementControls from './vitals/MeasurementControls';
 import CalibrationPanel from './CalibrationPanel';
 import { useVitals } from '@/contexts/VitalsContext';
-import { useToast } from "@/hooks/use-toast";
 
-const HeartRateMonitor: React.FC = () => {
-  const { toast } = useToast();
-  const location = useLocation();
-  const navigate = useNavigate();
-  
-  const handleReturn = () => {
-    try {
-      if (isStarted) {
-        toggleMeasurement(); // Detener medición antes de salir
-      }
-      if (location.pathname !== '/') {
-        navigate('/');
-      } else {
-        window.location.href = '/';
-      }
-    } catch (error) {
-      console.error('Error al navegar:', error);
-      // Fallback: recargar la página
-      window.location.href = '/';
-    }
-  };
+interface HeartRateMonitorProps {
+  onClose: () => void;
+}
 
+const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onClose }) => {
   const { 
     bpm, 
     spo2, 
@@ -51,12 +31,19 @@ const HeartRateMonitor: React.FC = () => {
     updateSensitivitySettings
   } = useVitals();
 
+  const handleClose = () => {
+    if (isStarted) {
+      toggleMeasurement(); // Detener medición antes de cerrar
+    }
+    onClose();
+  };
+
   const showFingerIndicator = isStarted && measurementQuality < 0.2;
 
   return (
     <div className="relative h-screen w-screen overflow-hidden">
       <button 
-        onClick={handleReturn}
+        onClick={handleClose}
         className="absolute top-3 left-3 z-30 p-2 rounded-full bg-black/30 backdrop-blur-sm border border-white/10 text-white/80 hover:bg-black/40 transition-colors cursor-pointer"
       >
         <ArrowLeft className="w-5 h-5" />
