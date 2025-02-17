@@ -41,11 +41,11 @@ const HeartRateMonitor: React.FC = () => {
 
       {/* Contenido superpuesto */}
       <div className="absolute inset-0 z-20">
-        <div className="h-full w-full p-2 flex flex-col">
+        <div className="h-full w-full p-3 flex flex-col">
           {/* Área superior - Indicadores y mensaje */}
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             {isStarted && (
-              <div className="bg-black/30 backdrop-blur-md rounded p-1 border border-white/10">
+              <div className="bg-black/30 backdrop-blur-md rounded p-1.5 border border-white/10">
                 <SignalQualityIndicator
                   isStarted={isStarted}
                   measurementQuality={measurementQuality}
@@ -55,17 +55,17 @@ const HeartRateMonitor: React.FC = () => {
             )}
             
             {isStarted && bpm === 0 && (
-              <div className="px-2 py-0.5 bg-yellow-500/10 border border-yellow-500/20 backdrop-blur-md rounded">
-                <p className="text-yellow-300 text-[10px] text-center">
+              <div className="px-3 py-1 bg-yellow-500/10 border border-yellow-500/20 backdrop-blur-md rounded">
+                <p className="text-yellow-300 text-xs text-center">
                   Coloque su dedo sobre el lente de la cámara
                 </p>
               </div>
             )}
           </div>
 
-          {/* Área de vitales y gráfico */}
-          <div className="mt-1 space-y-1">
-            <div className="bg-black/30 backdrop-blur-md rounded p-1 border border-white/10">
+          {/* Área de vitales */}
+          <div className="mt-2">
+            <div className="bg-black/30 backdrop-blur-md rounded p-2 border border-white/10">
               <VitalSignsDisplay
                 bpm={bpm}
                 spo2={spo2}
@@ -75,18 +75,24 @@ const HeartRateMonitor: React.FC = () => {
                 arrhythmiaType={arrhythmiaType}
               />
             </div>
+          </div>
 
-            <div className="bg-black/30 backdrop-blur-md rounded p-1 border border-white/10">
-              <h3 className="text-[9px] font-medium mb-0.5 text-gray-100">PPG en Tiempo Real</h3>
+          {/* Espacio flexible */}
+          <div className="flex-grow" />
+
+          {/* Gráfico PPG */}
+          <div className="mb-4">
+            <div className="bg-black rounded p-1.5 border border-white/10">
+              <h3 className="text-[10px] font-medium mb-0.5 text-gray-100">PPG en Tiempo Real</h3>
               <div className="h-[60px]">
                 <VitalChart data={readings} color="#ea384c" />
               </div>
             </div>
           </div>
 
-          {/* Espacio flexible y botón centrado */}
-          <div className="flex-grow flex flex-col justify-center items-center">
-            <div className="w-32">
+          {/* Botón centrado */}
+          <div className="mb-6 flex justify-center">
+            <div className="w-48">
               <MeasurementControls
                 isStarted={isStarted}
                 onToggleMeasurement={toggleMeasurement}
