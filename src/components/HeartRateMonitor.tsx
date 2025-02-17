@@ -30,10 +30,48 @@ const HeartRateMonitor: React.FC = () => {
   const { toast } = useToast();
 
   return (
-    <div className="container max-w-5xl mx-auto p-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="container max-w-xl mx-auto px-2">
+      {/* Cámara centrada en la parte superior */}
+      <div className="flex justify-center mb-2">
+        <div className="w-32 aspect-[3/4] bg-black/40 backdrop-blur-xl rounded-lg p-1.5 border border-white/5 shadow-lg">
+          <div className="w-full h-full overflow-hidden rounded-md">
+            <CameraView onFrame={processFrame} isActive={isStarted} />
+          </div>
+        </div>
+      </div>
+
+      {/* Controles y mensaje de ayuda */}
+      <div className="flex flex-col items-center space-y-1 mb-2">
+        {isStarted && bpm === 0 && (
+          <div className="p-1.5 bg-yellow-500/10 border border-yellow-500/20 rounded text-center w-full">
+            <p className="text-yellow-300 text-xs">
+              Coloque su dedo sobre el lente
+            </p>
+          </div>
+        )}
+        
+        <div className="w-full max-w-xs">
+          <MeasurementControls
+            isStarted={isStarted}
+            onToggleMeasurement={toggleMeasurement}
+          />
+        </div>
+
+        {isStarted && (
+          <div className="w-full max-w-xs">
+            <SignalQualityIndicator
+              isStarted={isStarted}
+              measurementQuality={measurementQuality}
+              measurementProgress={measurementProgress}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Grid de 2 columnas para métricas y gráfico */}
+      <div className="grid grid-cols-2 gap-2">
         {/* Columna izquierda - Signos vitales */}
-        <div className="md:order-1">
+        <div className="bg-black/40 backdrop-blur-xl rounded-lg p-2 border border-white/5">
           <VitalSignsDisplay
             bpm={bpm}
             spo2={spo2}
@@ -44,47 +82,11 @@ const HeartRateMonitor: React.FC = () => {
           />
         </div>
 
-        {/* Columna central - Cámara y controles */}
-        <div className="md:order-2 flex flex-col items-center">
-          <div className="w-48 aspect-[3/4] bg-black/40 backdrop-blur-xl rounded-xl p-2 border border-white/5 shadow-lg">
-            <div className="w-full h-full overflow-hidden rounded-lg">
-              <CameraView onFrame={processFrame} isActive={isStarted} />
-            </div>
-          </div>
-
-          {isStarted && bpm === 0 && (
-            <div className="mt-2 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-center w-full">
-              <p className="text-yellow-300 text-xs">
-                Coloque su dedo sobre el lente
-              </p>
-            </div>
-          )}
-
-          <div className="mt-2 w-full">
-            <MeasurementControls
-              isStarted={isStarted}
-              onToggleMeasurement={toggleMeasurement}
-            />
-          </div>
-
-          {isStarted && (
-            <div className="mt-2 w-full">
-              <SignalQualityIndicator
-                isStarted={isStarted}
-                measurementQuality={measurementQuality}
-                measurementProgress={measurementProgress}
-              />
-            </div>
-          )}
-        </div>
-
         {/* Columna derecha - Gráfico PPG */}
-        <div className="md:order-3">
-          <div className="bg-black/40 backdrop-blur-xl rounded-xl p-3 border border-white/5 h-full">
-            <h3 className="text-sm font-medium mb-2 text-gray-100">PPG en Tiempo Real</h3>
-            <div className="h-[200px]">
-              <VitalChart data={readings} color="#ea384c" />
-            </div>
+        <div className="bg-black/40 backdrop-blur-xl rounded-lg p-2 border border-white/5">
+          <h3 className="text-xs font-medium mb-1 text-gray-100">PPG en Tiempo Real</h3>
+          <div className="h-[120px]">
+            <VitalChart data={readings} color="#ea384c" />
           </div>
         </div>
       </div>
