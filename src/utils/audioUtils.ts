@@ -43,10 +43,12 @@ export class BeepPlayer {
 
       const currentTime = this.audioContext.currentTime;
 
-      // Ajustar frecuencia y volumen según la calidad de la señal
+      // Ajustar frecuencia según la calidad de la señal
       const baseFrequency = 150;
       oscillator.frequency.value = baseFrequency + (quality * 50);
-      const volume = Math.min(0.5, Math.max(0.1, quality));
+      
+      // Aumentar el volumen significativamente
+      const volume = Math.min(1.0, Math.max(0.6, quality));
 
       // Configurar la envolvente del sonido
       gainNode.gain.setValueAtTime(0, currentTime);

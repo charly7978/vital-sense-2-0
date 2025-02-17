@@ -1,6 +1,5 @@
 
 import React from 'react';
-import { useToast } from "@/hooks/use-toast";
 import CameraView from './CameraView';
 import VitalChart from './VitalChart';
 import VitalSignsDisplay from './vitals/VitalSignsDisplay';
@@ -26,8 +25,6 @@ const HeartRateMonitor: React.FC = () => {
     toggleMeasurement,
     processFrame
   } = useVitals();
-
-  const { toast } = useToast();
 
   return (
     <div className="relative h-screen w-screen overflow-hidden">
@@ -55,16 +52,19 @@ const HeartRateMonitor: React.FC = () => {
             )}
             
             {isStarted && bpm === 0 && (
-              <div className="px-3 py-1.5 bg-yellow-500/10 border border-yellow-500/20 backdrop-blur-md rounded-lg">
-                <p className="text-yellow-300 text-xs text-center">
-                  Coloque su dedo sobre el lente de la cámara
-                </p>
+              <div className="px-3 py-2 bg-yellow-500/10 border border-yellow-500/20 backdrop-blur-md rounded-lg">
+                <div className="flex items-center justify-center space-x-2">
+                  <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"/>
+                  <p className="text-yellow-300 text-xs">
+                    Coloque su dedo sobre el lente de la cámara
+                  </p>
+                </div>
               </div>
             )}
           </div>
 
-          {/* Área de vitales */}
-          <div className="mt-3">
+          {/* Área de vitales y gráfico PPG */}
+          <div className="mt-3 space-y-2">
             <div className="bg-black/30 backdrop-blur-md rounded-lg p-2.5 border border-white/10">
               <VitalSignsDisplay
                 bpm={bpm}
@@ -75,13 +75,7 @@ const HeartRateMonitor: React.FC = () => {
                 arrhythmiaType={arrhythmiaType}
               />
             </div>
-          </div>
 
-          {/* Espacio flexible */}
-          <div className="flex-grow" />
-
-          {/* Gráfico PPG */}
-          <div className="mb-16">
             <div className="bg-black rounded-lg p-2 border border-white/10">
               <h3 className="text-xs font-medium mb-1 text-gray-100">PPG en Tiempo Real</h3>
               <div className="h-[80px]">
@@ -89,6 +83,9 @@ const HeartRateMonitor: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* Espacio flexible */}
+          <div className="flex-grow" />
 
           {/* Botón centrado */}
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
