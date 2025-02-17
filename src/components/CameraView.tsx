@@ -32,9 +32,9 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
   const isAndroid = /android/i.test(navigator.userAgent);
   const beepAudio = useRef(new Audio("/beep.mp3"));
 
-  // 🔹 Ajustar volumen del beep
+  // 🔹 Asegurar que el beep suene fuerte
   useEffect(() => {
-    beepAudio.current.volume = 1.0; // Subimos el volumen al máximo
+    beepAudio.current.volume = 1.0;
   }, []);
 
   const getDeviceConstraints = () => ({
@@ -60,7 +60,8 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
     const canvas = canvasRef.current;
     const context = canvas.getContext("2d");
 
-    if (!context || video.readyState !== video.HAVE_ENOUGH_DATA) {
+    // 🔹 Evitar errores en getImageData
+    if (!context || !video || video.readyState !== video.HAVE_ENOUGH_DATA) {
       animationFrameRef.current = requestAnimationFrame(processFrame);
       return;
     }
@@ -72,7 +73,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
       const signal = calculateSignalStrength(frameData);
       setSignalStrength(signal);
 
-      if (signal < 15) { // 🔹 Aumentamos la sensibilidad de detección en Android
+      if (signal < 10) { // 🔹 Aumentamos la sensibilidad de detección en Android
         setBpm(0);
         setSpo2(0);
         setQuality(0);
@@ -92,7 +93,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
         }
       }
     } catch (error) {
-      console.error("Error al procesar el frame:", error);
+      console.error("❌ Error al procesar el frame:", error);
     }
 
     animationFrameRef.current = requestAnimationFrame(processFrame);
@@ -162,7 +163,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
 
   const playBeep = () => {
     beepAudio.current.currentTime = 0;
-    beepAudio.current.volume = 1.0; // 🔹 Subimos volumen al máximo
+    beepAudio.current.volume = 1.0; 
     beepAudio.current.play();
   };
 
