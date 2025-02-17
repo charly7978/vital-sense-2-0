@@ -52,7 +52,7 @@ export class PeakDetector {
       amplitudPico: Math.abs(currentValue)
     });
 
-    this.adaptiveThreshold = Math.abs(avgValue) + (stdDev * 1.2);
+    this.adaptiveThreshold = Math.abs(avgValue) + (stdDev * 1.5);
 
     const isValidShape = this.validatePeakShape(currentValue, signalBuffer);
     const hasSignificantAmplitude = Math.abs(currentValue) > this.adaptiveThreshold * this.MIN_PEAK_AMPLITUDE;
@@ -89,22 +89,17 @@ export class PeakDetector {
         valido: isValidInterval
       });
 
-      if (isValidInterval) {
+      if (isValidInterval && this.peakBuffer.length >= this.MIN_VALID_PEAKS) {
         this.lastPeakTime = now;
         this.updatePeakHistory(currentValue, now);
-        const estimatedBPM = 60000 / currentInterval;
+        const quality = this.calculatePeakQuality(currentValue, avgValue, stdDev);
         
-        if (this.peakBuffer.length >= this.MIN_VALID_PEAKS) {
-          const quality = this.calculatePeakQuality(currentValue, avgValue, stdDev);
+        if (quality > 0.5) {
           console.log('💓 PICO VÁLIDO DETECTADO:', {
-            bpmEstimado: estimatedBPM,
             calidad: quality,
             picosTotales: this.peakBuffer.length
           });
           return true;
-        } else {
-          console.log('⚠️ Insuficientes picos válidos consecutivos');
-          return false;
         }
       }
     }
