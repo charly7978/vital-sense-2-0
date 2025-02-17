@@ -12,16 +12,21 @@ export class PeakDetector {
   private readonly MIN_BPM = 40;
   private readonly peakWindowSize = 5;
   private readonly minPeakProminence = 0.3;
-  private frameCount = 0; // Agregamos la propiedad frameCount
+  private frameCount = 0;
+  private readonly minSignalStrength = 0.1; // Nueva propiedad
 
   isRealPeak(currentValue: number, now: number, signalBuffer: number[]): boolean {
     this.frameCount++;
+    
+    // Verificar fuerza mínima de la señal
+    if (Math.abs(currentValue) < this.minSignalStrength) {
+      return false;
+    }
     
     const timeSinceLastPeak = now - this.lastPeakTime;
     const minTimeGap = (60 / this.MAX_BPM) * 1000;
     const maxTimeGap = (60 / this.MIN_BPM) * 1000;
 
-    // Verificación más estricta del tiempo entre picos
     if (timeSinceLastPeak < minTimeGap) {
       return false;
     }
@@ -30,21 +35,17 @@ export class PeakDetector {
       return false;
     }
 
-    // Análisis de señal mejorado con ventana deslizante
     const recentValues = signalBuffer.slice(-this.bufferSize);
     const avgValue = recentValues.reduce((a, b) => a + b, 0) / recentValues.length;
     
-    // Calcular desviación estándar con más precisión
     const positiveValues = recentValues.filter(v => v > 0);
     const stdDev = positiveValues.length > 0 ? 
       Math.sqrt(
         positiveValues.reduce((a, b) => a + Math.pow(b - avgValue, 2), 0) / positiveValues.length
       ) : 1;
 
-    // Umbral adaptativo más robusto
     this.adaptiveThreshold = Math.abs(avgValue) + (stdDev * 1.2);
 
-    // Validaciones más estrictas
     const isValidShape = this.validatePeakShape(currentValue, signalBuffer);
     const hasSignificantAmplitude = Math.abs(currentValue) > this.adaptiveThreshold * 0.8;
     const isLocalMaximum = this.isLocalMax(currentValue, signalBuffer);
@@ -88,7 +89,6 @@ export class PeakDetector {
 
     const last6Values = [...signalBuffer.slice(-5), currentValue];
     
-    // Verificar tendencia creciente más estricta
     let increasing = 0;
     let decreasing = 0;
     
@@ -100,7 +100,6 @@ export class PeakDetector {
       }
     }
     
-    // Requiere un patrón más claro de subida y bajada
     return increasing >= 3 && decreasing <= 2;
   }
 
@@ -112,8 +111,7 @@ export class PeakDetector {
     const recentIntervals = this.timeBuffer.slice(-3);
     const avgInterval = recentIntervals.reduce((a, b) => a + b, 0) / recentIntervals.length;
     
-    // Tolerancia más estricta a la variación
-    const maxVariation = 0.3; // Reducido de 0.4 a 0.3
+    const maxVariation = 0.3;
     const isWithinRange = Math.abs(currentInterval - avgInterval) <= avgInterval * maxVariation;
     const isPhysiologicallyValid = currentInterval >= this.minPeakDistance && 
                                   currentInterval <= (60 / this.MIN_BPM) * 1000;
@@ -139,5 +137,9 @@ export class PeakDetector {
 
   getLastPeakTime(): number {
     return this.lastPeakTime;
+  }
+
+  getFrameCount(): number {
+    return this.frameCount;
   }
 }
