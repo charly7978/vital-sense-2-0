@@ -33,13 +33,13 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
       ? [
           { torch: isMeasuring },
           { exposureMode: "manual" },
-          { exposureCompensation: -1.0 }, // Reducir la exposición
-          { brightness: 0.3 }, // Reducir el brillo
+          { exposureCompensation: -0.5 }, // Reducimos menos la exposición
+          { brightness: 0.5 }, // Aumentamos un poco el brillo
         ] 
       : [
           { exposureMode: "manual" },
-          { exposureCompensation: -1.0 },
-          { brightness: 0.3 },
+          { exposureCompensation: -0.5 },
+          { brightness: 0.5 },
         ],
   });
 
@@ -61,10 +61,6 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       context.drawImage(video, 0, 0);
-
-      // Aplicar un ligero oscurecimiento a la imagen
-      context.fillStyle = 'rgba(0, 0, 0, 0.3)'; // Aumentar la opacidad del oscurecimiento
-      context.fillRect(0, 0, canvas.width, canvas.height);
       
       const frameData = context.getImageData(0, 0, canvas.width, canvas.height);
       
