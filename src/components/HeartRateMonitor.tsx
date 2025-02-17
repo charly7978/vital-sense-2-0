@@ -1,7 +1,8 @@
+
 import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Settings, ArrowLeft } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import CameraView from './CameraView';
 import VitalChart from './VitalChart';
 import VitalSignsDisplay from './vitals/VitalSignsDisplay';
@@ -12,14 +13,25 @@ import { useVitals } from '@/contexts/VitalsContext';
 import { useToast } from "@/hooks/use-toast";
 
 const HeartRateMonitor: React.FC = () => {
-  const navigate = useNavigate();
   const { toast } = useToast();
+  const location = useLocation();
+  const navigate = useNavigate();
   
   const handleReturn = () => {
-    if (isStarted) {
-      toggleMeasurement(); // Detener medición antes de salir
+    try {
+      if (isStarted) {
+        toggleMeasurement(); // Detener medición antes de salir
+      }
+      if (location.pathname !== '/') {
+        navigate('/');
+      } else {
+        window.location.href = '/';
+      }
+    } catch (error) {
+      console.error('Error al navegar:', error);
+      // Fallback: recargar la página
+      window.location.href = '/';
     }
-    navigate('/');
   };
 
   const { 
@@ -45,7 +57,7 @@ const HeartRateMonitor: React.FC = () => {
     <div className="relative h-screen w-screen overflow-hidden">
       <button 
         onClick={handleReturn}
-        className="absolute top-3 left-3 z-30 p-2 rounded-full bg-black/30 backdrop-blur-sm border border-white/10 text-white/80 hover:bg-black/40 transition-colors"
+        className="absolute top-3 left-3 z-30 p-2 rounded-full bg-black/30 backdrop-blur-sm border border-white/10 text-white/80 hover:bg-black/40 transition-colors cursor-pointer"
       >
         <ArrowLeft className="w-5 h-5" />
       </button>
