@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
-import { Gauge, Scale, Sparkles, Heart, Zap, Activity, Sun } from 'lucide-react';
+import { Scale, Sparkles, Heart, Zap, Activity, Sun } from 'lucide-react';
 import type { SensitivitySettings } from '@/utils/types';
 
 interface CalibrationPanelProps {
@@ -26,7 +26,7 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
   };
 
   return (
-    <div className="max-w-md mx-auto space-y-4">
+    <div className="max-w-3xl mx-auto space-y-4">
       <Card className="bg-black/30 backdrop-blur-md border-white/10">
         <CardHeader>
           <CardTitle className="text-white">Panel de Calibración</CardTitle>
@@ -194,6 +194,12 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
           </div>
         </CardContent>
       </Card>
+
+      <div className="text-center">
+        <p className="text-xs text-gray-500">
+          Los cambios se aplican automáticamente
+        </p>
+      </div>
     </div>
   );
 };
