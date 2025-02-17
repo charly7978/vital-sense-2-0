@@ -4,8 +4,8 @@ export class SignalFilter {
   private kalmanState = {
     x: 0,
     p: 1,
-    q: 0.15, // Aumentado para mejor respuesta
-    r: 0.8   // Reducido para menor suavizado
+    q: 0.25, // Aumentado para mejor respuesta
+    r: 0.6   // Reducido para menor suavizado
   };
 
   constructor(sampleRate: number = 30) {
@@ -20,7 +20,7 @@ export class SignalFilter {
     const rc = 1.0 / (cutoffFreq * 2 * Math.PI);
     const dt = 1.0 / this.sampleRate;
     const alpha = dt / (rc + dt);
-    const windowSize = Math.min(8, signal.length); // Reducido para mayor sensibilidad
+    const windowSize = Math.min(6, signal.length); // Reducido para mayor sensibilidad
     
     // Aplicar ventana Hamming mejorada
     for (let i = 0; i < kalmanFiltered.length; i++) {
@@ -30,7 +30,7 @@ export class SignalFilter {
       for (let j = Math.max(0, i - windowSize + 1); j <= i; j++) {
         // Ventana Hamming modificada para mejor respuesta a picos
         const weight = 0.54 - 0.46 * Math.cos((2 * Math.PI * (j - i + windowSize)) / windowSize);
-        sum += kalmanFiltered[j] * weight * 1.5; // Amplificación de señal
+        sum += kalmanFiltered[j] * weight * 2.0; // Amplificación aumentada
         weightSum += weight;
       }
       
@@ -40,11 +40,19 @@ export class SignalFilter {
     // Aplicar filtro RC con alpha aumentado
     let lastFiltered = filtered[0];
     for (let i = 1; i < signal.length; i++) {
-      lastFiltered = lastFiltered + alpha * 1.2 * (filtered[i] - lastFiltered);
+      lastFiltered = lastFiltered + alpha * 1.5 * (filtered[i] - lastFiltered);
       filtered[i] = lastFiltered;
     }
     
-    return filtered;
+    // Amplificación adicional de picos
+    const max = Math.max(...filtered);
+    const min = Math.min(...filtered);
+    const range = max - min;
+    
+    return filtered.map(value => {
+      const normalized = (value - min) / range;
+      return value * (1 + normalized * 0.5); // Amplifica más los picos
+    });
   }
 
   private kalmanFilter(measurement: number): number {
@@ -54,7 +62,7 @@ export class SignalFilter {
     
     // Paso de actualización con ganancia aumentada
     const kalmanGain = predictedCovariance / (predictedCovariance + this.kalmanState.r);
-    this.kalmanState.x = predictedState + kalmanGain * 1.3 * (measurement - predictedState);
+    this.kalmanState.x = predictedState + kalmanGain * 1.5 * (measurement - predictedState);
     this.kalmanState.p = (1 - kalmanGain) * predictedCovariance;
     
     return this.kalmanState.x;
