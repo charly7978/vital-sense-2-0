@@ -28,18 +28,16 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
   const getDeviceConstraints = () => ({
     width: { ideal: 1280 },
     height: { ideal: 720 },
-    facingMode: isAndroid ? "environment" : "user",
+    facingMode: isAndroid ? { exact: "environment" } : "user",
     advanced: isAndroid 
       ? [
           { torch: isMeasuring },
-          { exposureMode: "manual" },
-          { exposureCompensation: -0.5 }, // Reducimos menos la exposición
-          { brightness: 0.5 }, // Aumentamos un poco el brillo
+          { zoom: 1 }
         ] 
       : [
           { exposureMode: "manual" },
-          { exposureCompensation: -0.5 },
-          { brightness: 0.5 },
+          { exposureCompensation: -1.0 },
+          { brightness: 0.3 },
         ],
   });
 
