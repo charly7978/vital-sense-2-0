@@ -114,24 +114,17 @@ export class SignalProcessor {
       return { spo2: 0, confidence: 0 };
     }
 
-    const filteredRed = this.applySmoothingFilter(this.signalFilter.lowPassFilter(redSignal, 4));
-    const filteredIr = this.applySmoothingFilter(this.signalFilter.lowPassFilter(irSignal, 4));
-
-    const windowSize = Math.min(30, filteredRed.length);
     let redAC = 0, redDC = 0, irAC = 0, irDC = 0;
-    const perfusionIndices: number[] = [];
+    const windowSize = Math.min(30, redSignal.length);
 
-    for (let i = filteredRed.length - windowSize; i < filteredRed.length; i++) {
-      const redACTemp = Math.abs(filteredRed[i] - (i > 0 ? filteredRed[i-1] : filteredRed[i]));
-      const irACTemp = Math.abs(filteredIr[i] - (i > 0 ? filteredIr[i-1] : filteredIr[i]));
+    for (let i = redSignal.length - windowSize; i < redSignal.length; i++) {
+      const redACTemp = Math.abs(redSignal[i] - (i > 0 ? redSignal[i-1] : redSignal[i]));
+      const irACTemp = Math.abs(irSignal[i] - (i > 0 ? irSignal[i-1] : irSignal[i]));
       
       redAC += redACTemp;
       irAC += irACTemp;
-      redDC += filteredRed[i];
-      irDC += filteredIr[i];
-
-      const perfusionIndex = (redACTemp / filteredRed[i]) * 100;
-      perfusionIndices.push(perfusionIndex);
+      redDC += redSignal[i];
+      irDC += irSignal[i];
     }
 
     redDC /= windowSize;
@@ -139,22 +132,22 @@ export class SignalProcessor {
     redAC /= windowSize;
     irAC /= windowSize;
 
-    const R = ((redAC * irDC) / (irAC * redDC)) * this.spO2CalibrationCoefficients.c;
+    if (irAC === 0 || irDC === 0) return { spo2: 0, confidence: 0 };
+
+    const R = (redAC * irDC) / (irAC * redDC);
     
-    let spo2 = this.spO2CalibrationCoefficients.a - 
-               (this.spO2CalibrationCoefficients.b * Math.pow(R, 1.1));
+    let spo2 = 110 - 25 * R;
+    spo2 = Math.min(100, Math.max(70, spo2));
 
-    spo2 = Math.min(Math.max(Math.round(spo2), 70), 100);
-
-    const avgPerfusionIndex = perfusionIndices.reduce((a, b) => a + b, 0) / perfusionIndices.length;
-    const signalStability = this.calculateSignalStability(perfusionIndices);
     const confidence = Math.min(
-      (avgPerfusionIndex / this.spO2CalibrationCoefficients.perfusionIndexThreshold) * 
-      signalStability * 100, 
-      100
-    );
+      (redAC / redDC) * 100,
+      (irAC / irDC) * 100
+    ) / 3;
 
-    return { spo2, confidence };
+    return { 
+      spo2: Math.round(spo2), 
+      confidence: Math.max(0, Math.min(1, confidence))
+    };
   }
 
   private calculateSignalStability(values: number[]): number {
