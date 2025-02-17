@@ -43,16 +43,16 @@ export class BeepPlayer {
 
       const currentTime = this.audioContext.currentTime;
 
-      // Frecuencia base más alta para un beep más audible
-      oscillator.frequency.value = 880; // Nota A5
+      // Frecuencia más alta y duración más corta para un beep más notorio
+      oscillator.frequency.value = 1200; // Aumentada a 1200Hz
       
       // Volumen base mucho más alto
-      const baseVolume = 0.75;
+      const baseVolume = 1.0; // Aumentado a máximo
       const finalVolume = Math.min(baseVolume * volumeMultiplier, 1.0);
 
       // Envolvente de amplitud más pronunciada
       gainNode.gain.setValueAtTime(0, currentTime);
-      gainNode.gain.linearRampToValueAtTime(finalVolume, currentTime + 0.01);
+      gainNode.gain.linearRampToValueAtTime(finalVolume, currentTime + 0.005);
       gainNode.gain.exponentialRampToValueAtTime(0.01, currentTime + 0.05);
 
       oscillator.start(currentTime);
@@ -65,6 +65,7 @@ export class BeepPlayer {
         volumen: finalVolume
       });
 
+      // Asegurar que se limpien los nodos después de reproducir
       setTimeout(() => {
         oscillator.disconnect();
         gainNode.disconnect();
