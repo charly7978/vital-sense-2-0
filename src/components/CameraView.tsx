@@ -32,7 +32,6 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
   const isAndroid = /android/i.test(navigator.userAgent);
   const beepAudio = useRef(new Audio("/beep.mp3"));
 
-  // 🔹 Asegurar que el beep suene fuerte
   useEffect(() => {
     beepAudio.current.volume = 1.0;
   }, []);
@@ -60,20 +59,31 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
     const canvas = canvasRef.current;
     const context = canvas.getContext("2d");
 
-    // 🔹 Evitar errores en getImageData
+    // 🔹 Verificar si el video tiene dimensiones correctas antes de capturar imagen
     if (!context || !video || video.readyState !== video.HAVE_ENOUGH_DATA) {
       animationFrameRef.current = requestAnimationFrame(processFrame);
       return;
     }
 
+    // 🔹 Asegurar que el canvas tenga las mismas dimensiones que el video
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
     try {
-      context.drawImage(video, 0, 0, Math.min(canvas.width, video.videoWidth), Math.min(canvas.height, video.videoHeight));
-      const frameData = context.getImageData(0, 0, Math.min(canvas.width, video.videoWidth), Math.min(canvas.height, video.videoHeight));
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const frameData = context.getImageData(0, 0, canvas.width, canvas.height);
+
+      // 🔹 Evitar procesar frames vacíos o con errores
+      if (!frameData || frameData.data.length < 4) {
+        console.warn("⚠️ Frame vacío detectado, saltando...");
+        animationFrameRef.current = requestAnimationFrame(processFrame);
+        return;
+      }
 
       const signal = calculateSignalStrength(frameData);
       setSignalStrength(signal);
 
-      if (signal < 10) { // 🔹 Aumentamos la sensibilidad de detección en Android
+      if (signal < 10) {
         setBpm(0);
         setSpo2(0);
         setQuality(0);
@@ -163,7 +173,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
 
   const playBeep = () => {
     beepAudio.current.currentTime = 0;
-    beepAudio.current.volume = 1.0; 
+    beepAudio.current.volume = 1.0;
     beepAudio.current.play();
   };
 
