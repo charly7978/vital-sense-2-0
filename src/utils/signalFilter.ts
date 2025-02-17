@@ -6,6 +6,22 @@ export class SignalFilter {
     this.sampleRate = sampleRate;
   }
 
+  lowPassFilter(signal: number[], cutoffFrequency: number): number[] {
+    const dt = 1.0 / this.sampleRate;
+    const rc = 1.0 / (cutoffFrequency * 2 * Math.PI);
+    const alpha = dt / (rc + dt);
+    
+    const filtered: number[] = [];
+    let lastValue = signal[0] || 0;
+    
+    for (let i = 0; i < signal.length; i++) {
+      lastValue = lastValue + alpha * (signal[i] - lastValue);
+      filtered.push(lastValue);
+    }
+    
+    return filtered;
+  }
+
   bandPassFilter(signal: number[], lowCutoff: number, highCutoff: number): number[] {
     const filtered: number[] = [];
     const rc1 = 1.0 / (lowCutoff * 2 * Math.PI);
@@ -14,7 +30,6 @@ export class SignalFilter {
     const alpha1 = dt / (rc1 + dt);
     const alpha2 = dt / (rc2 + dt);
     
-    // Implementar filtro pasa banda basado en Butterworth
     let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
     
     for (let i = 0; i < signal.length; i++) {
