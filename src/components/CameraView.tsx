@@ -22,10 +22,10 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
   const animationFrameRef = useRef<number | null>(null);
   const { toast } = useToast();
   const [isMeasuring, setIsMeasuring] = useState(false);
-  const [fingerDetected, setFingerDetected] = useState(false);
   const [bpm, setBpm] = useState(0);
   const [spo2, setSpo2] = useState(98);
   const [quality, setQuality] = useState(0);
+  const [signalStrength, setSignalStrength] = useState(0);
   const isMobile = useIsMobile();
   const isAndroid = /android/i.test(navigator.userAgent);
   const beepAudio = useRef(new Audio("/beep.mp3"));
@@ -56,10 +56,10 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
       context.drawImage(video, 0, 0, Math.min(canvas.width, video.videoWidth), Math.min(canvas.height, video.videoHeight));
       const frameData = context.getImageData(0, 0, Math.min(canvas.width, video.videoWidth), Math.min(canvas.height, video.videoHeight));
 
-      const isFingerDetected = detectFinger(frameData);
-      setFingerDetected(isFingerDetected);
+      const signal = calculateSignalStrength(frameData);
+      setSignalStrength(signal);
 
-      if (!isFingerDetected) {
+      if (signal < 20) {
         setBpm(0);
         setSpo2(0);
         setQuality(0);
@@ -85,9 +85,9 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
     animationFrameRef.current = requestAnimationFrame(processFrame);
   };
 
-  const detectFinger = (imageData: ImageData): boolean => {
-    let redPixels = 0;
-    let skinTonePixels = 0;
+  const calculateSignalStrength = (imageData: ImageData): number => {
+    let redIntensity = 0;
+    let totalPixels = 0;
     const data = imageData.data;
 
     for (let i = 0; i < data.length; i += 4) {
@@ -95,18 +95,13 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
       const g = data[i + 1];
       const b = data[i + 2];
 
-      // 🔹 Detectar colores de piel típicos
-      if (r > 120 && g > 40 && b > 20 && r > g * 1.5 && r > b * 1.8) {
-        skinTonePixels++;
+      if (r > 120 && g < 80 && b < 80) {
+        redIntensity += r;
       }
-
-      // 🔹 Detectar alta concentración de rojo (dedo con linterna encendida)
-      if (r > 180 && g < 80 && b < 80) {
-        redPixels++;
-      }
+      totalPixels++;
     }
 
-    return skinTonePixels > 5000 && redPixels > 2000;
+    return (redIntensity / totalPixels) * 100;
   };
 
   const analyzeVitalSigns = (imageData: ImageData) => {
@@ -178,7 +173,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
         <p>BPM: {bpm}</p>
         <p>SpO2: {spo2}%</p>
         <p>Calidad: {quality}%</p>
-        {!fingerDetected && <p style={{ color: "red" }}>⚠️ Dedo no detectado. Colóquelo correctamente.</p>}
+        <p>Señal: {signalStrength.toFixed(1)}%</p>
       </div>
     </div>
   );
