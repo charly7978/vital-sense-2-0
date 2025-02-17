@@ -28,7 +28,7 @@ const VitalsContext = createContext<VitalsContextType | undefined>(undefined);
 const beepPlayer = new BeepPlayer();
 const ppgProcessor = new PPGProcessor();
 
-const MEASUREMENT_DURATION = 30; // Restaurado el tiempo de medición
+const MEASUREMENT_DURATION = 30;
 
 export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [bpm, setBpm] = useState<number>(0);
@@ -74,7 +74,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const vitals = await ppgProcessor.processFrame(imageData);
       
       if (vitals) {
-        // ÚNICO CAMBIO: Reproducir beep cuando se detecta un pico
         if (vitals.isPeak) {
           console.log('Pico detectado - Reproduciendo beep');
           await beepPlayer.playBeep('heartbeat', vitals.signalQuality);
@@ -118,7 +117,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [isStarted, toast, resetMeasurements]);
 
-  // Restaurado el temporizador de medición
   React.useEffect(() => {
     let interval: NodeJS.Timeout;
 
