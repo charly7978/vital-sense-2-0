@@ -10,35 +10,33 @@ interface VitalChartProps {
 
 const VitalChart: React.FC<VitalChartProps> = ({ data, color = "#ea384c" }) => {
   const formattedData = useMemo(() => {
-    // Mantenemos los últimos 100 puntos para una señal más suave
-    const recentData = data.slice(-100);
+    // Solo mantenemos los últimos 30 puntos para una mejor visualización
+    const recentData = data.slice(-30);
     
     if (recentData.length === 0) return [];
-    
-    // Calculamos una media móvil para suavizar la señal
-    const smoothedData = recentData.map((reading, index) => {
-      const windowSize = 5;
-      const start = Math.max(0, index - windowSize);
-      const end = index + 1;
-      const window = recentData.slice(start, end);
-      const avgValue = window.reduce((sum, r) => sum + r.value, 0) / window.length;
-      
-      return {
-        ...reading,
-        value: avgValue
-      };
-    });
-    
-    // Normalizamos los valores después del suavizado
-    const values = smoothedData.map(r => r.value);
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const range = max - min || 1;
 
-    return smoothedData.map(reading => ({
-      timestamp: new Date(reading.timestamp).toISOString().substr(17, 6),
-      value: ((reading.value - min) / range) * 100,
-      originalValue: reading.value
+    // Suavizamos la señal con una media móvil simple
+    const smoothedData = [];
+    const windowSize = 3;
+
+    for (let i = 0; i < recentData.length; i++) {
+      const start = Math.max(0, i - windowSize + 1);
+      const window = recentData.slice(start, i + 1);
+      const avg = window.reduce((sum, r) => sum + r.value, 0) / window.length;
+      
+      smoothedData.push({
+        timestamp: recentData[i].timestamp,
+        value: avg
+      });
+    }
+
+    // Normalizamos la señal a un rango fijo
+    const minValue = -50;
+    const maxValue = 50;
+    
+    return smoothedData.map(point => ({
+      timestamp: new Date(point.timestamp).toISOString().substr(17, 6),
+      value: point.value
     }));
   }, [data]);
 
@@ -47,7 +45,7 @@ const VitalChart: React.FC<VitalChartProps> = ({ data, color = "#ea384c" }) => {
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
           data={formattedData}
-          margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
+          margin={{ top: 10, right: 10, bottom: 10, left: 10 }}
         >
           <CartesianGrid 
             strokeDasharray="3 3" 
@@ -60,14 +58,14 @@ const VitalChart: React.FC<VitalChartProps> = ({ data, color = "#ea384c" }) => {
             hide={true}
           />
           <YAxis
-            domain={[0, 100]}
+            domain={[-50, 50]}
             hide={true}
           />
           <Line
-            type="monotoneX"
+            type="linear"
             dataKey="value"
             stroke={color}
-            strokeWidth={2.5}
+            strokeWidth={2}
             dot={false}
             isAnimationActive={false}
             connectNulls
