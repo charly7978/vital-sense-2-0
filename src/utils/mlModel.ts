@@ -12,7 +12,7 @@ export class MLModel {
   private readonly maxMemoryEntries = 1000;
   private memoryBuffer: TrainingData[] = [];
   private readonly defaultValues = [25, 0.5, 0.35];
-  private isTraining: boolean = false;
+  private currentTraining: Promise<void> | null = null;
   private readonly modelConfig = {
     inputUnits: 16,
     hiddenUnits: 8,
@@ -54,50 +54,41 @@ export class MLModel {
     });
   }
 
-  async trainModel(trainingData: number[][], targetData: number[][]) {
-    if (this.isTraining) {
-      console.log("⚠ Entrenamiento en curso, ignorando nueva solicitud");
-      return;
+  private async executeTraining(trainingData: number[][], targetData: number[][]): Promise<void> {
+    const newData: TrainingData[] = trainingData.map((input, index) => ({
+      input,
+      output: targetData[index]
+    }));
+
+    this.memoryBuffer.push(...newData);
+
+    if (this.memoryBuffer.length > this.maxMemoryEntries) {
+      this.memoryBuffer = this.memoryBuffer.slice(-this.maxMemoryEntries);
     }
 
-    if (trainingData.length < 10) {
-      console.log("⚠ Datos insuficientes para entrenar");
-      return;
-    }
+    const shuffleArray = <T>(array: T[]): T[] => {
+      const shuffled = [...array];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      return shuffled;
+    };
+
+    const shuffledData = shuffleArray(this.memoryBuffer);
+    const inputData = shuffledData.map(d => d.input);
+    const outputData = shuffledData.map(d => d.output);
+
+    let tensors: { xs: tf.Tensor2D; ys: tf.Tensor2D } | null = null;
 
     try {
-      this.isTraining = true;
-      console.log("✓ Iniciando entrenamiento del modelo");
-
-      const newData: TrainingData[] = trainingData.map((input, index) => ({
-        input,
-        output: targetData[index]
-      }));
-
-      this.memoryBuffer.push(...newData);
-
-      if (this.memoryBuffer.length > this.maxMemoryEntries) {
-        this.memoryBuffer = this.memoryBuffer.slice(-this.maxMemoryEntries);
-      }
-
-      const shuffleArray = <T>(array: T[]): T[] => {
-        const shuffled = [...array];
-        for (let i = shuffled.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-        }
-        return shuffled;
+      tensors = {
+        xs: tf.tensor2d(inputData),
+        ys: tf.tensor2d(outputData)
       };
 
-      const shuffledData = shuffleArray(this.memoryBuffer);
-      const inputData = shuffledData.map(d => d.input);
-      const outputData = shuffledData.map(d => d.output);
-
-      const xs = tf.tensor2d(inputData);
-      const ys = tf.tensor2d(outputData);
-
       await tf.engine().startScope();
-      const history = await this.model.fit(xs, ys, { 
+      const history = await this.model.fit(tensors.xs, tensors.ys, { 
         epochs: 50,
         batchSize: 32,
         validationSplit: 0.2,
@@ -122,15 +113,37 @@ export class MLModel {
         finalMSE: history.history.mse[history.history.mse.length - 1]
       });
 
-      xs.dispose();
-      ys.dispose();
+    } finally {
+      if (tensors) {
+        tensors.xs.dispose();
+        tensors.ys.dispose();
+      }
       await tf.engine().endScope();
+    }
+  }
+
+  async trainModel(trainingData: number[][], targetData: number[][]): Promise<void> {
+    if (trainingData.length < 10) {
+      console.log("⚠ Datos insuficientes para entrenar");
+      return;
+    }
+
+    try {
+      // Si hay un entrenamiento en curso, esperamos a que termine
+      if (this.currentTraining) {
+        console.log("⚠ Esperando a que termine el entrenamiento anterior...");
+        await this.currentTraining;
+      }
+
+      console.log("✓ Iniciando nuevo entrenamiento del modelo");
+      this.currentTraining = this.executeTraining(trainingData, targetData);
+      await this.currentTraining;
 
     } catch (error) {
       console.error("Error entrenando modelo:", error);
       this.handleModelError(error);
     } finally {
-      this.isTraining = false;
+      this.currentTraining = null;
     }
   }
 
@@ -140,7 +153,7 @@ export class MLModel {
       stack: error.stack,
       modelState: this.isTrained ? "Entrenado" : "No entrenado",
       memoryBufferSize: this.memoryBuffer.length,
-      isTraining: this.isTraining
+      isTraining: this.currentTraining !== null
     });
   }
 
@@ -196,14 +209,14 @@ export class MLModel {
   clearMemory() {
     this.memoryBuffer = [];
     this.isTrained = false;
-    this.isTraining = false;
+    this.currentTraining = null;
     console.log("Memoria del modelo limpiada");
   }
 
   getModelStats(): object {
     return {
       isTrained: this.isTrained,
-      isTraining: this.isTraining,
+      isTraining: this.currentTraining !== null,
       memoryBufferSize: this.memoryBuffer.length,
       modelConfig: this.modelConfig,
       defaultValues: this.defaultValues
