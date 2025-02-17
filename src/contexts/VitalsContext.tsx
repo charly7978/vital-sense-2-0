@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 import { BeepPlayer } from '../utils/audioUtils';
 import { PPGProcessor } from '../utils/ppgProcessor';
 import { useToast } from "@/hooks/use-toast";
@@ -28,7 +28,7 @@ const VitalsContext = createContext<VitalsContextType | undefined>(undefined);
 const beepPlayer = new BeepPlayer();
 const ppgProcessor = new PPGProcessor();
 
-const MEASUREMENT_DURATION = 30;
+const MEASUREMENT_DURATION = 30; // Restaurado el tiempo de medición
 
 export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [bpm, setBpm] = useState<number>(0);
@@ -50,20 +50,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   });
 
   const { toast } = useToast();
-
-  // Nuevo efecto para inicializar el audio al inicio
-  useEffect(() => {
-    const initAudio = async () => {
-      try {
-        await beepPlayer.playBeep('success', 0.1);
-        console.log('✓ Audio inicializado correctamente');
-      } catch (error) {
-        console.error('Error inicializando audio:', error);
-      }
-    };
-
-    initAudio();
-  }, []);
 
   const resetMeasurements = useCallback(() => {
     setBpm(0);
@@ -88,18 +74,10 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const vitals = await ppgProcessor.processFrame(imageData);
       
       if (vitals) {
+        // ÚNICO CAMBIO: Reproducir beep cuando se detecta un pico
         if (vitals.isPeak) {
-          console.log('🫀 Pico detectado - Intentando reproducir beep');
-          try {
-            await beepPlayer.playBeep('heartbeat', vitals.signalQuality);
-          } catch (error) {
-            console.error('Error reproduciendo beep:', error);
-            toast({
-              variant: "destructive",
-              title: "Error de audio",
-              description: "No se pudo reproducir el sonido. Intente recargar la página."
-            });
-          }
+          console.log('Pico detectado - Reproduciendo beep');
+          await beepPlayer.playBeep('heartbeat', vitals.signalQuality);
         }
 
         if (vitals.bpm > 0) setBpm(vitals.bpm);
@@ -133,15 +111,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       resetMeasurements();
       setIsStarted(true);
       setMeasurementStartTime(Date.now());
-      // Intentar inicializar el audio al comenzar la medición
-      beepPlayer.playBeep('success', 0.1).catch(error => {
-        console.error('Error inicializando audio:', error);
-        toast({
-          variant: "destructive",
-          title: "Error de audio",
-          description: "No se pudo inicializar el audio. Intente recargar la página."
-        });
-      });
       toast({
         title: "Iniciando medición",
         description: "Por favor, mantenga su dedo frente a la cámara."
@@ -149,6 +118,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [isStarted, toast, resetMeasurements]);
 
+  // Restaurado el temporizador de medición
   React.useEffect(() => {
     let interval: NodeJS.Timeout;
 

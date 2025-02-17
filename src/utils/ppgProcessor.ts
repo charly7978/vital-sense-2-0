@@ -1,3 +1,4 @@
+
 import { VitalReading, PPGData, SensitivitySettings, ProcessingSettings } from './types';
 import { BeepPlayer } from './audioUtils';
 import { SignalProcessor } from './signalProcessing';
@@ -184,7 +185,20 @@ export class PPGProcessor {
     
     const { red, ir, quality } = this.signalExtractor.extractChannels(imageData);
     
+    console.log('Estado del sensor:', {
+      detectandoDedo: red > this.processingSettings.MIN_RED_VALUE,
+      valorRojo: red.toFixed(2),
+      umbralMinimo: this.processingSettings.MIN_RED_VALUE,
+      calidadSenal: (quality * 100).toFixed(1) + '%'
+    });
+    
     if (quality < this.qualityThreshold || red < this.processingSettings.MIN_RED_VALUE) {
+      console.log('❌ No se detecta dedo o señal de baja calidad:', { 
+        red: red.toFixed(2), 
+        calidad: (quality * 100).toFixed(1) + '%',
+        umbralCalidad: (this.qualityThreshold * 100).toFixed(1) + '%',
+        umbralRojo: this.processingSettings.MIN_RED_VALUE
+      });
       this.redBuffer = [];
       this.irBuffer = [];
       this.readings = [];
@@ -225,43 +239,43 @@ export class PPGProcessor {
     const normalizedValue = this.signalNormalizer.normalizeSignal(
       filteredRed[filteredRed.length - 1]
     );
+    
+    // Actualizar lecturas y gráfico primero
+    this.readings.push({ timestamp: now, value: normalizedValue });
+    if (this.readings.length > this.windowSize) {
+      this.readings = this.readings.slice(-this.windowSize);
+    }
 
     this.signalBuffer.push(normalizedValue);
     if (this.signalBuffer.length > this.bufferSize) {
       this.signalBuffer.shift();
     }
 
+    // Detectar pico y reproducir beep de manera sincronizada
     const isPeak = this.peakDetector.isRealPeak(normalizedValue, now, this.signalBuffer);
 
     if (isPeak) {
-      this.readings.unshift({ timestamp: now, value: normalizedValue });
-      if (this.readings.length > this.windowSize) {
-        this.readings.pop();
-      }
-      
       this.peakTimes.push(now);
+      
+      // Asegurar que solo mantenemos los últimos 10 picos
       if (this.peakTimes.length > 10) {
         this.peakTimes.shift();
       }
       
+      // Reproducir beep inmediatamente después de detectar el pico
       try {
         await this.beepPlayer.playBeep('heartbeat', quality);
-        console.log('🫀 Pico detectado + Beep reproducido + Gráfico actualizado:', {
+        console.log('🫀 Pico detectado + Beep reproducido:', {
           tiempo: now,
           valorPico: normalizedValue,
-          calidadSenal: quality,
-          lecturasTotales: this.readings.length
+          calidadSenal: quality
         });
       } catch (err) {
         console.error('Error al reproducir beep:', err);
       }
-    } else {
-      this.readings.push({ timestamp: now, value: normalizedValue });
-      if (this.readings.length > this.windowSize) {
-        this.readings.shift();
-      }
     }
 
+    // Calcular métricas
     const { frequencies, magnitudes } = this.frequencyAnalyzer.performFFT(filteredRed);
     const dominantFreqIndex = magnitudes.indexOf(Math.max(...magnitudes));
     const dominantFreq = frequencies[dominantFreqIndex];
@@ -274,6 +288,7 @@ export class PPGProcessor {
     const signalQuality = this.signalProcessor.analyzeSignalQuality(filteredRed);
     const validatedVitals = this.validateVitalSigns(calculatedBpm, bp.systolic, bp.diastolic);
 
+    // Actualización de ML cada 30 frames
     if (this.frameCount % 30 === 0 && validatedVitals.bpm > 0) {
       this.saveTrainingData(validatedVitals.bpm, spo2Result.spo2, signalQuality);
       await this.trainMLModel();
