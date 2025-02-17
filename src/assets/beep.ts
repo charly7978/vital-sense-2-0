@@ -11,13 +11,13 @@ export const playBeep = (type: 'heartbeat' | 'warning' | 'success' = 'heartbeat'
   // Configurar frecuencias para diferentes tipos de sonido
   switch (type) {
     case 'heartbeat':
-      oscillator.frequency.value = 40; // Frecuencia más baja para sonido de latido
+      oscillator.frequency.value = 150; // Frecuencia más grave para simular latido
       break;
     case 'warning':
-      oscillator.frequency.value = 440; // La4 (A4)
+      oscillator.frequency.value = 440;
       break;
     case 'success':
-      oscillator.frequency.value = 880; // La5 (A5)
+      oscillator.frequency.value = 880;
       break;
   }
 
@@ -25,18 +25,18 @@ export const playBeep = (type: 'heartbeat' | 'warning' | 'success' = 'heartbeat'
   gainNode.gain.setValueAtTime(0, now);
 
   if (type === 'heartbeat') {
-    // Primer beat (lub)
-    gainNode.gain.linearRampToValueAtTime(0.5, now + 0.01);
+    // Primer beat (lub) - más fuerte
+    gainNode.gain.linearRampToValueAtTime(0.8, now + 0.01);
     gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
     
     // Pausa breve
     gainNode.gain.linearRampToValueAtTime(0.001, now + 0.15);
     
-    // Segundo beat (dub)
-    gainNode.gain.linearRampToValueAtTime(0.3, now + 0.16);
+    // Segundo beat (dub) - más suave
+    gainNode.gain.linearRampToValueAtTime(0.4, now + 0.16);
     gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
   } else {
-    gainNode.gain.linearRampToValueAtTime(0.3, now + 0.01);
+    gainNode.gain.linearRampToValueAtTime(0.5, now + 0.01);
     gainNode.gain.linearRampToValueAtTime(0, type === 'warning' ? now + 0.3 : now + 0.15);
   }
 
@@ -49,4 +49,3 @@ export const playBeep = (type: 'heartbeat' | 'warning' | 'success' = 'heartbeat'
     gainNode.disconnect();
   }, 500);
 };
-
