@@ -10,22 +10,24 @@ interface VitalChartProps {
 
 const VitalChart: React.FC<VitalChartProps> = ({ data, color = "#ea384c" }) => {
   const formattedData = useMemo(() => {
-    // Mostramos los últimos 100 puntos para mejor visualización de la actividad cardíaca
-    const recentData = data.slice(-100);
+    // Mantenemos más puntos para una visualización más fluida
+    const recentData = data.slice(-200);
     return recentData.map(reading => ({
       timestamp: new Date(reading.timestamp).toISOString().substr(17, 6),
-      value: reading.value * 2 // Amplificamos la señal para mejor visibilidad
+      // Normalizamos y amplificamos la señal para que se vea mejor
+      value: reading.value * 3
     }));
   }, [data]);
 
-  // Calculamos el rango dinámico para el eje Y
+  // Calculamos el rango dinámico para el eje Y con más espacio para la señal
   const yDomain = useMemo(() => {
     if (formattedData.length === 0) return [-1, 1];
     const values = formattedData.map(d => d.value);
     const min = Math.min(...values);
     const max = Math.max(...values);
-    const padding = (max - min) * 0.2;
-    return [min - padding, max + padding];
+    const range = max - min;
+    // Añadimos más padding para ver mejor los picos
+    return [min - range * 0.3, max + range * 0.3];
   }, [formattedData]);
 
   return (
@@ -40,23 +42,24 @@ const VitalChart: React.FC<VitalChartProps> = ({ data, color = "#ea384c" }) => {
             dataKey="timestamp" 
             stroke="#ffffff60"
             tick={{ fill: '#ffffff60', fontSize: 10 }}
-            interval={10}
-            minTickGap={20}
+            interval={15}
+            minTickGap={30}
+            hide // Ocultamos el eje X para que se vea más como un ECG
           />
           <YAxis 
             stroke="#ffffff60"
             tick={{ fill: '#ffffff60', fontSize: 10 }}
             domain={yDomain}
             scale="linear"
+            hide // Ocultamos el eje Y para que se vea más como un ECG
           />
           <Line
-            type="monotone"
+            type="basis" // Cambiamos a "basis" para una curva más suave
             dataKey="value"
             stroke={color}
-            strokeWidth={2.5}
+            strokeWidth={2}
             dot={false}
-            isAnimationActive={true}
-            animationDuration={200}
+            isAnimationActive={false} // Desactivamos la animación para mayor fluidez
             connectNulls={true}
           />
         </LineChart>
