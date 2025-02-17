@@ -37,9 +37,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
       ? [
           {
             torch: isMeasuring,
-            zoom: 1,
-            exposureMode: "manual",
-            exposureCompensation: -0.5 // Un valor más suave para Android
+            zoom: 1
           }
         ] 
       : [
