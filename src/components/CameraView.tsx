@@ -33,70 +33,73 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
   });
 
   const processFrame = () => {
-    if (!isActive) {
+    if (!isActive || !webcamRef.current?.video || !canvasRef.current) {
       return;
     }
 
-    const video = webcamRef.current?.video;
+    const video = webcamRef.current.video;
     const canvas = canvasRef.current;
-    const context = canvas?.getContext('2d');
+    const context = canvas.getContext('2d');
 
-    if (!video || !canvas || !context || video.readyState !== video.HAVE_ENOUGH_DATA) {
+    if (!context || video.readyState !== video.HAVE_ENOUGH_DATA) {
       animationFrameRef.current = requestAnimationFrame(processFrame);
       return;
     }
 
     try {
-      // Ajustar el tamaño del canvas al video
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-
-      // Dibujar el frame en el canvas
       context.drawImage(video, 0, 0);
-
-      // Obtener los datos de la imagen
       const frameData = context.getImageData(0, 0, canvas.width, canvas.height);
       
-      // Procesar el frame solo si hay datos válidos
       if (frameData && frameData.data.length > 0) {
         onFrame(frameData);
       }
     } catch (error) {
       console.error("Error al procesar frame:", error);
-      toast({
-        variant: "destructive",
-        title: "Error de cámara",
-        description: "Hubo un problema al procesar la imagen de la cámara."
-      });
+      // Solo mostramos el toast si el error no es por detener la medición
+      if (isActive) {
+        toast({
+          variant: "destructive",
+          title: "Error de cámara",
+          description: "Hubo un problema al procesar la imagen de la cámara."
+        });
+      }
     }
 
-    // Continuar el ciclo de procesamiento
     if (isActive) {
       animationFrameRef.current = requestAnimationFrame(processFrame);
     }
   };
 
+  const stopCamera = () => {
+    if (webcamRef.current?.video?.srcObject) {
+      const tracks = (webcamRef.current.video.srcObject as MediaStream).getTracks();
+      tracks.forEach(track => track.stop());
+    }
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    setIsMeasuring(false);
+  };
+
   useEffect(() => {
-    // Iniciar o detener el procesamiento según isActive
     if (isActive) {
       setIsMeasuring(true);
       processFrame();
     } else {
-      setIsMeasuring(false);
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
+      stopCamera();
     }
 
-    // Limpieza al desmontar
     return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
+      stopCamera();
     };
   }, [isActive]);
+
+  if (!isActive) {
+    return null;
+  }
 
   return (
     <div className="relative w-full">
