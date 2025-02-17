@@ -37,7 +37,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
       ? [
           {
             torch: isMeasuring,
-            zoom: 1.5 // Aumentado el zoom para reducir la luz que entra
+            zoom: 1
           }
         ] 
       : [
