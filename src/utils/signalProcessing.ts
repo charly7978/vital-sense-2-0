@@ -114,14 +114,6 @@ export class SignalProcessor {
       return { spo2: 0, confidence: 0 };
     }
 
-    const redMean = redSignal.reduce((a, b) => a + b, 0) / redSignal.length;
-    const irMean = irSignal.reduce((a, b) => a + b, 0) / irSignal.length;
-    
-    if (redMean < 0.1 || irMean < 0.1) {
-      console.log('⚠️ Señal PPG muy débil:', { red: redMean, ir: irMean });
-      return { spo2: 0, confidence: 0 };
-    }
-
     let redAC = 0, redDC = 0, irAC = 0, irDC = 0;
     const windowSize = Math.min(30, redSignal.length);
 
@@ -144,8 +136,7 @@ export class SignalProcessor {
 
     const R = (redAC * irDC) / (irAC * redDC);
     
-    if (R < 0.1 || R > 10) {
-      console.log('⚠️ Ratio R fuera de rango:', R);
+    if (R < 0.05 || R > 15) {
       return { spo2: 0, confidence: 0 };
     }
 
@@ -157,8 +148,7 @@ export class SignalProcessor {
       (irAC / irDC) * 100
     ) / 3;
 
-    if (confidence < 0.2) {
-      console.log('⚠️ Confianza muy baja:', confidence);
+    if (confidence < 0.1) {
       return { spo2: 0, confidence: 0 };
     }
 
@@ -180,24 +170,19 @@ export class SignalProcessor {
     const minPeakDistance = Math.floor(this.sampleRate * 0.3); // 300ms mínimo entre picos
     let lastPeakIndex = -minPeakDistance;
 
-    const signalStrength = intervals.reduce((a, b) => a + Math.abs(b), 0) / intervals.length;
-    if (signalStrength < 0.1) {
-      console.log('⚠️ Señal demasiado débil:', signalStrength);
-      return 0;
-    }
-
     const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
     const stdDev = Math.sqrt(
       intervals.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / intervals.length
     );
-    threshold = mean + 0.25 * stdDev;
+    
+    threshold = mean + 0.15 * stdDev;
 
     for (let i = 2; i < intervals.length - 2; i++) {
       if (
         i - lastPeakIndex >= minPeakDistance &&
         intervals[i] > threshold &&
-        intervals[i] > intervals[i - 1] * 1.1 &&
-        intervals[i] > intervals[i + 1] * 1.1 &&
+        intervals[i] > intervals[i - 1] * 1.05 &&
+        intervals[i] > intervals[i + 1] * 1.05 &&
         intervals[i] > intervals[i - 2] &&
         intervals[i] > intervals[i + 2]
       ) {
@@ -207,19 +192,18 @@ export class SignalProcessor {
         const localMean = intervals
           .slice(Math.max(0, i - 5), Math.min(intervals.length, i + 6))
           .reduce((a, b) => a + b, 0) / 11;
-        threshold = localMean * 0.5;
+        threshold = localMean * 0.4;
       }
     }
 
     const timeWindow = intervals.length / this.sampleRate;
     const bpm = (peaks * 60) / timeWindow;
 
-    if (bpm < 40 || bpm > 200) {
-      console.log('⚠️ BPM fuera de rango:', bpm);
-      return 0;
+    if (peaks > 0 && bpm >= 40 && bpm <= 200) {
+      return Math.round(bpm);
     }
 
-    return Math.round(bpm);
+    return 0;
   }
 
   estimateBloodPressure(signal: number[], peakTimes: number[]): { systolic: number; diastolic: number } {
