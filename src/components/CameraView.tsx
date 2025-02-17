@@ -50,9 +50,11 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive }) => {
           // Usar type assertion para acceder a torch
           const capabilities = track.getCapabilities() as any;
           if (isAndroid && capabilities?.torch) {
-            await track.applyConstraints({
+            const torchConstraints = {
               advanced: [{ torch: true }]
-            } as MediaTrackConstraints);
+            } as unknown as MediaTrackConstraints;
+            
+            await track.applyConstraints(torchConstraints);
             console.log('✓ Linterna activada');
           }
         }
