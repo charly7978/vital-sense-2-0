@@ -26,60 +26,61 @@ const SignalQualityIndicator: React.FC<SignalQualityIndicatorProps> = ({
   const getSignalQualityIndicator = () => {
     if (measurementQuality === 0) {
       return (
-        <div className="flex items-center space-x-2 text-gray-400 animate-pulse">
-          <Hand className="w-6 h-6" />
-          <span>No se detecta el dedo</span>
+        <div className="flex items-center space-x-1">
+          <Hand className="w-3 h-3" />
+          <span className="text-[9px]">No señal</span>
         </div>
       );
     }
     
     if (measurementQuality < 0.3) {
       return (
-        <div className="flex items-center space-x-2 text-red-500">
-          <SignalLow className="w-6 h-6" />
-          <span>Señal débil - Ajuste la posición del dedo</span>
+        <div className="flex items-center space-x-1">
+          <SignalLow className="w-3 h-3" />
+          <span className="text-[9px]">Baja</span>
         </div>
       );
     }
     
     if (measurementQuality < 0.6) {
       return (
-        <div className="flex items-center space-x-2 text-yellow-500">
-          <SignalMedium className="w-6 h-6" />
-          <span>Señal regular - Mantenga el dedo quieto</span>
+        <div className="flex items-center space-x-1">
+          <SignalMedium className="w-3 h-3" />
+          <span className="text-[9px]">Regular</span>
         </div>
       );
     }
     
     return (
-      <div className="flex items-center space-x-2 text-green-500">
-        <SignalHigh className="w-6 h-6 animate-pulse" />
-        <span>Señal excelente</span>
+      <div className="flex items-center space-x-1">
+        <SignalHigh className="w-3 h-3" />
+        <span className="text-[9px]">Excelente</span>
       </div>
     );
   };
 
   return (
     <>
-      <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4">
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm text-gray-400">
-            <span>Progreso de la medición</span>
-            <span>{Math.round(measurementProgress)}%</span>
+      <div className="flex justify-between space-x-2">
+        {/* Progreso de medición */}
+        <div className="flex-1">
+          <div className="space-y-0.5">
+            <div className="flex items-center justify-between text-[9px] text-gray-400">
+              <span>Progreso</span>
+              <span>{Math.round(measurementProgress)}%</span>
+            </div>
+            <Progress value={measurementProgress} className="h-1" />
           </div>
-          <Progress value={measurementProgress} className="h-2" />
         </div>
-      </div>
 
-      <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4">
-        <div className="space-y-4">
-          {getSignalQualityIndicator()}
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm text-gray-400">
-              <span>Calidad de la señal</span>
+        {/* Calidad de señal */}
+        <div className="flex-1">
+          <div className="space-y-0.5">
+            <div className="flex items-center justify-between text-[9px] text-gray-400">
+              <span>Calidad</span>
               <span>{Math.round(measurementQuality * 100)}%</span>
             </div>
-            <div className="h-2 bg-black/20 rounded-full overflow-hidden">
+            <div className="h-1 bg-black/20 rounded-full overflow-hidden">
               <div 
                 className={cn(
                   "h-full transition-all duration-300 ease-in-out",
