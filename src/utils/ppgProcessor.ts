@@ -1,4 +1,3 @@
-
 import { VitalReading, PPGData, SensitivitySettings, ProcessingSettings } from './types';
 import { BeepPlayer } from './audioUtils';
 import { SignalProcessor } from './signalProcessing';
@@ -72,18 +71,12 @@ export class PPGProcessor {
     systolic: number;
     diastolic: number;
   } {
-    // Validar BPM (40-200 es un rango normal para humanos)
     const validBpm = bpm >= 40 && bpm <= 200 ? bpm : this.lastValidBpm || 0;
-    
-    // Validar presión sistólica (90-180 es un rango normal)
     const validSystolic = systolic >= 90 && systolic <= 180 ? 
       systolic : this.lastValidSystolic;
-    
-    // Validar presión diastólica (60-120 es un rango normal)
     const validDiastolic = diastolic >= 60 && diastolic <= 120 ? 
       diastolic : this.lastValidDiastolic;
     
-    // Asegurar que sistólica > diastólica
     if (validSystolic <= validDiastolic) {
       return {
         bpm: validBpm,
@@ -92,7 +85,6 @@ export class PPGProcessor {
       };
     }
 
-    // Actualizar últimos valores válidos
     this.lastValidBpm = validBpm;
     this.lastValidSystolic = validSystolic;
     this.lastValidDiastolic = validDiastolic;
@@ -240,7 +232,6 @@ export class PPGProcessor {
       filteredRed[filteredRed.length - 1]
     );
     
-    // Actualizar lecturas y gráfico primero
     this.readings.push({ timestamp: now, value: normalizedValue });
     if (this.readings.length > this.windowSize) {
       this.readings = this.readings.slice(-this.windowSize);
@@ -251,20 +242,16 @@ export class PPGProcessor {
       this.signalBuffer.shift();
     }
 
-    // Detectar pico y reproducir beep de manera sincronizada
     const isPeak = this.peakDetector.isRealPeak(normalizedValue, now, this.signalBuffer);
 
     if (isPeak) {
       this.peakTimes.push(now);
-      
-      // Asegurar que solo mantenemos los últimos 10 picos
       if (this.peakTimes.length > 10) {
         this.peakTimes.shift();
       }
       
-      // Reproducir beep inmediatamente después de detectar el pico
       try {
-        await this.beepPlayer.playBeep('heartbeat', quality);
+        await this.beepPlayer.playBeep('heartbeat', 5.0);
         console.log('🫀 Pico detectado + Beep reproducido:', {
           tiempo: now,
           valorPico: normalizedValue,
@@ -275,7 +262,6 @@ export class PPGProcessor {
       }
     }
 
-    // Calcular métricas
     const { frequencies, magnitudes } = this.frequencyAnalyzer.performFFT(filteredRed);
     const dominantFreqIndex = magnitudes.indexOf(Math.max(...magnitudes));
     const dominantFreq = frequencies[dominantFreqIndex];
@@ -288,7 +274,6 @@ export class PPGProcessor {
     const signalQuality = this.signalProcessor.analyzeSignalQuality(filteredRed);
     const validatedVitals = this.validateVitalSigns(calculatedBpm, bp.systolic, bp.diastolic);
 
-    // Actualización de ML cada 30 frames
     if (this.frameCount % 30 === 0 && validatedVitals.bpm > 0) {
       this.saveTrainingData(validatedVitals.bpm, spo2Result.spo2, signalQuality);
       await this.trainMLModel();

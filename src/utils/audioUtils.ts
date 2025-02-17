@@ -2,7 +2,7 @@
 export class BeepPlayer {
   private audioContext: AudioContext | null = null;
   private lastBeepTime: number = 0;
-  private readonly minBeepInterval = 300; // Mínimo intervalo entre beeps en ms
+  private readonly minBeepInterval = 300;
 
   constructor() {
     this.initAudioContext();
@@ -18,7 +18,7 @@ export class BeepPlayer {
     }
   }
 
-  async playBeep(type: 'heartbeat' | 'warning' | 'success' = 'heartbeat', quality: number = 1) {
+  async playBeep(type: 'heartbeat' | 'warning' | 'success' = 'heartbeat', volumeMultiplier: number = 1) {
     const now = Date.now();
     if (now - this.lastBeepTime < this.minBeepInterval) {
       console.log('⚠ Beep ignorado: demasiado pronto');
@@ -38,32 +38,22 @@ export class BeepPlayer {
       const oscillator = this.audioContext.createOscillator();
       const gainNode = this.audioContext.createGain();
 
-      // Crear un nodo de compresión para aumentar la ganancia
-      const compressor = this.audioContext.createDynamicsCompressor();
-      compressor.threshold.setValueAtTime(-50, this.audioContext.currentTime);
-      compressor.knee.setValueAtTime(40, this.audioContext.currentTime);
-      compressor.ratio.setValueAtTime(12, this.audioContext.currentTime);
-      compressor.attack.setValueAtTime(0, this.audioContext.currentTime);
-      compressor.release.setValueAtTime(0.25, this.audioContext.currentTime);
-
-      // Conectar los nodos en cadena
       oscillator.connect(gainNode);
-      gainNode.connect(compressor);
-      compressor.connect(this.audioContext.destination);
+      gainNode.connect(this.audioContext.destination);
 
       const currentTime = this.audioContext.currentTime;
 
-      // Ajustar frecuencia según la calidad de la señal
-      const baseFrequency = 150;
-      oscillator.frequency.value = baseFrequency + (quality * 50);
+      // Frecuencia base más alta para un beep más audible
+      oscillator.frequency.value = 880; // Nota A5
       
-      // Aumentar significativamente el volumen
-      const volume = Math.min(3.0, Math.max(2.0, quality * 2.5));
+      // Volumen base mucho más alto
+      const baseVolume = 0.75;
+      const finalVolume = Math.min(baseVolume * volumeMultiplier, 1.0);
 
-      // Configurar la envolvente del sonido con más volumen
+      // Envolvente de amplitud más pronunciada
       gainNode.gain.setValueAtTime(0, currentTime);
-      gainNode.gain.linearRampToValueAtTime(volume, currentTime + 0.01);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.05);
+      gainNode.gain.linearRampToValueAtTime(finalVolume, currentTime + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, currentTime + 0.05);
 
       oscillator.start(currentTime);
       oscillator.stop(currentTime + 0.05);
@@ -72,15 +62,12 @@ export class BeepPlayer {
       console.log('♥ Beep reproducido:', {
         tiempo: now,
         frecuencia: oscillator.frequency.value,
-        volumen: volume,
-        calidad: quality
+        volumen: finalVolume
       });
 
-      // Limpiar después de que el sonido termine
       setTimeout(() => {
         oscillator.disconnect();
         gainNode.disconnect();
-        compressor.disconnect();
       }, 100);
 
     } catch (error) {
