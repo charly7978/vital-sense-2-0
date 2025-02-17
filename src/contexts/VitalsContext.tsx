@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { BeepPlayer } from '../utils/audioUtils';
 import { PPGProcessor } from '../utils/ppgProcessor';
@@ -74,23 +73,29 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const vitals = await ppgProcessor.processFrame(imageData);
       
       if (vitals) {
-        // ÚNICO CAMBIO: Reproducir beep cuando se detecta un pico
-        if (vitals.isPeak) {
+        // Reproducir beep cuando se detecta un pico
+        if (vitals.isPeak && vitals.signalQuality > 0.3) { // Solo reproducir si la calidad es suficiente
           console.log('Pico detectado - Reproduciendo beep');
           await beepPlayer.playBeep('heartbeat', vitals.signalQuality);
         }
 
-        if (vitals.bpm > 0) setBpm(vitals.bpm);
-        if (vitals.spo2 > 0) setSpo2(vitals.spo2);
-        if (vitals.systolic > 0 && vitals.diastolic > 0) {
-          setSystolic(vitals.systolic);
-          setDiastolic(vitals.diastolic);
+        // Actualizar valores solo si hay señal válida
+        if (vitals.signalQuality > 0) {
+          if (vitals.bpm > 0) setBpm(vitals.bpm);
+          if (vitals.spo2 > 0) setSpo2(vitals.spo2);
+          if (vitals.systolic > 0 && vitals.diastolic > 0) {
+            setSystolic(vitals.systolic);
+            setDiastolic(vitals.diastolic);
+          }
+          
+          setHasArrhythmia(vitals.hasArrhythmia);
+          setArrhythmiaType(vitals.arrhythmiaType);
+          setReadings(ppgProcessor.getReadings());
+          setMeasurementQuality(vitals.signalQuality);
+        } else {
+          // Resetear valores cuando no hay señal válida
+          resetMeasurements();
         }
-        
-        setHasArrhythmia(vitals.hasArrhythmia);
-        setArrhythmiaType(vitals.arrhythmiaType);
-        setReadings(ppgProcessor.getReadings());
-        setMeasurementQuality(vitals.signalQuality);
       }
     } catch (error) {
       console.error('Error procesando frame:', error);
@@ -100,7 +105,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         description: "Error al procesar la imagen de la cámara."
       });
     }
-  }, [isStarted, toast]);
+  }, [isStarted, toast, resetMeasurements]);
 
   const toggleMeasurement = useCallback(() => {
     if (isStarted) {
