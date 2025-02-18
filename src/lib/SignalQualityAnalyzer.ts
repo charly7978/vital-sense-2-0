@@ -1,5 +1,3 @@
-// src/lib/SignalQualityAnalyzer.ts
-
 import { SignalQualityLevel, SensitivitySettings } from '@/types';
 
 export class SignalQualityAnalyzer {
@@ -33,23 +31,23 @@ export class SignalQualityAnalyzer {
     }
   };
 
-  // Buffers y estado
-  private readonly signalBuffer: Float32Array;
-  private readonly qualityHistory: number[] = [];
-  private readonly motionHistory: number[] = [];
-  private readonly frequencyHistory: number[] = [];
-  private readonly maxHistoryLength = 90; // 3 segundos @ 30Hz
-
-  // Análisis espectral
-  private readonly fftSize = 256;
+  private buffer: Float32Array;
+  private qualityHistory: number[];
+  private baselineNoise: number;
+  private lastUpdate: number;
   private readonly hannWindow: Float32Array;
   private readonly fft: FFTAnalyzer;
+  private readonly fftSize = 256;
 
-  constructor(private settings: SensitivitySettings) {
-    this.signalBuffer = new Float32Array(this.config.windowSize);
-    this.hannWindow = this.createHannWindow();
-    this.fft = new FFTAnalyzer(this.fftSize);
-    this.initializeAnalyzer();
+  constructor() {
+    this.buffer = new Float32Array(this.config.windowSize);
+    this.initializeAnalyzer();  // <-- Este es el cambio importante
+  }
+
+  private initializeAnalyzer(): void {
+    this.qualityHistory = new Array(10).fill(0);
+    this.baselineNoise = 0.1;
+    this.lastUpdate = Date.now();
   }
 
   public analyzeQuality(signal: Float32Array): SignalQualityLevel {
@@ -80,7 +78,7 @@ export class SignalQualityAnalyzer {
     harmonics: number[];
   } {
     // Preparar señal para análisis
-    const windowedSignal = this.applyWindow(this.signalBuffer);
+    const windowedSignal = this.applyWindow(this.buffer);
     
     // Análisis espectral
     const spectrum = this.fft.forward(windowedSignal);
@@ -242,14 +240,14 @@ export class SignalQualityAnalyzer {
 
   private updateBuffer(newData: Float32Array): void {
     // Desplazar datos existentes
-    this.signalBuffer.set(
-      this.signalBuffer.subarray(newData.length),
+    this.buffer.set(
+      this.buffer.subarray(newData.length),
       0
     );
     // Añadir nuevos datos
-    this.signalBuffer.set(
+    this.buffer.set(
       newData,
-      this.signalBuffer.length - newData.length
+      this.buffer.length - newData.length
     );
   }
 
