@@ -24,6 +24,127 @@ export class SignalProcessor {
     this.waveletAnalyzer = new WaveletAnalyzer();
     this.signalFilter = new SignalFilter();
     this.qualityAnalyzer = new SignalQualityAnalyzer();
+    
+    // Inicializar sistema
+    console.log('SignalProcessor inicializado');
+  }
+
+  public processFrame(conditions: SignalConditions): VitalSigns {
+    try {
+      if (!this.lastImageData) {
+        console.log('No hay imagen disponible');
+        return this.getDefaultVitalSigns();
+      }
+
+      // Extraer canales de color
+      const { red, ir } = this.extractChannels(this.lastImageData);
+      
+      // Actualizar buffer
+      this.buffer.push(red);
+      if (this.buffer.length > this.bufferSize) {
+        this.buffer.shift();
+      }
+
+      // Detección de dedo
+      const fingerPresent = this.fingerDetector.detectFinger(this.lastImageData);
+      if (!fingerPresent.isPresent) {
+        console.log('Dedo no detectado');
+        return this.getDefaultVitalSigns();
+      }
+
+      // Calidad de señal
+      const signalQuality = this.qualityAnalyzer.analyzeQuality(this.buffer);
+      if (signalQuality < 0.3) {
+        console.log('Calidad de señal baja:', signalQuality);
+        return this.getDefaultVitalSigns();
+      }
+
+      // Procesar señal PPG
+      const filteredSignal = this.signalFilter.filter(this.buffer);
+      const peaks = this.waveletAnalyzer.detectPeaks(filteredSignal);
+      const intervals = this.calculatePeakIntervals(peaks);
+
+      // Calcular BPM
+      const bpm = this.calculateBPM(intervals);
+      
+      // Calcular SpO2
+      const spo2 = this.calculateSpO2(red, ir);
+
+      // Estimar presión arterial
+      const { systolic, diastolic } = this.estimateBloodPressure(bpm, intervals);
+
+      // Detectar arritmias
+      const { hasArrhythmia, arrhythmiaType } = this.detectArrhythmia(intervals);
+
+      console.log('Frame procesado:', { bpm, spo2, systolic, diastolic });
+      
+      return {
+        bpm,
+        spo2,
+        systolic,
+        diastolic,
+        hasArrhythmia,
+        arrhythmiaType
+      };
+
+    } catch (error) {
+      console.error('Error procesando frame:', error);
+      return this.getDefaultVitalSigns();
+    }
+  }
+
+  private getDefaultVitalSigns(): VitalSigns {
+    return {
+      bpm: 0,
+      spo2: 0,
+      systolic: 0,
+      diastolic: 0,
+      hasArrhythmia: false,
+      arrhythmiaType: 'Normal'
+    };
+  }
+
+  private calculateBPM(intervals: number[]): number {
+    if (intervals.length === 0) return 0;
+    const averageInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+    return Math.round(60000 / averageInterval); // Convertir ms a BPM
+  }
+
+  private calculateSpO2(red: number, ir: number): number {
+    if (red === 0 || ir === 0) return 0;
+    const ratio = Math.log(red) / Math.log(ir);
+    return Math.round(110 - (25 * ratio)); // Aproximación simple
+  }
+
+  private estimateBloodPressure(bpm: number, intervals: number[]): BloodPressure {
+    const variability = this.calculateVariability(intervals);
+    const baselineSystolic = 120;
+    const baselineDiastolic = 80;
+
+    return {
+      systolic: Math.round(baselineSystolic + (bpm - 60) * 0.5 + variability * 10),
+      diastolic: Math.round(baselineDiastolic + (bpm - 60) * 0.3 + variability * 5)
+    };
+  }
+
+  private calculateVariability(intervals: number[]): number {
+    if (intervals.length < 2) return 0;
+    const diffs = intervals.slice(1).map((val, i) => Math.abs(val - intervals[i]));
+    return diffs.reduce((a, b) => a + b, 0) / diffs.length;
+  }
+
+  private detectArrhythmia(intervals: number[]): { hasArrhythmia: boolean; arrhythmiaType: ArrhythmiaType } {
+    if (intervals.length < 5) {
+      return { hasArrhythmia: false, arrhythmiaType: 'Normal' };
+    }
+
+    const variability = this.calculateVariability(intervals);
+    const hasArrhythmia = variability > 100; // Umbral simple
+
+    return {
+      hasArrhythmia,
+      arrhythmiaType: hasArrhythmia ? 'Irregular' : 'Normal'
+    };
   }
 
   public calculatePeakIntervals(peaks: number[]): number[] {
@@ -81,18 +202,6 @@ export class SignalProcessor {
       coverage: this.calculateCoverage(),
       measurementType: 'bpm',
       temperature: this.estimateTemperature()
-    };
-  }
-
-  public processFrame(conditions: any): any {
-    // Implementación básica
-    return {
-      bpm: 75,
-      spo2: 98,
-      systolic: 120,
-      diastolic: 80,
-      hasArrhythmia: false,
-      arrhythmiaType: 'Normal' as const
     };
   }
 
