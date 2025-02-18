@@ -19,32 +19,32 @@ export const useCameraInitializer = ({
   const initializeCamera = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: videoConstraints,
+        video: {
+          ...videoConstraints,
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
         audio: false
       });
 
       const track = stream.getVideoTracks()[0];
       
-      console.log('Capacidades de la cámara:', track.getCapabilities());
+      // Aplicamos configuraciones básicas primero
+      await track.applyConstraints({
+        advanced: [{
+          exposureMode: "continuous",
+          whiteBalanceMode: "continuous"
+        }]
+      });
 
-      const settings: MediaTrackConstraintsExtended = {
-        whiteBalance: { ideal: "continuous" },
-        exposureMode: { ideal: "continuous" },
-        exposureCompensation: { ideal: 0.5 },
-      };
-
-      try {
-        await track.applyConstraints(settings);
-      } catch (e) {
-        console.warn('Algunas configuraciones no están soportadas:', e);
-      }
+      // Esperamos un momento para que la cámara se estabilice
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       return true;
 
     } catch (error) {
       console.error('Error inicializando cámara:', error);
       setHasError(true);
-      setIsInitializing(false);
       
       toast({
         title: "Error de cámara",
@@ -55,7 +55,7 @@ export const useCameraInitializer = ({
 
       return false;
     }
-  }, [videoConstraints, setIsInitializing, setHasError, toast]);
+  }, [videoConstraints, setHasError, toast]);
 
   return { initializeCamera };
 };

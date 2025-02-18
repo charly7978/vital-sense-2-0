@@ -1,5 +1,5 @@
 
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, useMemo } from "react";
 import Webcam from "react-webcam";
 import CameraPreview from "./camera/CameraPreview";
 import CameraOverlay from "./camera/CameraOverlay";
@@ -24,25 +24,14 @@ const CameraView: React.FC<CameraViewProps> = ({
   const [hasError, setHasError] = useState(false);
   const [frameCount, setFrameCount] = useState(0);
 
-  const videoConstraints = {
+  // Memoizamos las configuraciones de video para evitar re-renders
+  const videoConstraints = useMemo(() => ({
     width: { ideal: 1280 },
     height: { ideal: 720 },
     facingMode: "environment",
     frameRate: { ideal: 30 },
-    aspectRatio: { ideal: 16/9 },
-    advanced: [{
-      exposureMode: "manual",
-      exposureTime: 10000,
-      exposureCompensation: 2,
-      brightness: 1.0,
-      contrast: 1.2,
-      whiteBalanceMode: "manual",
-      colorTemperature: 3300,
-      saturation: 1.5,
-      sharpness: 1.2,
-      torch: false
-    }]
-  };
+    aspectRatio: { ideal: 16/9 }
+  }), []);
 
   const { initializeCamera } = useCameraInitializer({
     videoConstraints,
@@ -56,26 +45,36 @@ const CameraView: React.FC<CameraViewProps> = ({
     setFrameCount
   });
 
-  // Solo inicializa la cámara una vez cuando isActive cambia a true
+  // Solo inicializamos la cámara una vez cuando el componente se monta
   useEffect(() => {
     let isMounted = true;
+    let initialized = false;
 
-    if (isActive && isInitializing) {
-      initializeCamera().then(() => {
-        if (isMounted) {
+    const setupCamera = async () => {
+      if (!initialized && isActive) {
+        const success = await initializeCamera();
+        if (isMounted && success) {
           setIsInitializing(false);
+          initialized = true;
         }
-      });
-    }
+      }
+    };
+
+    setupCamera();
 
     return () => {
       isMounted = false;
     };
-  }, [isActive]);
+  }, [isActive, initializeCamera]);
 
-  // Procesa frames solo cuando la cámara está completamente inicializada
+  // Procesamos frames solo cuando la cámara está lista
   useEffect(() => {
-    if (isActive && !isInitializing && !hasError && webcamRef.current?.video?.readyState === 4) {
+    if (
+      isActive && 
+      !isInitializing && 
+      !hasError && 
+      webcamRef.current?.video?.readyState === 4
+    ) {
       processFrame(webcamRef, canvasRef);
     }
 
@@ -89,30 +88,32 @@ const CameraView: React.FC<CameraViewProps> = ({
 
   return (
     <div className="relative w-full h-screen bg-black">
-      {isActive && (
-        <>
-          <CameraPreview 
-            webcamRef={webcamRef}
-            videoConstraints={videoConstraints}
-          />
+      <div className="absolute inset-0">
+        {isActive && (
+          <>
+            <CameraPreview 
+              webcamRef={webcamRef}
+              videoConstraints={videoConstraints}
+            />
 
-          <canvas 
-            ref={canvasRef} 
-            style={{ display: "none" }}
-          />
+            <canvas 
+              ref={canvasRef} 
+              style={{ display: "none" }}
+            />
 
-          <CameraOverlay
-            frameCount={frameCount}
-            isInitializing={isInitializing}
-            hasError={hasError}
-          />
-        </>
-      )}
+            <CameraOverlay
+              frameCount={frameCount}
+              isInitializing={isInitializing}
+              hasError={hasError}
+            />
+          </>
+        )}
 
-      <CameraStatus
-        isInitializing={isInitializing}
-        hasError={hasError}
-      />
+        <CameraStatus
+          isInitializing={isInitializing}
+          hasError={hasError}
+        />
+      </div>
     </div>
   );
 };
