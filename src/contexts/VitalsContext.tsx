@@ -42,19 +42,32 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Inicializar procesadores
   useEffect(() => {
-    ppgProcessor.current = new PPGProcessor();
-    beepPlayer.current = new BeepPlayer();
+    // Crear instancias
+    const processor = new PPGProcessor();
+    const beep = new BeepPlayer();
+    
+    // Asignar a las referencias
+    ppgProcessor.current = processor;
+    beepPlayer.current = beep;
 
+    // Cleanup
     return () => {
-      if (ppgProcessor.current) {
-        ppgProcessor.current.stop();
-      }
-      if (beepPlayer.current) {
-        beepPlayer.current.stop();
-      }
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
+      
+      if (videoRef.current?.srcObject) {
+        const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+        tracks.forEach(track => track.stop());
+      }
+
+      // Detener procesadores
+      processor.stop();
+      beep.stop();
+      
+      // Limpiar referencias
+      ppgProcessor.current = null;
+      beepPlayer.current = null;
     };
   }, []);
 
@@ -134,7 +147,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     // Detener video
-    if (videoRef.current && videoRef.current.srcObject) {
+    if (videoRef.current?.srcObject) {
       const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
       tracks.forEach(track => track.stop());
       videoRef.current.srcObject = null;
@@ -182,3 +195,5 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     </VitalsContext.Provider>
   );
 };
+
+export default VitalsProvider;
