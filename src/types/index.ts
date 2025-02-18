@@ -40,6 +40,8 @@ export interface VitalSigns {
   systolic: number;
   diastolic: number;
   quality?: number;
+  hasArrhythmia?: boolean;
+  arrhythmiaType?: ArrhythmiaType;
 }
 
 export interface BloodPressure {
@@ -58,6 +60,7 @@ export interface SignalConditions {
   movement: number;
   coverage: number;
   measurementType: string;
+  temperature?: number;
 }
 
 export interface ExtendedMediaTrackCapabilities extends MediaTrackCapabilities {
@@ -82,4 +85,11 @@ export interface ExtendedMediaTrackSettings extends MediaTrackSettings {
   brightness?: number;
   contrast?: number;
   saturation?: number;
+}
+
+export interface MediaTrackConstraintsExtended extends MediaTrackConstraints {
+  width?: number | { ideal: number };
+  height?: number | { ideal: number };
+  frameRate?: number | { ideal: number };
+  facingMode?: string | { ideal: string };
 }

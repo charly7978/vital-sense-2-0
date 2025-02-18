@@ -1,22 +1,53 @@
 export class PeakDetector {
-  // OPTIMIZACIÓN: Umbrales ajustados para mejor detección sin linterna
   private adaptiveThreshold = 0;
-  private readonly minPeakDistance = 400;    // Antes: 300 (más estable)
+  private readonly minPeakDistance = 400;
   private lastPeakTime = 0;
-  private readonly bufferSize = 60;          // Antes: 30 (mejor análisis)
-  private readonly minAmplitude = 0.3;       // Antes: 0.1 (menos falsos positivos)
-  private readonly adaptiveRate = 0.3;       // Antes: 0.2 (mejor adaptación)
+  private readonly bufferSize = 60;
+  private readonly minAmplitude = 0.3;
+  private readonly adaptiveRate = 0.3;
   private peakBuffer: number[] = [];
   private timeBuffer: number[] = [];
   private frameCount = 0;
-  
-  // OPTIMIZACIÓN: Rangos fisiológicos ajustados
   private readonly MAX_BPM = 180;
-  private readonly MIN_BPM = 45;             // Antes: 40
-  private readonly MIN_VALID_PEAKS = 4;      // Antes: 2 (más estricto)
-  private readonly MIN_SIGNAL_QUALITY = 0.45; // Antes: 0.25
-  private readonly MIN_PEAK_AMPLITUDE = 0.35; // Antes: 0.2
+  private readonly MIN_BPM = 45;
+  private readonly MIN_VALID_PEAKS = 4;
+  private readonly MIN_SIGNAL_QUALITY = 0.45;
+  private readonly MIN_PEAK_AMPLITUDE = 0.35;
   private lastValidPeakValue = 0;
+
+  public updateAdaptiveThreshold(mean: number, stdDev: number): void {
+    this.adaptiveThreshold = mean + stdDev * 2;
+  }
+
+  public validateAmplitude(currentValue: number, mean: number, stdDev: number): boolean {
+    return Math.abs(currentValue - mean) > stdDev * this.MIN_PEAK_AMPLITUDE;
+  }
+
+  public validateSignalStability(signal: number[]): boolean {
+    if (signal.length < 10) return false;
+    const { mean, stdDev } = this.calculateSignalStats(signal);
+    return stdDev / (mean + 1e-6) < 0.5;
+  }
+
+  public validatePeakConsistency(currentValue: number): boolean {
+    if (this.lastValidPeakValue === 0) return true;
+    const difference = Math.abs(currentValue - this.lastValidPeakValue);
+    return difference / (this.lastValidPeakValue + 1e-6) < 0.3;
+  }
+
+  public updatePeakHistory(value: number, time: number): void {
+    this.peakBuffer.push(value);
+    this.timeBuffer.push(time);
+    if (this.peakBuffer.length > this.bufferSize) {
+      this.peakBuffer.shift();
+      this.timeBuffer.shift();
+    }
+  }
+
+  public calculatePeakQuality(currentValue: number, mean: number, stdDev: number): number {
+    const amplitude = Math.abs(currentValue - mean) / stdDev;
+    return Math.min(amplitude / 3, 1);
+  }
 
   isRealPeak(currentValue: number, now: number, signalBuffer: number[]): boolean {
     this.frameCount++;
@@ -209,45 +240,5 @@ export class PeakDetector {
 
   getLastPeakTime(): number {
     return this.lastPeakTime;
-  }
-
-  private updateAdaptiveThreshold(mean: number, stdDev: number): void {
-    const targetThreshold = mean + 1.5 * stdDev;
-    this.adaptiveThreshold += this.adaptiveRate * (targetThreshold - this.adaptiveThreshold);
-  }
-
-  private validateAmplitude(currentValue: number, mean: number, stdDev: number): boolean {
-    return Math.abs(currentValue - mean) > this.minAmplitude * stdDev;
-  }
-
-  private validateSignalStability(signalBuffer: number[]): boolean {
-    if (signalBuffer.length < this.bufferSize / 2) return false;
-    const recent = signalBuffer.slice(-this.bufferSize / 2);
-    const { stdDev } = this.calculateSignalStats(recent);
-    return stdDev < this.adaptiveThreshold * 0.8;
-  }
-
-  private validatePeakConsistency(currentValue: number): boolean {
-    if (this.peakBuffer.length === 0) return true;
-    const recentPeaks = this.peakBuffer.slice(-3);
-    const avgPeakValue = recentPeaks.reduce((a, b) => a + b, 0) / recentPeaks.length;
-    const variation = Math.abs(currentValue - avgPeakValue) / avgPeakValue;
-    return variation < 0.3;
-  }
-
-  private updatePeakHistory(currentValue: number, now: number): void {
-    this.peakBuffer.push(currentValue);
-    this.timeBuffer.push(now - this.lastPeakTime);
-    if (this.peakBuffer.length > 10) {
-      this.peakBuffer.shift();
-      this.timeBuffer.shift();
-    }
-  }
-
-  private calculatePeakQuality(currentValue: number, mean: number, stdDev: number): number {
-    const amplitudeScore = Math.abs(currentValue - mean) / stdDev;
-    const timeScore = this.timeBuffer.length > 0 ? 
-                      Math.exp(-Math.abs(this.timeBuffer[this.timeBuffer.length - 1] - this.minPeakDistance) / 100) : 0;
-    return (amplitudeScore + timeScore) / 2;
   }
 }

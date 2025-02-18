@@ -10,9 +10,29 @@ export class SignalProcessor {
   private buffer: number[] = [];
   private readonly bufferSize = 180;
   private lastImageData: ImageData | null = null;
+  private fingerDetector: FingerDetector;
+  private ppgSynchronizer: PPGSynchronizer;
+  private calibrator: AdaptiveCalibrator;
+  private waveletAnalyzer: WaveletAnalyzer;
+  private signalFilter: SignalFilter;
+  private qualityAnalyzer: SignalQualityAnalyzer;
 
   constructor() {
-    // Inicialización
+    this.fingerDetector = new FingerDetector();
+    this.ppgSynchronizer = new PPGSynchronizer();
+    this.calibrator = new AdaptiveCalibrator();
+    this.waveletAnalyzer = new WaveletAnalyzer();
+    this.signalFilter = new SignalFilter();
+    this.qualityAnalyzer = new SignalQualityAnalyzer();
+  }
+
+  public calculatePeakIntervals(peaks: number[]): number[] {
+    if (peaks.length < 2) return [];
+    const intervals = [];
+    for (let i = 1; i < peaks.length; i++) {
+      intervals.push(peaks[i] - peaks[i-1]);
+    }
+    return intervals;
   }
 
   public extractChannels(imageData: ImageData): { red: number; ir: number } {
@@ -32,11 +52,6 @@ export class SignalProcessor {
       red: totalRed / pixelCount,
       ir: totalIR / pixelCount
     };
-  }
-
-  public calculatePeakIntervals(data: number[]): number[] {
-    // Implementación básica
-    return [];
   }
 
   public processFrame(conditions: any): any {

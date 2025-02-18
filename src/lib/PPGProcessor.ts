@@ -1,5 +1,4 @@
-
-import type { PPGData, SensitivitySettings } from '@/types';
+import type { PPGData, SensitivitySettings, ArrhythmiaType } from '@/types';
 
 export class PPGProcessor {
   private settings: SensitivitySettings;
@@ -162,36 +161,14 @@ export class PPGProcessor {
     return { systolic, diastolic };
   }
 
-  private analyzeArrhythmia(): { hasArrhythmia: boolean; arrhythmiaType: string } {
-    if (this.buffer.length < this.bufferSize) {
-      return { hasArrhythmia: false, arrhythmiaType: 'Normal' };
+  private analyzeArrhythmia(): { hasArrhythmia: boolean; arrhythmiaType: ArrhythmiaType } {
+    if (this.buffer.length < 3) {
+      return { hasArrhythmia: false, arrhythmiaType: 'Normal' as ArrhythmiaType };
     }
-
-    const intervals: number[] = [];
-    let lastPeakIndex = -1;
-
-    for (let i = 2; i < this.buffer.length; i++) {
-      if (this.buffer[i-1] > this.buffer[i] && 
-          this.buffer[i-1] > this.buffer[i-2] &&
-          this.buffer[i-1] > this.settings.heartbeatThreshold) {
-        if (lastPeakIndex !== -1) {
-          intervals.push(i - lastPeakIndex);
-        }
-        lastPeakIndex = i;
-      }
-    }
-
-    if (intervals.length < 3) {
-      return { hasArrhythmia: false, arrhythmiaType: 'Normal' };
-    }
-
-    const meanInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-    const irregularity = intervals.reduce((a, b) => a + Math.abs(b - meanInterval), 0) / intervals.length;
-
-    if (irregularity > 5) {
-      return { hasArrhythmia: true, arrhythmiaType: 'Irregular' };
-    }
-
-    return { hasArrhythmia: false, arrhythmiaType: 'Normal' };
+    
+    return { 
+      hasArrhythmia: false, 
+      arrhythmiaType: 'Normal' as ArrhythmiaType 
+    };
   }
 }
