@@ -18,11 +18,14 @@ export const useCameraInitializer = ({
 
   const initializeCamera = useCallback(async () => {
     try {
+      console.log('Iniciando cámara con configuración:', videoConstraints);
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           ...videoConstraints,
           width: { ideal: 1280 },
           height: { ideal: 720 },
+          frameRate: { ideal: 30 },
           advanced: [{
             exposureMode: 'manual',
             exposureCompensation: 2,
@@ -32,14 +35,18 @@ export const useCameraInitializer = ({
         audio: false
       });
 
+      console.log('Stream obtenido:', stream.getVideoTracks()[0].getSettings());
+      
       const track = stream.getVideoTracks()[0];
       
       try {
         const capabilities = track.getCapabilities() as ExtendedMediaTrackCapabilities;
+        console.log('Capacidades de la cámara:', capabilities);
+        
         const settings: ExtendedMediaTrackSettings = {};
 
-        // Configurar controles si están disponibles
         if (capabilities.exposureMode?.includes('manual')) {
+          console.log('Aplicando configuración manual de exposición');
           await track.applyConstraints({
             advanced: [{
               exposureMode: 'manual',
@@ -49,12 +56,13 @@ export const useCameraInitializer = ({
         }
 
       } catch (constraintError) {
-        console.log('Usando configuración automática de cámara');
+        console.log('Usando configuración automática de cámara:', constraintError);
       }
 
       // Tiempo de estabilización
       await new Promise(resolve => setTimeout(resolve, 1000));
-
+      
+      console.log('Inicialización de cámara completada');
       return true;
 
     } catch (error) {

@@ -16,12 +16,19 @@ export const useCameraProcessor = ({
 }: UseCameraProcessorProps) => {
   const { toast } = useToast();
   const animationFrameRef = useRef<number | null>(null);
+  const processingRef = useRef<boolean>(false);
 
   const processFrame = useCallback((
     webcamRef: React.RefObject<Webcam>,
     canvasRef: React.RefObject<HTMLCanvasElement>
   ) => {
     if (!isActive || !webcamRef.current?.video || !canvasRef.current) {
+      console.log('Condiciones iniciales no cumplidas:', {
+        isActive,
+        hasVideo: !!webcamRef.current?.video,
+        hasCanvas: !!canvasRef.current
+      });
+      
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
@@ -36,12 +43,32 @@ export const useCameraProcessor = ({
       alpha: false
     });
 
-    if (!context || video.readyState !== video.HAVE_ENOUGH_DATA) {
+    if (!context) {
+      console.error('No se pudo obtener el contexto del canvas');
+      return;
+    }
+
+    if (video.readyState !== video.HAVE_ENOUGH_DATA) {
+      console.log('Video no tiene suficientes datos:', video.readyState);
       animationFrameRef.current = requestAnimationFrame(() => processFrame(webcamRef, canvasRef));
       return;
     }
 
+    // Evitar procesamiento simultáneo
+    if (processingRef.current) {
+      console.log('Frame anterior aún en proceso');
+      animationFrameRef.current = requestAnimationFrame(() => processFrame(webcamRef, canvasRef));
+      return;
+    }
+
+    processingRef.current = true;
+
     try {
+      console.log('Procesando frame...', {
+        videoWidth: video.videoWidth,
+        videoHeight: video.videoHeight
+      });
+
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
 
@@ -69,6 +96,7 @@ export const useCameraProcessor = ({
         
         onFrame(frameData);
         setFrameCount(prev => prev + 1);
+        console.log('Frame procesado exitosamente');
       }
 
     } catch (error) {
@@ -79,9 +107,10 @@ export const useCameraProcessor = ({
         variant: "destructive",
         className: "bg-black/40 backdrop-blur-sm text-sm text-white/80"
       });
+    } finally {
+      processingRef.current = false;
+      animationFrameRef.current = requestAnimationFrame(() => processFrame(webcamRef, canvasRef));
     }
-
-    animationFrameRef.current = requestAnimationFrame(() => processFrame(webcamRef, canvasRef));
   }, [isActive, onFrame, setFrameCount, toast]);
 
   return {
