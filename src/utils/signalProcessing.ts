@@ -1,5 +1,6 @@
+
 import { SignalProcessor } from '@/lib/SignalProcessor';
-import type { SignalConditions } from '@/types';
+import type { SignalConditions, MeasurementType } from '@/types';
 
 export class SignalProcessing {
   private signalProcessor: SignalProcessor;
@@ -8,7 +9,7 @@ export class SignalProcessing {
     this.signalProcessor = new SignalProcessor();
   }
 
-  private createSignalConditions(signalQuality: number, type: string = 'bpm'): SignalConditions {
+  private createSignalConditions(signalQuality: number, type: MeasurementType = 'bpm'): SignalConditions {
     return {
       brightness: this.signalProcessor.calculateLightLevel(),
       stability: this.signalProcessor.calculateStability(),
