@@ -17,18 +17,14 @@ export const useCameraProcessor = ({
   const { toast } = useToast();
   const animationFrameRef = useRef<number | null>(null);
   const processingRef = useRef<boolean>(false);
+  const frameCountRef = useRef<number>(0);
 
   const processFrame = useCallback((
     webcamRef: React.RefObject<Webcam>,
     canvasRef: React.RefObject<HTMLCanvasElement>
   ) => {
-    if (!isActive || !webcamRef.current?.video || !canvasRef.current) {
-      console.log('Condiciones iniciales no cumplidas:', {
-        isActive,
-        hasVideo: !!webcamRef.current?.video,
-        hasCanvas: !!canvasRef.current
-      });
-      
+    if (!isActive) {
+      console.log('Procesamiento inactivo');
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
@@ -36,8 +32,29 @@ export const useCameraProcessor = ({
       return;
     }
 
+    if (!webcamRef.current?.video || !canvasRef.current) {
+      console.log('Referencias no disponibles:', {
+        hasVideo: !!webcamRef.current?.video,
+        hasCanvas: !!canvasRef.current
+      });
+      animationFrameRef.current = requestAnimationFrame(() => processFrame(webcamRef, canvasRef));
+      return;
+    }
+
     const video = webcamRef.current.video;
     const canvas = canvasRef.current;
+    
+    // Asegurarse de que el video esté reproduciendo
+    if (video.paused || video.ended || !video.videoWidth) {
+      console.log('Video no está activo:', {
+        paused: video.paused,
+        ended: video.ended,
+        width: video.videoWidth
+      });
+      animationFrameRef.current = requestAnimationFrame(() => processFrame(webcamRef, canvasRef));
+      return;
+    }
+
     const context = canvas.getContext('2d', { 
       willReadFrequently: true,
       alpha: false
@@ -48,15 +65,15 @@ export const useCameraProcessor = ({
       return;
     }
 
+    // Verificar que el video tenga datos
     if (video.readyState !== video.HAVE_ENOUGH_DATA) {
-      console.log('Video no tiene suficientes datos:', video.readyState);
+      console.log('Esperando datos del video:', video.readyState);
       animationFrameRef.current = requestAnimationFrame(() => processFrame(webcamRef, canvasRef));
       return;
     }
 
     // Evitar procesamiento simultáneo
     if (processingRef.current) {
-      console.log('Frame anterior aún en proceso');
       animationFrameRef.current = requestAnimationFrame(() => processFrame(webcamRef, canvasRef));
       return;
     }
@@ -64,23 +81,24 @@ export const useCameraProcessor = ({
     processingRef.current = true;
 
     try {
-      console.log('Procesando frame...', {
-        videoWidth: video.videoWidth,
-        videoHeight: video.videoHeight
-      });
+      // Actualizar dimensiones del canvas si es necesario
+      if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        console.log('Canvas redimensionado:', {
+          width: canvas.width,
+          height: canvas.height
+        });
+      }
 
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      // Dibujar frame actual
+      context.drawImage(video, 0, 0);
 
+      // Obtener región central
       const centerX = Math.floor(canvas.width / 2);
       const centerY = Math.floor(canvas.height / 2);
       const regionSize = Math.floor(Math.min(canvas.width, canvas.height) * 0.4);
 
-      // Mejoras para captura sin linterna
-      context.filter = 'brightness(150%) contrast(120%) saturate(120%)';
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      context.filter = 'none';
-      
       const frameData = context.getImageData(
         centerX - regionSize,
         centerY - regionSize,
@@ -88,19 +106,18 @@ export const useCameraProcessor = ({
         regionSize * 2
       );
 
-      // Amplificación del canal rojo
-      if (frameData && frameData.data.length >= 4) {
-        for (let i = 0; i < frameData.data.length; i += 4) {
-          frameData.data[i] = Math.min(frameData.data[i] * 1.2, 255);
-        }
-        
-        onFrame(frameData);
-        setFrameCount(prev => prev + 1);
-        console.log('Frame procesado exitosamente');
+      // Procesar frame
+      onFrame(frameData);
+      
+      // Actualizar contador de frames
+      frameCountRef.current += 1;
+      if (frameCountRef.current % 30 === 0) { // Log cada 30 frames
+        console.log('Frames procesados:', frameCountRef.current);
       }
+      setFrameCount(prev => prev + 1);
 
     } catch (error) {
-      console.error("Error procesando frame:", error);
+      console.error('Error procesando frame:', error);
       toast({
         title: "Error de procesamiento",
         description: "Error al procesar la imagen",
@@ -109,6 +126,7 @@ export const useCameraProcessor = ({
       });
     } finally {
       processingRef.current = false;
+      // Continuar el ciclo de procesamiento
       animationFrameRef.current = requestAnimationFrame(() => processFrame(webcamRef, canvasRef));
     }
   }, [isActive, onFrame, setFrameCount, toast]);
