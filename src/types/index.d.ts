@@ -1,7 +1,7 @@
 export interface VitalReading {
-  [key: string]: number;
   timestamp: number;
   value: number;
+  isPeak?: boolean;
 }
 
 export interface PPGData {
@@ -15,16 +15,19 @@ export interface PPGData {
   readings: VitalReading[];
   isPeak?: boolean;
   signalQuality: number;
-  hrvMetrics?: {
-    sdnn: number;
-    rmssd: number;
-    pnn50: number;
-    lfhf: number;
-  };
+  timestamp: number;
+  value: number;
+  quality?: number; // Añadido para compatibilidad
+}
+
+export interface VitalReading {
+  timestamp: number;
+  value: number;
+  isPeak?: boolean;
+  [key: string]: any; // Permite propiedades adicionales
 }
 
 export interface SensitivitySettings {
-  [key: string]: number;
   signalAmplification: number;
   noiseReduction: number;
   peakDetection: number;
@@ -33,49 +36,10 @@ export interface SensitivitySettings {
   signalStability: number;
   brightness?: number;
   redIntensity?: number;
+  [key: string]: any; // Permite propiedades adicionales
 }
 
-export interface ProcessingSettings {
-  MEASUREMENT_DURATION: number;
-  MIN_FRAMES_FOR_CALCULATION: number;
-  MIN_PEAKS_FOR_VALID_HR: number;
-  MIN_PEAK_DISTANCE: number;
-  MAX_PEAK_DISTANCE: number;
-  PEAK_THRESHOLD_FACTOR: number;
-  MIN_RED_VALUE: number;
-  MIN_RED_DOMINANCE: number;
-  MIN_VALID_PIXELS_RATIO: number;
-  MIN_BRIGHTNESS: number;
-  MIN_VALID_READINGS: number;
-  FINGER_DETECTION_DELAY: number;
-  MIN_SPO2: number;
-}
-
-export interface CalibrationSettings {
-  [key: string]: {
-    value: number;
-    min: number;
-    max: number;
-    step: number;
-    description: string;
-  };
-}
-
-export interface BPCalibrationData {
-  id?: string;
-  systolic_reference: number;
-  diastolic_reference: number;
-  age?: number;
-  weight?: number;
-  height?: number;
-  calibration_date?: string;
-  is_active?: boolean;
-  calibration_quality?: number;
-  notes?: string;
-  environmental_conditions?: Record<string, any>;
-}
-
-export interface MediaTrackConstraints extends MediaTrackConstraints {
+export interface MediaTrackConstraintsExtended extends MediaTrackConstraints {
   width?: number | { ideal: number };
   height?: number | { ideal: number };
   facingMode?: string;
@@ -85,3 +49,23 @@ export interface MediaTrackConstraints extends MediaTrackConstraints {
   exposureMode?: { ideal: string };
   exposureCompensation?: { ideal: number };
 }
+
+export type VitalSigns = {
+  bpm: number;
+  spo2: number;
+  systolic: number;
+  diastolic: number;
+};
+
+export type BloodPressure = {
+  systolic: number;
+  diastolic: number;
+};
+
+export type ArrhythmiaType = 'Normal' | 'Irregular' | 'Unknown';
+
+export type SignalConditions = {
+  brightness: number;
+  stability: number;
+  quality: number;
+};

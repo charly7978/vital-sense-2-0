@@ -1,11 +1,11 @@
 
 import React from "react";
 import Webcam from "react-webcam";
-import type { MediaTrackConstraints } from "types";
+import { MediaTrackConstraintsExtended } from "@/types";
 
 interface CameraPreviewProps {
   webcamRef: React.RefObject<Webcam>;
-  videoConstraints: MediaTrackConstraints;
+  videoConstraints: MediaTrackConstraintsExtended;
 }
 
 const CameraPreview: React.FC<CameraPreviewProps> = ({

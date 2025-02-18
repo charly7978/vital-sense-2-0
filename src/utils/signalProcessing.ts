@@ -1,12 +1,12 @@
 // ==================== SignalProcessor.ts ====================
 
-import { FingerDetector } from './FingerDetector';
-import { PPGSynchronizer } from './PPGSynchronizer';
-import { AdaptiveCalibrator } from './AdaptiveCalibrator';
-import { WaveletAnalyzer } from './WaveletAnalyzer';
-import { SignalFilter } from './SignalFilter';
-import { SignalQualityAnalyzer } from './SignalQualityAnalyzer';
-import type { VitalSigns, BloodPressure, ArrhythmiaType } from '@/types';
+import { SignalFilter } from '@/lib/SignalFilter';
+import { FingerDetector } from '@/lib/FingerDetector';
+import { PPGSynchronizer } from '@/lib/PPGSynchronizer';
+import { AdaptiveCalibrator } from '@/lib/AdaptiveCalibrator';
+import { WaveletAnalyzer } from '@/lib/WaveletAnalyzer';
+import { SignalQualityAnalyzer } from '@/lib/SignalQualityAnalyzer';
+import type { VitalSigns, BloodPressure, ArrhythmiaType, SignalConditions } from '@/types';
 
 export class SignalProcessor {
   // OPTIMIZACIÓN: Componentes avanzados

@@ -1,10 +1,10 @@
 
 import { useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
-import type { MediaTrackConstraints } from "types";
+import { MediaTrackConstraintsExtended } from "@/types";
 
 interface UseCameraInitializerProps {
-  videoConstraints: MediaTrackConstraints;
+  videoConstraints: MediaTrackConstraintsExtended;
   setIsInitializing: (value: boolean) => void;
   setHasError: (value: boolean) => void;
 }
@@ -30,7 +30,7 @@ export const useCameraInitializer = ({
       
       console.log('Capacidades de la cámara:', track.getCapabilities());
 
-      const settings: MediaTrackConstraints = {
+      const settings: MediaTrackConstraintsExtended = {
         whiteBalance: { ideal: "continuous" },
         exposureMode: { ideal: "continuous" },
         exposureCompensation: { ideal: 0.5 },
