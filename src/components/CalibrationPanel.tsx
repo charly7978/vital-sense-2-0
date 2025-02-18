@@ -3,26 +3,39 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { Gauge, Scale, Sparkles, Heart, Zap, Activity, Sun, Palette } from 'lucide-react';
-import type { SensitivitySettings } from '@/utils/types';
+import type { SensitivitySettings } from '@/types';
+
+// Valores por defecto
+const DEFAULT_SETTINGS: SensitivitySettings = {
+  brightness: 1.0,
+  redIntensity: 1.0,
+  signalAmplification: 1.0,
+  noiseReduction: 1.0,
+  peakDetection: 1.0,
+  heartbeatThreshold: 0.5,
+  responseTime: 1.0,
+  signalStability: 0.5
+};
 
 interface CalibrationPanelProps {
-  settings: SensitivitySettings;
+  settings: Partial<SensitivitySettings>;
   onUpdateSettings: (settings: SensitivitySettings) => void;
 }
 
 const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
-  settings,
+  settings = {},
   onUpdateSettings
 }) => {
   const handleSettingChange = (key: keyof SensitivitySettings) => (value: number[]) => {
     onUpdateSettings({
+      ...DEFAULT_SETTINGS,
       ...settings,
       [key]: value[0]
     });
   };
 
-  const getValue = (key: keyof SensitivitySettings, defaultValue: number = 1) => {
-    return settings[key] ?? defaultValue;
+  const getValue = (key: keyof SensitivitySettings) => {
+    return settings[key] ?? DEFAULT_SETTINGS[key];
   };
 
   return (
