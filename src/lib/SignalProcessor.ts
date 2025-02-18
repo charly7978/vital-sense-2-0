@@ -84,4 +84,40 @@ export class SignalProcessor {
     // Implementación básica
     return 0.8;
   }
+
+  private calculateLightLevel(): number {
+    if (!this.lastImageData) return 0;
+    const data = this.lastImageData.data;
+    let totalBrightness = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      totalBrightness += (data[i] + data[i + 1] + data[i + 2]) / 3;
+    }
+    return totalBrightness / (data.length / 4) / 255;
+  }
+
+  private calculateMovement(): number {
+    if (this.buffer.length < 2) return 0;
+    const differences = this.buffer.slice(1).map((val, i) => 
+      Math.abs(val - this.buffer[i])
+    );
+    return Math.min(differences.reduce((a, b) => a + b, 0) / differences.length / 10, 1);
+  }
+
+  private calculateCoverage(): number {
+    if (!this.lastImageData) return 0;
+    return this.fingerDetector.detectFinger(this.lastImageData).confidence;
+  }
+
+  private estimateTemperature(): number {
+    // Estimación simple basada en el brillo promedio
+    return 20 + (this.calculateLightLevel() * 10);
+  }
+
+  private calculateStability(): number {
+    if (this.buffer.length < 10) return 0;
+    const recentValues = this.buffer.slice(-10);
+    const mean = recentValues.reduce((a, b) => a + b, 0) / recentValues.length;
+    const variance = recentValues.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / recentValues.length;
+    return Math.exp(-Math.sqrt(variance) / mean);
+  }
 }

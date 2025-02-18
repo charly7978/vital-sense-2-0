@@ -49,10 +49,16 @@ export class PeakDetector {
     return Math.min(amplitude / 3, 1);
   }
 
+  private calculateSignalStats(values: number[]) {
+    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / values.length;
+    const stdDev = Math.sqrt(variance);
+    return { mean, stdDev };
+  }
+
   isRealPeak(currentValue: number, now: number, signalBuffer: number[]): boolean {
     this.frameCount++;
     
-    // OPTIMIZACIÓN: Logging mejorado para debugging
     if (this.frameCount % 30 === 0) {
       console.log('🔍 Análisis de pico:', {
         valor: currentValue.toFixed(3),
@@ -63,35 +69,29 @@ export class PeakDetector {
       });
     }
     
-    // OPTIMIZACIÓN: Validación temporal más estricta
     const timeSinceLastPeak = now - this.lastPeakTime;
-    const minTimeGap = (60 / this.MAX_BPM) * 1000 * 1.1; // 10% más estricto
+    const minTimeGap = (60 / this.MAX_BPM) * 1000 * 1.1;
     const maxTimeGap = (60 / this.MIN_BPM) * 1000;
 
     if (timeSinceLastPeak < minTimeGap) {
       return false;
     }
 
-    // OPTIMIZACIÓN: Mejor validación de buffer
     if (signalBuffer.length < 10) {
       return false;
     }
 
-    // OPTIMIZACIÓN: Análisis de señal mejorado
     const recentValues = signalBuffer.slice(-this.bufferSize);
     const { mean, stdDev } = this.calculateSignalStats(recentValues);
     
-    // OPTIMIZACIÓN: Umbral adaptativo más robusto
     this.updateAdaptiveThreshold(mean, stdDev);
 
-    // OPTIMIZACIÓN: Validaciones múltiples mejoradas
     const isValidShape = this.validatePeakShape(currentValue, signalBuffer);
     const hasSignificantAmplitude = this.validateAmplitude(currentValue, mean, stdDev);
     const isLocalMaximum = this.isLocalMax(currentValue, signalBuffer);
     const signalQuality = this.calculateSignalQuality(signalBuffer);
     const isStable = this.validateSignalStability(signalBuffer);
 
-    // OPTIMIZACIÓN: Logging de validaciones mejorado
     if (this.frameCount % 30 === 0) {
       console.log('🎯 Validaciones:', {
         formaValida: isValidShape,
@@ -107,7 +107,6 @@ export class PeakDetector {
       return false;
     }
 
-    // OPTIMIZACIÓN: Validación completa mejorada
     if (isLocalMaximum && hasSignificantAmplitude && isValidShape && isStable) {
       if (timeSinceLastPeak > maxTimeGap) {
         this.resetPeakDetection(now);
@@ -135,14 +134,12 @@ export class PeakDetector {
     return false;
   }
 
-  // OPTIMIZACIÓN: Mejor detección de máximos locales
   private isLocalMax(currentValue: number, signalBuffer: number[]): boolean {
-    const window = 7; // Antes: 5 (más preciso)
+    const window = 7;
     const recent = signalBuffer.slice(-window);
     return Math.abs(currentValue) === Math.max(...recent.map(Math.abs));
   }
 
-  // OPTIMIZACIÓN: Validación de forma de pico mejorada
   private validatePeakShape(currentValue: number, signalBuffer: number[]): boolean {
     if (signalBuffer.length < 8) return false;
 
@@ -166,7 +163,6 @@ export class PeakDetector {
     return increasing >= 2 && decreasing >= 2;
   }
 
-  // OPTIMIZACIÓN: Validación de intervalo más estricta
   private validatePeakInterval(currentInterval: number): boolean {
     if (this.timeBuffer.length < 2) {
       return currentInterval >= this.minPeakDistance;
@@ -175,7 +171,7 @@ export class PeakDetector {
     const recentIntervals = this.timeBuffer.slice(-3);
     const avgInterval = recentIntervals.reduce((a, b) => a + b, 0) / recentIntervals.length;
     
-    const maxVariation = 0.3; // Antes: 0.4 (más estricto)
+    const maxVariation = 0.3;
     const isWithinRange = Math.abs(currentInterval - avgInterval) <= avgInterval * maxVariation;
     const isPhysiologicallyValid = 
       currentInterval >= this.minPeakDistance && 
@@ -184,7 +180,6 @@ export class PeakDetector {
     return isPhysiologicallyValid && isWithinRange;
   }
 
-  // OPTIMIZACIÓN: Mejor cálculo de calidad de señal
   private calculateSignalQuality(signal: number[]): number {
     const { mean, stdDev } = this.calculateSignalStats(signal);
     
@@ -196,14 +191,6 @@ export class PeakDetector {
       (snr * 0.4 + stability * 0.4 + trend * 0.2),
       1
     );
-  }
-
-  // OPTIMIZACIÓN: Métodos auxiliares mejorados
-  private calculateSignalStats(values: number[]) {
-    const mean = values.reduce((a, b) => a + b, 0) / values.length;
-    const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / values.length;
-    const stdDev = Math.sqrt(variance);
-    return { mean, stdDev };
   }
 
   private calculateStability(signal: number[]): number {
