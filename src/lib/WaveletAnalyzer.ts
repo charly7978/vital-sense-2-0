@@ -128,7 +128,8 @@ export class WaveletAnalyzer {
   }
 
   private calculatePeakConsistency(detail: number[]): number {
-    const peaks = this.detectPeaks([detail]);
+    // Fixed: Now we pass the detail array directly instead of wrapping it in another array
+    const peaks = this.detectPeaks(detail);
     if (peaks.length < 2) return 0;
 
     const intervals = peaks.slice(1).map((peak, i) => peak - peaks[i]);
