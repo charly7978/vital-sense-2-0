@@ -7,6 +7,7 @@ import CameraStatus from "./camera/CameraStatus";
 import { useCameraProcessor } from "./camera/useCameraProcessor";
 import { useCameraInitializer } from "./camera/useCameraInitializer";
 import { useToast } from "@/hooks/use-toast";
+import { MediaTrackConstraintsExtended } from "@/types";
 
 interface CameraViewProps {
   onFrame: (imageData: ImageData) => void;
@@ -65,9 +66,11 @@ const CameraView: React.FC<CameraViewProps> = ({
       }
 
       const newTorchState = !isFlashlightOn;
-      await track.applyConstraints({
+      const constraints: MediaTrackConstraintsExtended = {
         advanced: [{ torch: newTorchState }]
-      });
+      };
+
+      await track.applyConstraints(constraints);
 
       setIsFlashlightOn(newTorchState);
       
