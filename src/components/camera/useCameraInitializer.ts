@@ -29,20 +29,26 @@ export const useCameraInitializer = ({
 
       const track = stream.getVideoTracks()[0];
       
-      // Optimizaciones para captura sin linterna
-      await track.applyConstraints({
-        advanced: [{
-          exposureMode: "manual",
-          exposureTime: 10000,
-          exposureCompensation: 2.0,
-          brightness: 1.0,
-          contrast: 1.2,
-          whiteBalanceMode: "manual",
-          colorTemperature: 3300,
-          saturation: 1.5,
-          sharpness: 1.2
-        }]
-      });
+      // Optimizaciones para captura sin linterna con valores más conservadores
+      try {
+        await track.applyConstraints({
+          advanced: [{
+            exposureMode: "manual",
+            exposureTime: 1000,
+            exposureCompensation: 0.5,
+            brightness: 1.0,
+            contrast: 1.2
+          }]
+        });
+      } catch (constraintError) {
+        console.log('No se pudieron aplicar todas las configuraciones avanzadas, usando modo automático');
+        await track.applyConstraints({
+          advanced: [{
+            exposureMode: "continuous",
+            whiteBalanceMode: "continuous"
+          }]
+        });
+      }
 
       // Tiempo de estabilización
       await new Promise(resolve => setTimeout(resolve, 500));
