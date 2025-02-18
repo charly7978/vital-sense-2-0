@@ -1,4 +1,3 @@
-// src/types/index.ts
 
 // Tipos de base más específicos
 export type Percentage = number & { __brand: 'Percentage' };
@@ -131,4 +130,17 @@ export interface SystemConfig {
     minSamples: number;
     targetQuality: Percentage;
   };
+}
+
+// Tipos extendidos para MediaStream
+export interface ExtendedMediaTrackCapabilities extends MediaTrackCapabilities {
+  torch?: boolean;
+}
+
+export interface MediaTrackConstraintSet {
+  torch?: boolean;
+}
+
+export interface MediaTrackConstraintsExtended extends MediaTrackConstraints {
+  advanced?: MediaTrackConstraintSet[];
 }
