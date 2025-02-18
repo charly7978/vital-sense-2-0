@@ -29,25 +29,26 @@ export const useCameraInitializer = ({
 
       const track = stream.getVideoTracks()[0];
       
-      // Optimizaciones para captura sin linterna con valores más conservadores
+      // Configuración básica de la cámara
       try {
-        await track.applyConstraints({
-          advanced: [{
-            exposureMode: "manual",
-            exposureTime: 1000,
-            exposureCompensation: 0.5,
-            brightness: 1.0,
-            contrast: 1.2
-          }]
-        });
+        const capabilities = track.getCapabilities();
+        const settings: MediaTrackSettings = {};
+
+        if (capabilities.brightness) {
+          settings.brightness = 100;
+        }
+
+        if (capabilities.contrast) {
+          settings.contrast = 120;
+        }
+
+        if (capabilities.saturation) {
+          settings.saturation = 120;
+        }
+
+        await track.applyConstraints({ advanced: [settings] });
       } catch (constraintError) {
-        console.log('No se pudieron aplicar todas las configuraciones avanzadas, usando modo automático');
-        await track.applyConstraints({
-          advanced: [{
-            exposureMode: "continuous",
-            whiteBalanceMode: "continuous"
-          }]
-        });
+        console.log('Usando configuración automática de cámara');
       }
 
       // Tiempo de estabilización

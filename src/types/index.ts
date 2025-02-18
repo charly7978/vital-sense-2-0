@@ -3,6 +3,7 @@ export interface VitalReading {
   timestamp: number;
   value: number;
   isPeak?: boolean;
+  [key: string]: any; // Permite propiedades adicionales
 }
 
 export interface PPGData {
@@ -18,6 +19,7 @@ export interface PPGData {
   signalQuality: number;
   timestamp: number;
   value: number;
+  quality?: number;
 }
 
 export interface SensitivitySettings {
@@ -29,4 +31,34 @@ export interface SensitivitySettings {
   signalStability: number;
   brightness?: number;
   redIntensity?: number;
+  [key: string]: number | undefined;
+}
+
+export interface MediaTrackConstraintsExtended extends MediaTrackConstraints {
+  width?: number | { ideal: number };
+  height?: number | { ideal: number };
+  facingMode?: string;
+  frameRate?: number | { ideal: number };
+  aspectRatio?: number | { ideal: number };
+  advanced?: MediaTrackConstraintSet[];
+}
+
+export interface VitalSigns {
+  bpm: number;
+  spo2: number;
+  systolic: number;
+  diastolic: number;
+}
+
+export interface BloodPressure {
+  systolic: number;
+  diastolic: number;
+}
+
+export type ArrhythmiaType = 'Normal' | 'Irregular' | 'Unknown';
+
+export interface SignalConditions {
+  brightness: number;
+  stability: number;
+  quality: number;
 }
