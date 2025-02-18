@@ -65,4 +65,23 @@ export class SignalProcessor {
       arrhythmiaType: 'Normal' as const
     };
   }
+
+  private createSignalConditions(signalQuality: number): SignalConditions {
+    return {
+      brightness: this.calculateLightLevel(),
+      stability: this.calculateStability(),
+      quality: signalQuality,
+      signalQuality,
+      lightLevel: this.calculateLightLevel(),
+      movement: this.calculateMovement(),
+      coverage: this.calculateCoverage(),
+      measurementType: 'bpm',
+      temperature: this.estimateTemperature()
+    };
+  }
+
+  private calculateStability(): number {
+    // Implementación básica
+    return 0.8;
+  }
 }

@@ -1,4 +1,3 @@
-
 export interface VitalReading {
   timestamp: number;
   value: number;
@@ -51,6 +50,22 @@ export interface BloodPressure {
 
 export type ArrhythmiaType = 'Normal' | 'Irregular' | 'Unknown' | 'Fibrilación Auricular' | 'Extrasístoles';
 
+export type MeasurementType = 'bpm' | 'spo2' | 'systolic' | 'diastolic';
+
+export interface CalibrationEntry {
+  raw: number;
+  calibrated: number;
+  conditions: SignalConditions;
+  factor: number;
+  timestamp: number;
+}
+
+export interface CalibratedResult {
+  value: number;
+  confidence: number;
+  factor: number;
+}
+
 export interface SignalConditions {
   brightness: number;
   stability: number;
@@ -59,7 +74,7 @@ export interface SignalConditions {
   lightLevel: number;
   movement: number;
   coverage: number;
-  measurementType: string;
+  measurementType: MeasurementType;
   temperature?: number;
 }
 
