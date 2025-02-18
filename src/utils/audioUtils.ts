@@ -1,6 +1,7 @@
 // ==================== audioUtils.ts ====================
 
 export class BeepPlayer {
+  // OPTIMIZACIÓN: Configuración mejorada para sonido médico
   private audioContext: AudioContext | null = null;
   private oscillator: OscillatorNode | null = null;
   private gainNode: GainNode | null = null;
@@ -9,7 +10,7 @@ export class BeepPlayer {
   private readonly minBeepInterval = 300;
 
   constructor() {
-    // Inicializar bajo demanda para móviles
+    // OPTIMIZACIÓN: Inicialización bajo demanda para móviles
     this.initAudioContext = this.initAudioContext.bind(this);
     document.addEventListener('touchstart', this.initAudioContext, { once: true });
   }
@@ -20,10 +21,10 @@ export class BeepPlayer {
     }
   }
 
+  // OPTIMIZACIÓN: Beep mejorado tipo monitor cardíaco
   async playBeep(type: 'heartbeat' | 'warning' | 'success' = 'heartbeat', volumeMultiplier: number = 1) {
     const now = Date.now();
     if (now - this.lastBeepTime < this.minBeepInterval) {
-      console.log('⚠ Beep ignorado: demasiado pronto');
       return;
     }
 
@@ -31,50 +32,50 @@ export class BeepPlayer {
       this.initAudioContext();
       if (!this.audioContext) return;
 
-      // Crear nodos de audio
+      // OPTIMIZACIÓN: Crear nodos de audio
       this.oscillator = this.audioContext.createOscillator();
       this.gainNode = this.audioContext.createGain();
       this.filterNode = this.audioContext.createBiquadFilter();
 
-      // Configurar filtro para sonido médico
+      // OPTIMIZACIÓN: Configurar filtro para sonido médico
       this.filterNode.type = 'bandpass';
-      this.filterNode.frequency.value = 1000;
-      this.filterNode.Q.value = 10;
+      this.filterNode.frequency.value = 1200;  // Frecuencia más alta
+      this.filterNode.Q.value = 15;           // Resonancia aumentada
 
-      // Configurar oscilador
+      // OPTIMIZACIÓN: Configurar oscilador para sonido más claro
       this.oscillator.type = 'sine';
       const now = this.audioContext.currentTime;
-      this.oscillator.frequency.setValueAtTime(660, now);
-      this.oscillator.frequency.linearRampToValueAtTime(440, now + 0.03);
+      
+      // OPTIMIZACIÓN: Sweep de frecuencia más pronunciado
+      this.oscillator.frequency.setValueAtTime(880, now);
+      this.oscillator.frequency.exponentialRampToValueAtTime(440, now + 0.04);
 
-      // Envelope para sonido de monitor cardíaco
+      // OPTIMIZACIÓN: Envelope más definido y volumen aumentado
       this.gainNode.gain.setValueAtTime(0, now);
-      this.gainNode.gain.linearRampToValueAtTime(0.4 * volumeMultiplier, now + 0.01);
-      this.gainNode.gain.linearRampToValueAtTime(0.2 * volumeMultiplier, now + 0.02);
-      this.gainNode.gain.linearRampToValueAtTime(0, now + 0.05);
+      this.gainNode.gain.linearRampToValueAtTime(0.7 * volumeMultiplier, now + 0.01);
+      this.gainNode.gain.linearRampToValueAtTime(0.3 * volumeMultiplier, now + 0.03);
+      this.gainNode.gain.linearRampToValueAtTime(0, now + 0.06);
 
-      // Conectar nodos
+      // OPTIMIZACIÓN: Conectar nodos con el filtro
       this.oscillator.connect(this.filterNode);
       this.filterNode.connect(this.gainNode);
       this.gainNode.connect(this.audioContext.destination);
 
-      // Reproducir
+      // OPTIMIZACIÓN: Reproducir con duración aumentada
       this.oscillator.start(now);
-      this.oscillator.stop(now + 0.05);
+      this.oscillator.stop(now + 0.06);
 
       this.lastBeepTime = Date.now();
 
-      // Log para debugging
-      console.log('🫀 Beep reproducido:', {
+      // OPTIMIZACIÓN: Logging para debugging
+      console.log('🔊 Beep reproducido:', {
         tipo: type,
-        tiempo: now,
-        volumen: volumeMultiplier
+        volumen: volumeMultiplier,
+        tiempo: now
       });
 
-      // Limpiar después de reproducir
-      setTimeout(() => {
-        this.cleanup();
-      }, 100);
+      // OPTIMIZACIÓN: Limpiar después de reproducir
+      setTimeout(() => this.cleanup(), 100);
 
     } catch (error) {
       console.error('Error reproduciendo beep:', error);
@@ -82,6 +83,7 @@ export class BeepPlayer {
     }
   }
 
+  // OPTIMIZACIÓN: Limpieza mejorada
   private cleanup() {
     if (this.oscillator) {
       try {
@@ -101,6 +103,7 @@ export class BeepPlayer {
     }
   }
 
+  // OPTIMIZACIÓN: Stop mejorado
   stop() {
     if (this.oscillator) {
       try {
@@ -114,5 +117,5 @@ export class BeepPlayer {
   }
 }
 
-// Exportar una instancia única para toda la aplicación
+// OPTIMIZACIÓN: Exportar instancia única
 export const beepPlayer = new BeepPlayer();
