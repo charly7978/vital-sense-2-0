@@ -49,7 +49,7 @@ export class SignalQualityAnalyzer {
     this.signalBuffer = new Float32Array(this.config.windowSize);
     this.hannWindow = this.createHannWindow();
     this.fft = new FFTAnalyzer(this.fftSize);
-    this.initializeBuffers();
+    this.initializeAnalyzer();
   }
 
   public analyzeQuality(signal: Float32Array): SignalQualityLevel {
