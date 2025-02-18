@@ -1,8 +1,8 @@
-import { SignalFilter } from './SignalFilter';
-import { FingerDetector } from './FingerDetector';
-import { WaveletAnalyzer } from './WaveletAnalyzer';
-import { SignalQualityAnalyzer } from './SignalQualityAnalyzer';
-import { BeepPlayer } from './BeepPlayer';
+import { SignalFilter } from '@/lib/SignalFilter';
+import { FingerDetector } from '@/lib/FingerDetector';
+import { WaveletAnalyzer } from '@/lib/WaveletAnalyzer';
+import { SignalQualityAnalyzer } from '@/lib/SignalQualityAnalyzer';
+import { BeepPlayer } from '@/lib/BeepPlayer';
 import type { PPGData, SensitivitySettings, ArrhythmiaType } from '@/types';
 
 export class PPGProcessor {
@@ -37,27 +37,33 @@ export class PPGProcessor {
       const now = Date.now();
       if (!this.shouldProcessFrame(now)) return null;
 
+      // Detección de dedo mejorada
       const fingerPresent = this.components.fingerDetector.detectFinger(imageData);
       if (!fingerPresent.isPresent) {
         return this.getDefaultPPGData(now);
       }
 
+      // Extracción y filtrado de señal
       const redValue = this.extractRedValue(imageData);
       this.updateBuffer(redValue);
       const filteredSignal = this.components.signalFilter.filter(this.buffer);
       
+      // Análisis de calidad y picos
       const quality = this.components.qualityAnalyzer.analyzeQuality(filteredSignal);
       if (quality < 0.3) {
         return this.getDefaultPPGData(now);
       }
 
+      // Análisis wavelet para detección precisa de picos
       const { peaks } = this.components.waveletAnalyzer.analyzeSignal(filteredSignal);
       
-      const bpm = this.calculateBPM(peaks.map(peak => peak.value));
+      // Cálculos vitales mejorados
+      const bpm = this.calculateBPM(peaks);
       const spo2 = this.calculateSpO2(imageData, quality);
       const { systolic, diastolic } = this.estimateBloodPressure(bpm, peaks);
       const arrhythmia = this.analyzeArrhythmia(peaks);
 
+      // Reproducir beep si hay un pico válido
       if (this.shouldBeep(peaks)) {
         await this.components.beepPlayer.playBeep('heartbeat', quality);
       }
@@ -100,7 +106,7 @@ export class PPGProcessor {
   }
 
   private shouldProcessFrame(now: number): boolean {
-    if (now - this.lastProcessedTime < 33) return false;
+    if (now - this.lastProcessedTime < 33) return false; // ~30fps
     this.lastProcessedTime = now;
     return true;
   }
@@ -110,6 +116,7 @@ export class PPGProcessor {
     let totalRed = 0;
     let pixelCount = 0;
 
+    // Analizar solo la región central para mejor precisión
     const centerRegion = this.getCenterRegion(imageData);
     for (let i = centerRegion.start; i < centerRegion.end; i += 4) {
       totalRed += data[i];
@@ -144,9 +151,9 @@ export class PPGProcessor {
     
     const intervals = peaks.slice(1).map((peak, i) => peak - peaks[i]);
     const averageInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-    const bpm = Math.round(60000 / (averageInterval * (1000/30)));
+    const bpm = Math.round(60000 / (averageInterval * (1000/30))); // Convertir a BPM
 
-    return Math.min(Math.max(bpm, 45), 180);
+    return Math.min(Math.max(bpm, 45), 180); // Limitar a rangos realistas
   }
 
   private calculateSpO2(imageData: ImageData, quality: number): number {
@@ -155,7 +162,7 @@ export class PPGProcessor {
 
     const ratio = Math.log(red) / Math.log(ir);
     const baseSpO2 = 110 - (25 * ratio);
-    const compensatedSpO2 = baseSpO2 + (quality * 2);
+    const compensatedSpO2 = baseSpO2 + (quality * 2); // Ajuste por calidad
 
     return Math.min(Math.max(Math.round(compensatedSpO2), 90), 100);
   }
@@ -169,7 +176,7 @@ export class PPGProcessor {
     const centerRegion = this.getCenterRegion(imageData);
     for (let i = centerRegion.start; i < centerRegion.end; i += 4) {
       redTotal += data[i];
-      irTotal += (data[i + 1] + data[i + 2]) / 2;
+      irTotal += (data[i + 1] + data[i + 2]) / 2; // Aproximación IR
       pixelCount++;
     }
 
