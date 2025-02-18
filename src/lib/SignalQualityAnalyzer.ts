@@ -1,230 +1,400 @@
+// src/lib/SignalQualityAnalyzer.ts
+
+import { SignalQualityLevel, SensitivitySettings } from '@/types';
+
 export class SignalQualityAnalyzer {
-  public analyzeQuality(signal: number[]): number {
-    if (signal.length < 2) return 0;
+  // Configuración de análisis
+  private readonly config = {
+    windowSize: 256,
+    minSNR: 5.0,        // dB
+    maxMotion: 0.3,     // Umbral de movimiento
+    minBrightness: 0.2,
+    maxBrightness: 0.9,
+    minContrast: 0.15,
+    minStability: 0.7,
+    sampleRate: 30,     // Hz
     
-    const { mean, stdDev, variance } = this.calculateStatistics(signal);
-    const signalVariation = stdDev / (Math.abs(mean) + 1e-6);
-    
-    if (signalVariation < 0.08) {
-      return 0.1;
+    // Pesos para métricas de calidad
+    weights: {
+      snr: 0.25,
+      stability: 0.20,
+      motion: 0.15,
+      brightness: 0.15,
+      contrast: 0.15,
+      frequency: 0.10
+    },
+
+    // Umbrales de calidad
+    thresholds: {
+      excellent: 0.85,
+      good: 0.70,
+      fair: 0.50,
+      poor: 0.30
     }
-    
-    const baselineStability = this.calculateBaselineStability(signal);
-    const noiseLevel = this.calculateNoiseLevel(signal);
-    const noiseQuality = 1 - Math.min(noiseLevel * 1.2, 1);
-    const baselineQuality = Math.min(baselineStability, 1);
-    
-    let quality = 
-      0.3 * this.analyzeAmplitude(signal).amplitudeQuality +
-      0.4 * noiseQuality +
-      0.3 * baselineQuality;
-    
-    if (baselineStability < 0.5) {
-      quality *= 0.8;
-    }
-    
-    quality = Math.pow(quality, 1.2);
-    return Math.min(Math.max(quality, 0), 1);
+  };
+
+  // Buffers y estado
+  private readonly signalBuffer: Float32Array;
+  private readonly qualityHistory: number[] = [];
+  private readonly motionHistory: number[] = [];
+  private readonly frequencyHistory: number[] = [];
+  private readonly maxHistoryLength = 90; // 3 segundos @ 30Hz
+
+  // Análisis espectral
+  private readonly fftSize = 256;
+  private readonly hannWindow: Float32Array;
+  private readonly fft: FFTAnalyzer;
+
+  constructor(private settings: SensitivitySettings) {
+    this.signalBuffer = new Float32Array(this.config.windowSize);
+    this.hannWindow = this.createHannWindow();
+    this.fft = new FFTAnalyzer(this.fftSize);
+    this.initializeBuffers();
   }
 
-  // OPTIMIZACIÓN: Umbrales más estrictos para mejor calidad
-  private readonly MIN_AMPLITUDE = 30;        // Antes: 20
-  private readonly MIN_VARIATION = 0.08;      // Antes: 0.05
-  private readonly WINDOW_SIZE = 15;          // Antes: 8
-  private readonly STABILITY_THRESHOLD = 0.5;
-  private readonly NOISE_SENSITIVITY = 1.2;
-  private lastQuality = 0;
+  public analyzeQuality(signal: Float32Array): SignalQualityLevel {
+    // Actualizar buffer
+    this.updateBuffer(signal);
 
-  // OPTIMIZACIÓN: Mejor análisis de calidad de señal
-  analyzeSignalQuality(signal: number[]): number {
-    if (signal.length < 2) return 0;
+    // Análisis completo
+    const metrics = this.calculateMetrics();
     
-    // OPTIMIZACIÓN: Estadísticas mejoradas
-    const { mean, stdDev, variance } = this.calculateStatistics(signal);
+    // Calcular score de calidad
+    const qualityScore = this.calculateQualityScore(metrics);
     
-    // OPTIMIZACIÓN: Mejor análisis de amplitud
-    const { peakToPeak, amplitudeQuality } = this.analyzeAmplitude(signal);
-    if (peakToPeak < this.MIN_AMPLITUDE) {
-      return this.smoothQuality(0.1);
-    }
+    // Actualizar historiales
+    this.updateHistories(metrics, qualityScore);
     
-    // OPTIMIZACIÓN: Análisis de ruido mejorado
-    const noiseLevel = this.calculateNoiseLevel(signal);
+    // Determinar nivel de calidad
+    return this.determineQualityLevel(qualityScore);
+  }
+
+  private calculateMetrics(): {
+    snr: number;
+    stability: number;
+    motion: number;
+    brightness: number;
+    contrast: number;
+    frequency: number;
+    entropy: number;
+    harmonics: number[];
+  } {
+    // Preparar señal para análisis
+    const windowedSignal = this.applyWindow(this.signalBuffer);
     
-    // OPTIMIZACIÓN: Mejor análisis de línea base
-    const baselineStability = this.calculateBaselineStability(signal);
+    // Análisis espectral
+    const spectrum = this.fft.forward(windowedSignal);
+    const harmonics = this.analyzeHarmonics(spectrum);
     
-    // OPTIMIZACIÓN: Mejor análisis de variación
-    const signalVariation = stdDev / (Math.abs(mean) + 1e-6);
-    if (signalVariation < this.MIN_VARIATION) {
-      return this.smoothQuality(0.1);
-    }
-    
-    // OPTIMIZACIÓN: Pesos ajustados para mejor detección
-    const weights = {
-      amplitude: 0.3,    // Antes: 0.35
-      noise: 0.4,        // Antes: 0.35
-      baseline: 0.3      // Antes: 0.3
+    // Calcular métricas individuales
+    return {
+      snr: this.calculateSNR(windowedSignal, spectrum),
+      stability: this.calculateStability(windowedSignal),
+      motion: this.calculateMotion(),
+      brightness: this.calculateBrightness(windowedSignal),
+      contrast: this.calculateContrast(windowedSignal),
+      frequency: this.estimateFrequency(spectrum),
+      entropy: this.calculateSpectralEntropy(spectrum),
+      harmonics
     };
+  }
+
+  private calculateSNR(signal: Float32Array, spectrum: Float32Array): number {
+    const signalBand = this.extractSignalBand(spectrum);
+    const noiseBand = this.extractNoiseBand(spectrum);
     
-    // OPTIMIZACIÓN: Cálculo de calidad mejorado
-    const noiseQuality = 1 - Math.min(noiseLevel * this.NOISE_SENSITIVITY, 1);
-    const baselineQuality = Math.min(baselineStability, 1);
+    const signalPower = signalBand.reduce((sum, val) => sum + val * val, 0);
+    const noisePower = noiseBand.reduce((sum, val) => sum + val * val, 0);
     
-    let quality = 
-      amplitudeQuality * weights.amplitude +
-      noiseQuality * weights.noise +
-      baselineQuality * weights.baseline;
+    return noisePower === 0 ? 
+      Number.POSITIVE_INFINITY : 
+      10 * Math.log10(signalPower / noisePower);
+  }
+
+  private calculateStability(signal: Float32Array): number {
+    if (this.qualityHistory.length < 2) return 1;
+
+    const variations = this.qualityHistory
+      .slice(-10)
+      .map((q, i, arr) => i > 0 ? Math.abs(q - arr[i-1]) : 0);
     
-    // OPTIMIZACIÓN: Penalización por inestabilidad
-    if (baselineStability < this.STABILITY_THRESHOLD) {
-      quality *= 0.8;
+    const avgVariation = variations.reduce((sum, v) => sum + v, 0) / variations.length;
+    return Math.exp(-avgVariation * 5);
+  }
+
+  private calculateMotion(): number {
+    if (this.motionHistory.length < 2) return 0;
+
+    const recentMotion = this.motionHistory.slice(-5);
+    return recentMotion.reduce((sum, m) => sum + m, 0) / recentMotion.length;
+  }
+
+  private calculateBrightness(signal: Float32Array): number {
+    const mean = signal.reduce((sum, val) => sum + val, 0) / signal.length;
+    return (mean + 1) / 2; // Normalizar a [0,1]
+  }
+
+  private calculateContrast(signal: Float32Array): number {
+    let min = Infinity;
+    let max = -Infinity;
+    
+    for (const value of signal) {
+      min = Math.min(min, value);
+      max = Math.max(max, value);
     }
     
-    // OPTIMIZACIÓN: Ajuste exponencial mejorado
-    quality = Math.pow(quality, 1.2);
-    
-    // OPTIMIZACIÓN: Suavizado temporal
-    return this.smoothQuality(quality);
+    return max - min;
   }
 
-  // OPTIMIZACIÓN: Mejor cálculo de estadísticas
-  private calculateStatistics(signal: number[]) {
-    const mean = signal.reduce((a, b) => a + b, 0) / signal.length;
-    const variance = signal.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / signal.length;
-    const stdDev = Math.sqrt(variance);
-    return { mean, variance, stdDev };
+  private estimateFrequency(spectrum: Float32Array): number {
+    const peakBin = this.findPeakFrequencyBin(spectrum);
+    return (peakBin * this.config.sampleRate) / this.fftSize;
   }
 
-  // OPTIMIZACIÓN: Mejor análisis de amplitud
-  private analyzeAmplitude(signal: number[]) {
-    const peakToPeak = Math.max(...signal) - Math.min(...signal);
-    const amplitudeQuality = Math.min(peakToPeak / 150, 1);
-    return { peakToPeak, amplitudeQuality };
-  }
+  private calculateSpectralEntropy(spectrum: Float32Array): number {
+    const totalPower = spectrum.reduce((sum, val) => sum + val * val, 0);
+    if (totalPower === 0) return 0;
 
-  // OPTIMIZACIÓN: Cálculo de ruido mejorado
-  private calculateNoiseLevel(signal: number[]): number {
-    if (signal.length < 2) return 1;
-
-    // OPTIMIZACIÓN: Análisis de primer y segundo orden
-    const firstOrderDiff = [];
-    for (let i = 1; i < signal.length; i++) {
-      firstOrderDiff.push(Math.abs(signal[i] - signal[i-1]));
-    }
-    
-    const secondOrderDiff = [];
-    for (let i = 1; i < firstOrderDiff.length; i++) {
-      secondOrderDiff.push(Math.abs(firstOrderDiff[i] - firstOrderDiff[i-1]));
-    }
-    
-    const meanFirstOrder = firstOrderDiff.reduce((a, b) => a + b, 0) / firstOrderDiff.length;
-    const meanSecondOrder = secondOrderDiff.reduce((a, b) => a + b, 0) / secondOrderDiff.length;
-    
-    const maxSignal = Math.max(...signal) - Math.min(...signal);
-    if (maxSignal === 0) return 1;
-    
-    // OPTIMIZACIÓN: Combinación ponderada de ruidos
-    return (meanFirstOrder * 0.7 + meanSecondOrder * 0.3) / maxSignal;
-  }
-
-  // OPTIMIZACIÓN: Mejor estabilidad de línea base
-  private calculateBaselineStability(signal: number[]): number {
-    if (signal.length < this.WINDOW_SIZE) return 0;
-    
-    const baseline = this.calculateBaseline(signal);
-    const baselineVariation = this.calculateBaselineVariation(baseline);
-    
-    // OPTIMIZACIÓN: Normalización mejorada
-    return Math.exp(-baselineVariation / 5);
-  }
-
-  // OPTIMIZACIÓN: Mejor cálculo de línea base
-  private calculateBaseline(signal: number[]): number[] {
-    const baseline = [];
-    const windowSize = this.WINDOW_SIZE;
-    
-    for (let i = windowSize; i < signal.length; i++) {
-      let weightedSum = 0;
-      let weightSum = 0;
-      
-      for (let j = 0; j < windowSize; j++) {
-        const weight = Math.exp(-j/5);  // Peso exponencial
-        weightedSum += signal[i-j] * weight;
-        weightSum += weight;
+    let entropy = 0;
+    for (const val of spectrum) {
+      const p = (val * val) / totalPower;
+      if (p > 0) {
+        entropy -= p * Math.log2(p);
       }
-      
-      baseline.push(weightedSum / weightSum);
     }
-    
-    return baseline;
+
+    return entropy / Math.log2(spectrum.length);
   }
 
-  // OPTIMIZACIÓN: Mejor cálculo de variación
-  private calculateBaselineVariation(baseline: number[]): number {
-    const trend = this.calculateTrend(baseline);
-    
-    return baseline.reduce((acc, val, i) => 
-      acc + Math.pow(val - trend[i], 2), 0
-    ) / baseline.length;
-  }
+  private analyzeHarmonics(spectrum: Float32Array): number[] {
+    const fundamentalBin = this.findPeakFrequencyBin(spectrum);
+    const harmonics: number[] = [];
 
-  // OPTIMIZACIÓN: Mejor cálculo de tendencia
-  private calculateTrend(signal: number[]): number[] {
-    const trend = [];
-    const windowSize = Math.min(15, Math.floor(signal.length / 3));
-    
-    for (let i = 0; i < signal.length; i++) {
-      const start = Math.max(0, i - windowSize);
-      const end = Math.min(signal.length, i + windowSize + 1);
-      const segment = signal.slice(start, end);
-      trend.push(segment.reduce((a, b) => a + b, 0) / segment.length);
+    for (let i = 1; i <= 4; i++) {
+      const harmonicBin = fundamentalBin * i;
+      if (harmonicBin < spectrum.length) {
+        const harmonicPower = this.calculateBandPower(
+          spectrum,
+          harmonicBin - 1,
+          harmonicBin + 1
+        );
+        harmonics.push(harmonicPower);
+      }
     }
-    
-    return trend;
+
+    return harmonics;
   }
 
-  // OPTIMIZACIÓN: Suavizado temporal mejorado
-  private smoothQuality(newQuality: number): number {
-    const alpha = 0.3; // Factor de suavizado
-    this.lastQuality = alpha * newQuality + (1 - alpha) * this.lastQuality;
-    return Math.min(Math.max(this.lastQuality, 0), 1);
-  }
+  private calculateQualityScore(metrics: {
+    snr: number;
+    stability: number;
+    motion: number;
+    brightness: number;
+    contrast: number;
+    frequency: number;
+  }): number {
+    // Normalizar métricas
+    const normalizedSNR = Math.min(1, metrics.snr / this.config.minSNR);
+    const normalizedMotion = 1 - Math.min(1, metrics.motion / this.config.maxMotion);
+    const normalizedBrightness = this.normalizeBrightness(metrics.brightness);
+    const normalizedContrast = Math.min(1, metrics.contrast / this.config.minContrast);
+    const normalizedFrequency = this.normalizeFrequency(metrics.frequency);
 
-  // OPTIMIZACIÓN: Mejor cálculo de estabilidad entre señales
-  calculateSignalStability(redSignal: number[], irSignal: number[]): number {
-    if (redSignal.length < 2 || irSignal.length < 2) return 0;
-
-    const redQuality = this.analyzeSignalQuality(redSignal);
-    const irQuality = this.analyzeSignalQuality(irSignal);
-    
-    // OPTIMIZACIÓN: Análisis de correlación
-    const correlation = this.calculateCorrelation(redSignal, irSignal);
-    
-    // OPTIMIZACIÓN: Combinación ponderada
-    return Math.min(
-      redQuality * 0.4 + 
-      irQuality * 0.4 + 
-      correlation * 0.2,
-      1
+    // Aplicar pesos
+    return (
+      this.config.weights.snr * normalizedSNR +
+      this.config.weights.stability * metrics.stability +
+      this.config.weights.motion * normalizedMotion +
+      this.config.weights.brightness * normalizedBrightness +
+      this.config.weights.contrast * normalizedContrast +
+      this.config.weights.frequency * normalizedFrequency
     );
   }
 
-  // OPTIMIZACIÓN: Mejor cálculo de correlación
-  private calculateCorrelation(signal1: number[], signal2: number[]): number {
-    if (signal1.length !== signal2.length) return 0;
+  private determineQualityLevel(score: number): SignalQualityLevel {
+    if (score >= this.config.thresholds.excellent)
+      return SignalQualityLevel.Excellent;
+    if (score >= this.config.thresholds.good)
+      return SignalQualityLevel.Good;
+    if (score >= this.config.thresholds.fair)
+      return SignalQualityLevel.Fair;
+    if (score >= this.config.thresholds.poor)
+      return SignalQualityLevel.Poor;
+    return SignalQualityLevel.Invalid;
+  }
+
+  // Métodos auxiliares
+  private createHannWindow(): Float32Array {
+    const window = new Float32Array(this.config.windowSize);
+    for (let i = 0; i < this.config.windowSize; i++) {
+      window[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (this.config.windowSize - 1)));
+    }
+    return window;
+  }
+
+  private applyWindow(signal: Float32Array): Float32Array {
+    const windowed = new Float32Array(signal.length);
+    for (let i = 0; i < signal.length; i++) {
+      windowed[i] = signal[i] * this.hannWindow[i];
+    }
+    return windowed;
+  }
+
+  private updateBuffer(newData: Float32Array): void {
+    // Desplazar datos existentes
+    this.signalBuffer.set(
+      this.signalBuffer.subarray(newData.length),
+      0
+    );
+    // Añadir nuevos datos
+    this.signalBuffer.set(
+      newData,
+      this.signalBuffer.length - newData.length
+    );
+  }
+
+  private updateHistories(
+    metrics: {
+      motion: number;
+      frequency: number;
+    },
+    quality: number
+  ): void {
+    // Actualizar historiales
+    this.qualityHistory.push(quality);
+    this.motionHistory.push(metrics.motion);
+    this.frequencyHistory.push(metrics.frequency);
+
+    // Mantener longitud máxima
+    if (this.qualityHistory.length > this.maxHistoryLength) {
+      this.qualityHistory.shift();
+      this.motionHistory.shift();
+      this.frequencyHistory.shift();
+    }
+  }
+
+  private normalizeBrightness(brightness: number): number {
+    if (brightness < this.config.minBrightness) {
+      return brightness / this.config.minBrightness;
+    }
+    if (brightness > this.config.maxBrightness) {
+      return 1 - (brightness - this.config.maxBrightness) / 
+                 (1 - this.config.maxBrightness);
+    }
+    return 1;
+  }
+
+  private normalizeFrequency(frequency: number): number {
+    // Rango esperado: 0.5-4.0 Hz (30-240 BPM)
+    const minFreq = 0.5;
+    const maxFreq = 4.0;
+    const normalizedFreq = (frequency - minFreq) / (maxFreq - minFreq);
+    return Math.max(0, Math.min(1, normalizedFreq));
+  }
+
+  public updateSettings(newSettings: SensitivitySettings): void {
+    this.settings = newSettings;
+    this.updateConfigurationThresholds();
+  }
+
+  private updateConfigurationThresholds(): void {
+    // Ajustar umbrales basados en la sensibilidad
+    this.config.minSNR *= this.settings.signalAmplification;
+    this.config.maxMotion *= (2 - this.settings.noiseReduction);
+    this.config.minContrast *= this.settings.signalStability;
+  }
+}
+
+// Clase auxiliar para análisis FFT
+class FFTAnalyzer {
+  private readonly size: number;
+  private readonly real: Float32Array;
+  private readonly imag: Float32Array;
+  private readonly sinTable: Float32Array;
+  private readonly cosTable: Float32Array;
+
+  constructor(size: number) {
+    this.size = size;
+    this.real = new Float32Array(size);
+    this.imag = new Float32Array(size);
+    this.sinTable = new Float32Array(size);
+    this.cosTable = new Float32Array(size);
+    this.initializeTables();
+  }
+
+  private initializeTables(): void {
+    for (let i = 0; i < this.size; i++) {
+      const angle = (2 * Math.PI * i) / this.size;
+      this.sinTable[i] = Math.sin(angle);
+      this.cosTable[i] = Math.cos(angle);
+    }
+  }
+
+  public forward(signal: Float32Array): Float32Array {
+    // Copiar señal a buffer real
+    this.real.set(signal);
+    this.imag.fill(0);
+
+    // Realizar FFT
+    this.fft(this.real, this.imag);
+
+    // Calcular magnitud
+    const magnitude = new Float32Array(this.size / 2);
+    for (let i = 0; i < this.size / 2; i++) {
+      magnitude[i] = Math.sqrt(
+        this.real[i] * this.real[i] + 
+        this.imag[i] * this.imag[i]
+      );
+    }
+
+    return magnitude;
+  }
+
+  private fft(real: Float32Array, imag: Float32Array): void {
+    // Implementación optimizada de FFT in-place
+    // Reordenamiento bit-reversal
+    this.bitreversal(real, imag);
+
+    // Cálculo de FFT
+    for (let size = 2; size <= this.size; size *= 2) {
+      const halfsize = size / 2;
+      const tablestep = this.size / size;
+      
+      for (let i = 0; i < this.size; i += size) {
+        for (let j = i, k = 0; j < i + halfsize; j++, k += tablestep) {
+          const tr = real[j+halfsize] * this.cosTable[k] + 
+                    imag[j+halfsize] * this.sinTable[k];
+          const ti = imag[j+halfsize] * this.cosTable[k] - 
+                    real[j+halfsize] * this.sinTable[k];
+          
+          real[j + halfsize] = real[j] - tr;
+          imag[j + halfsize] = imag[j] - ti;
+          real[j] += tr;
+          imag[j] += ti;
+        }
+      }
+    }
+  }
+
+  private bitreversal(real: Float32Array, imag: Float32Array): void {
+    for (let i = 0; i < this.size; i++) {
+      const j = this.reverseBits(i);
+      if (j > i) {
+        [real[i], real[j]] = [real[j], real[i]];
+        [imag[i], imag[j]] = [imag[j], imag[i]];
+      }
+    }
+  }
+
+  private reverseBits(index: number): number {
+    let reversed = 0;
+    let bits = Math.log2(this.size);
     
-    const { mean: mean1, stdDev: std1 } = this.calculateStatistics(signal1);
-    const { mean: mean2, stdDev: std2 } = this.calculateStatistics(signal2);
-    
-    let correlation = 0;
-    for (let i = 0; i < signal1.length; i++) {
-      correlation += 
-        ((signal1[i] - mean1) / std1) * 
-        ((signal2[i] - mean2) / std2);
+    for (let i = 0; i < bits; i++) {
+      reversed = (reversed << 1) | (index & 1);
+      index >>= 1;
     }
     
-    correlation /= signal1.length;
-    return Math.max(0, correlation);
+    return reversed;
   }
 }
