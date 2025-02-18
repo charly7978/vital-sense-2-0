@@ -6,6 +6,7 @@ import CameraOverlay from "./camera/CameraOverlay";
 import CameraStatus from "./camera/CameraStatus";
 import { useCameraProcessor } from "./camera/useCameraProcessor";
 import { useCameraInitializer } from "./camera/useCameraInitializer";
+import { useToast } from "@/hooks/use-toast";
 
 interface CameraViewProps {
   onFrame: (imageData: ImageData) => void;
@@ -21,6 +22,8 @@ const CameraView: React.FC<CameraViewProps> = ({
   const [isInitializing, setIsInitializing] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [frameCount, setFrameCount] = useState(0);
+  const [isFlashlightOn, setIsFlashlightOn] = useState(false);
+  const { toast } = useToast();
 
   const videoConstraints = {
     width: { ideal: 1280 },
@@ -41,6 +44,48 @@ const CameraView: React.FC<CameraViewProps> = ({
     setFrameCount
   });
 
+  const toggleFlashlight = async () => {
+    if (!webcamRef.current?.video) return;
+
+    try {
+      const track = (await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" }
+      })).getVideoTracks()[0];
+
+      const capabilities = track.getCapabilities();
+      
+      // Verificar si el dispositivo tiene linterna
+      if (!capabilities.torch) {
+        toast({
+          title: "Error",
+          description: "Este dispositivo no tiene linterna",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const newTorchState = !isFlashlightOn;
+      await track.applyConstraints({
+        advanced: [{ torch: newTorchState }]
+      });
+
+      setIsFlashlightOn(newTorchState);
+      
+      toast({
+        title: newTorchState ? "Linterna encendida" : "Linterna apagada",
+        description: "Ajusta la luz según sea necesario",
+      });
+
+    } catch (error) {
+      console.error('Error al controlar la linterna:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo controlar la linterna",
+        variant: "destructive",
+      });
+    }
+  };
+
   useEffect(() => {
     let isMounted = true;
 
@@ -54,6 +99,8 @@ const CameraView: React.FC<CameraViewProps> = ({
           setIsInitializing(false);
           if (success) {
             console.log('Cámara iniciada exitosamente');
+            // Intentar encender la linterna automáticamente al iniciar
+            await toggleFlashlight();
           }
         }
       }
@@ -63,6 +110,10 @@ const CameraView: React.FC<CameraViewProps> = ({
 
     return () => {
       isMounted = false;
+      // Asegurarse de apagar la linterna al desmontar
+      if (isFlashlightOn) {
+        toggleFlashlight();
+      }
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
@@ -102,6 +153,13 @@ const CameraView: React.FC<CameraViewProps> = ({
               isInitializing={isInitializing}
               hasError={hasError}
             />
+
+            <button
+              onClick={toggleFlashlight}
+              className="absolute bottom-4 right-4 z-50 p-3 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 text-white/80"
+            >
+              {isFlashlightOn ? "Apagar Linterna" : "Encender Linterna"}
+            </button>
           </>
         )}
 
