@@ -2,12 +2,14 @@
 export class SignalProcessor {
   private buffer: number[] = [];
   private readonly bufferSize = 180;
+  private lastImageData: ImageData | null = null;
 
   constructor() {
     // Inicialización
   }
 
   public extractChannels(imageData: ImageData): { red: number; ir: number } {
+    this.lastImageData = imageData;
     const data = imageData.data;
     let totalRed = 0;
     let totalIR = 0;
@@ -25,6 +27,11 @@ export class SignalProcessor {
     };
   }
 
+  public calculatePeakIntervals(data: number[]): number[] {
+    // Implementación básica
+    return [];
+  }
+
   public processFrame(conditions: any): any {
     // Implementación básica
     return {
@@ -33,7 +40,7 @@ export class SignalProcessor {
       systolic: 120,
       diastolic: 80,
       hasArrhythmia: false,
-      arrhythmiaType: 'Normal'
+      arrhythmiaType: 'Normal' as const
     };
   }
 }

@@ -1,7 +1,7 @@
 
 import { useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { MediaTrackConstraintsExtended } from "@/types";
+import { MediaTrackConstraintsExtended, ExtendedMediaTrackCapabilities, ExtendedMediaTrackSettings } from "@/types";
 
 interface UseCameraInitializerProps {
   videoConstraints: MediaTrackConstraintsExtended;
@@ -29,11 +29,11 @@ export const useCameraInitializer = ({
 
       const track = stream.getVideoTracks()[0];
       
-      // Configuración básica de la cámara
       try {
-        const capabilities = track.getCapabilities();
-        const settings: MediaTrackSettings = {};
+        const capabilities = track.getCapabilities() as ExtendedMediaTrackCapabilities;
+        const settings: ExtendedMediaTrackSettings = {};
 
+        // Configurar si están disponibles los controles
         if (capabilities.brightness) {
           settings.brightness = 100;
         }
@@ -46,7 +46,11 @@ export const useCameraInitializer = ({
           settings.saturation = 120;
         }
 
-        await track.applyConstraints({ advanced: [settings] });
+        // Aplicar configuraciones básicas
+        await track.applyConstraints({
+          advanced: [settings as MediaTrackConstraintSet]
+        });
+
       } catch (constraintError) {
         console.log('Usando configuración automática de cámara');
       }

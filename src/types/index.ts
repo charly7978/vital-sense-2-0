@@ -3,7 +3,7 @@ export interface VitalReading {
   timestamp: number;
   value: number;
   isPeak?: boolean;
-  [key: string]: any; // Permite propiedades adicionales
+  [key: string]: any;
 }
 
 export interface PPGData {
@@ -12,7 +12,7 @@ export interface PPGData {
   systolic: number;
   diastolic: number;
   hasArrhythmia: boolean;
-  arrhythmiaType: string;
+  arrhythmiaType: ArrhythmiaType;
   confidence: number;
   readings: VitalReading[];
   isPeak?: boolean;
@@ -34,20 +34,12 @@ export interface SensitivitySettings {
   [key: string]: number | undefined;
 }
 
-export interface MediaTrackConstraintsExtended extends MediaTrackConstraints {
-  width?: number | { ideal: number };
-  height?: number | { ideal: number };
-  facingMode?: string;
-  frameRate?: number | { ideal: number };
-  aspectRatio?: number | { ideal: number };
-  advanced?: MediaTrackConstraintSet[];
-}
-
 export interface VitalSigns {
   bpm: number;
   spo2: number;
   systolic: number;
   diastolic: number;
+  quality?: number;
 }
 
 export interface BloodPressure {
@@ -55,10 +47,39 @@ export interface BloodPressure {
   diastolic: number;
 }
 
-export type ArrhythmiaType = 'Normal' | 'Irregular' | 'Unknown';
+export type ArrhythmiaType = 'Normal' | 'Irregular' | 'Unknown' | 'Fibrilación Auricular' | 'Extrasístoles';
 
 export interface SignalConditions {
   brightness: number;
   stability: number;
   quality: number;
+  signalQuality: number;
+  lightLevel: number;
+  movement: number;
+  coverage: number;
+  measurementType: string;
+}
+
+export interface ExtendedMediaTrackCapabilities extends MediaTrackCapabilities {
+  brightness?: {
+    max: number;
+    min: number;
+    step: number;
+  };
+  contrast?: {
+    max: number;
+    min: number;
+    step: number;
+  };
+  saturation?: {
+    max: number;
+    min: number;
+    step: number;
+  };
+}
+
+export interface ExtendedMediaTrackSettings extends MediaTrackSettings {
+  brightness?: number;
+  contrast?: number;
+  saturation?: number;
 }
