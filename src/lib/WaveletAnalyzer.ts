@@ -6,22 +6,24 @@ export class WaveletAnalyzer {
   private readonly scaleStep = 1;
   private readonly qualityThreshold = 0.6;
 
-  analyzeSignal(signal: number[]): { quality: number; peaks: number[] } {
+  public detectPeaks(signal: number[]): number[] {
+    if (!signal || signal.length < 4) {
+      return [];
+    }
+
+    const { quality, peaks } = this.analyzeSignal(signal);
+    return peaks;
+  }
+
+  public analyzeSignal(signal: number[]): { quality: number; peaks: number[] } {
     if (!signal || signal.length < 4) {
       return { quality: 0, peaks: [] };
     }
 
     try {
-      // Normalizar señal
       const normalizedSignal = this.normalizeSignal(signal);
-
-      // Descomposición wavelet
       const coefficients = this.waveletDecomposition(normalizedSignal);
-
-      // Detectar picos
-      const peaks = this.detectPeaks(coefficients);
-
-      // Calcular calidad
+      const peaks = this.findPeaks(coefficients);
       const quality = this.calculateSignalQuality(coefficients, normalizedSignal);
 
       return {
@@ -76,7 +78,7 @@ export class WaveletAnalyzer {
     return { approximation, detail };
   }
 
-  private detectPeaks(coefficients: number[][]): number[] {
+  private findPeaks(coefficients: number[][]): number[] {
     const peaks: number[] = [];
     const combinedCoefficients = this.combineCoefficients(coefficients);
 

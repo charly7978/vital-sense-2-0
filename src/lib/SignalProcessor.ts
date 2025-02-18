@@ -4,7 +4,7 @@ import { PPGSynchronizer } from '@/lib/PPGSynchronizer';
 import { AdaptiveCalibrator } from '@/lib/AdaptiveCalibrator';
 import { WaveletAnalyzer } from '@/lib/WaveletAnalyzer';
 import { SignalQualityAnalyzer } from '@/lib/SignalQualityAnalyzer';
-import type { VitalSigns, BloodPressure, ArrhythmiaType, SignalConditions, MeasurementType } from '@/types';
+import type { VitalSigns, BloodPressure, ArrhythmiaType, SignalConditions } from '@/types';
 
 export class SignalProcessor {
   private buffer: number[] = [];

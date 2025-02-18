@@ -23,7 +23,7 @@ export class SignalFilter {
   }
 
   // OPTIMIZACIÓN: Procesamiento de señal mejorado
-  processSignal(signal: number[]): number[] {
+  public filter(signal: number[]): number[] {
     if (signal.length < 2) return signal;
 
     // OPTIMIZACIÓN: Pipeline de procesamiento mejorado

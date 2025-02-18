@@ -1,4 +1,32 @@
 export class SignalQualityAnalyzer {
+  public analyzeQuality(signal: number[]): number {
+    if (signal.length < 2) return 0;
+    
+    const { mean, stdDev, variance } = this.calculateStatistics(signal);
+    const signalVariation = stdDev / (Math.abs(mean) + 1e-6);
+    
+    if (signalVariation < 0.08) {
+      return 0.1;
+    }
+    
+    const baselineStability = this.calculateBaselineStability(signal);
+    const noiseLevel = this.calculateNoiseLevel(signal);
+    const noiseQuality = 1 - Math.min(noiseLevel * 1.2, 1);
+    const baselineQuality = Math.min(baselineStability, 1);
+    
+    let quality = 
+      0.3 * this.analyzeAmplitude(signal).amplitudeQuality +
+      0.4 * noiseQuality +
+      0.3 * baselineQuality;
+    
+    if (baselineStability < 0.5) {
+      quality *= 0.8;
+    }
+    
+    quality = Math.pow(quality, 1.2);
+    return Math.min(Math.max(quality, 0), 1);
+  }
+
   // OPTIMIZACIÓN: Umbrales más estrictos para mejor calidad
   private readonly MIN_AMPLITUDE = 30;        // Antes: 20
   private readonly MIN_VARIATION = 0.08;      // Antes: 0.05
