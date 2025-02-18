@@ -1,6 +1,19 @@
+import { SignalFilter } from './SignalFilter';
+import { FingerDetector } from './FingerDetector';
+import { WaveletAnalyzer } from './WaveletAnalyzer';
+import { SignalQualityAnalyzer } from './SignalQualityAnalyzer';
+import { BeepPlayer } from './BeepPlayer';
 import type { PPGData, SensitivitySettings, ArrhythmiaType } from '@/types';
 
 export class PPGProcessor {
+  private readonly components = {
+    signalFilter: new SignalFilter(),
+    fingerDetector: new FingerDetector(),
+    waveletAnalyzer: new WaveletAnalyzer(),
+    qualityAnalyzer: new SignalQualityAnalyzer(),
+    beepPlayer: new BeepPlayer()
+  };
+
   private settings: SensitivitySettings;
   private buffer: number[] = [];
   private readonly bufferSize = 180;  // 6 segundos a 30fps
@@ -22,48 +35,42 @@ export class PPGProcessor {
   public async processFrame(imageData: ImageData): Promise<PPGData | null> {
     try {
       const now = Date.now();
-      
-      // Control de frecuencia de muestreo
-      if (now - this.lastProcessedTime < 33) { // ~30fps
-        return null;
-      }
-      
-      // Extraer valor rojo promedio de la región central
-      const redValue = this.extractRedValue(imageData);
-      
-      // Actualizar buffer
-      this.updateBuffer(redValue);
-      
-      // Detectar pico
-      const isPeak = this.detectPeak(redValue);
-      
-      // Calcular calidad de señal
-      const quality = this.calculateSignalQuality();
-      
-      // Calcular BPM
-      const bpm = this.calculateBPM();
-      
-      // Calcular SpO2
-      const spo2 = this.calculateSpO2(imageData);
-      
-      // Calcular presión arterial estimada
-      const { systolic, diastolic } = this.estimateBloodPressure();
-      
-      // Análisis de arritmia
-      const { hasArrhythmia, arrhythmiaType } = this.analyzeArrhythmia();
+      if (!this.shouldProcessFrame(now)) return null;
 
-      this.lastProcessedTime = now;
+      const fingerPresent = this.components.fingerDetector.detectFinger(imageData);
+      if (!fingerPresent.isPresent) {
+        return this.getDefaultPPGData(now);
+      }
+
+      const redValue = this.extractRedValue(imageData);
+      this.updateBuffer(redValue);
+      const filteredSignal = this.components.signalFilter.filter(this.buffer);
+      
+      const quality = this.components.qualityAnalyzer.analyzeQuality(filteredSignal);
+      if (quality < 0.3) {
+        return this.getDefaultPPGData(now);
+      }
+
+      const { peaks } = this.components.waveletAnalyzer.analyzeSignal(filteredSignal);
+      
+      const bpm = this.calculateBPM(peaks.map(peak => peak.value));
+      const spo2 = this.calculateSpO2(imageData, quality);
+      const { systolic, diastolic } = this.estimateBloodPressure(bpm, peaks);
+      const arrhythmia = this.analyzeArrhythmia(peaks);
+
+      if (this.shouldBeep(peaks)) {
+        await this.components.beepPlayer.playBeep('heartbeat', quality);
+      }
 
       return {
         bpm,
         spo2,
         systolic,
         diastolic,
-        hasArrhythmia,
-        arrhythmiaType,
+        ...arrhythmia,
         confidence: quality,
-        readings: [],
-        isPeak,
+        readings: filteredSignal,
+        isPeak: peaks.includes(this.buffer.length - 1),
         signalQuality: quality,
         timestamp: now,
         value: redValue
@@ -71,17 +78,31 @@ export class PPGProcessor {
 
     } catch (error) {
       console.error('Error procesando frame:', error);
-      return null;
+      return this.getDefaultPPGData(now);
     }
   }
 
-  public updateSettings(settings: SensitivitySettings): void {
-    this.settings = { ...this.settings, ...settings };
+  private getDefaultPPGData(timestamp: number): PPGData {
+    return {
+      bpm: 0,
+      spo2: 0,
+      systolic: 0,
+      diastolic: 0,
+      hasArrhythmia: false,
+      arrhythmiaType: 'Normal',
+      confidence: 0,
+      readings: [],
+      isPeak: false,
+      signalQuality: 0,
+      timestamp,
+      value: 0
+    };
   }
 
-  public stop(): void {
-    this.buffer = [];
-    this.lastProcessedTime = 0;
+  private shouldProcessFrame(now: number): boolean {
+    if (now - this.lastProcessedTime < 33) return false;
+    this.lastProcessedTime = now;
+    return true;
   }
 
   private extractRedValue(imageData: ImageData): number {
@@ -89,12 +110,26 @@ export class PPGProcessor {
     let totalRed = 0;
     let pixelCount = 0;
 
-    for (let i = 0; i < data.length; i += 4) {
+    const centerRegion = this.getCenterRegion(imageData);
+    for (let i = centerRegion.start; i < centerRegion.end; i += 4) {
       totalRed += data[i];
       pixelCount++;
     }
 
     return totalRed / pixelCount;
+  }
+
+  private getCenterRegion(imageData: ImageData) {
+    const width = imageData.width;
+    const height = imageData.height;
+    const centerX = Math.floor(width / 2);
+    const centerY = Math.floor(height / 2);
+    const regionSize = Math.floor(Math.min(width, height) * 0.3);
+
+    const start = (centerY - regionSize/2) * width * 4 + (centerX - regionSize/2) * 4;
+    const end = (centerY + regionSize/2) * width * 4 + (centerX + regionSize/2) * 4;
+
+    return { start, end };
   }
 
   private updateBuffer(value: number): void {
@@ -104,71 +139,96 @@ export class PPGProcessor {
     }
   }
 
-  private detectPeak(currentValue: number): boolean {
-    if (this.buffer.length < 3) return false;
+  private calculateBPM(peaks: number[]): number {
+    if (peaks.length < 2) return 0;
     
-    const previous = this.buffer[this.buffer.length - 2];
-    const beforePrevious = this.buffer[this.buffer.length - 3];
-    
-    return previous > currentValue && 
-           previous > beforePrevious && 
-           previous > this.settings.heartbeatThreshold;
+    const intervals = peaks.slice(1).map((peak, i) => peak - peaks[i]);
+    const averageInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+    const bpm = Math.round(60000 / (averageInterval * (1000/30)));
+
+    return Math.min(Math.max(bpm, 45), 180);
   }
 
-  private calculateSignalQuality(): number {
-    if (this.buffer.length < this.bufferSize / 2) return 0;
+  private calculateSpO2(imageData: ImageData, quality: number): number {
+    const { red, ir } = this.extractChannels(imageData);
+    if (red === 0 || ir === 0) return 0;
 
-    const mean = this.buffer.reduce((a, b) => a + b, 0) / this.buffer.length;
-    const variance = this.buffer.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / this.buffer.length;
-    const stability = Math.exp(-Math.sqrt(variance) / mean);
+    const ratio = Math.log(red) / Math.log(ir);
+    const baseSpO2 = 110 - (25 * ratio);
+    const compensatedSpO2 = baseSpO2 + (quality * 2);
 
-    return Math.min(stability * this.settings.signalStability, 1);
+    return Math.min(Math.max(Math.round(compensatedSpO2), 90), 100);
   }
 
-  private calculateBPM(): number {
-    if (this.buffer.length < this.bufferSize) return 0;
+  private extractChannels(imageData: ImageData) {
+    const data = imageData.data;
+    let redTotal = 0;
+    let irTotal = 0;
+    let pixelCount = 0;
 
-    let peakCount = 0;
-    for (let i = 2; i < this.buffer.length; i++) {
-      if (this.buffer[i-1] > this.buffer[i] && 
-          this.buffer[i-1] > this.buffer[i-2] &&
-          this.buffer[i-1] > this.settings.heartbeatThreshold) {
-        peakCount++;
-      }
+    const centerRegion = this.getCenterRegion(imageData);
+    for (let i = centerRegion.start; i < centerRegion.end; i += 4) {
+      redTotal += data[i];
+      irTotal += (data[i + 1] + data[i + 2]) / 2;
+      pixelCount++;
     }
 
-    const duration = (this.bufferSize / 30) / 60; // duración en minutos
-    return Math.round(peakCount / duration);
+    return {
+      red: redTotal / pixelCount,
+      ir: irTotal / pixelCount
+    };
   }
 
-  private calculateSpO2(imageData: ImageData): number {
-    // Simulación básica de SpO2
-    const quality = this.calculateSignalQuality();
-    return Math.round(95 + (quality * 5));
-  }
+  private estimateBloodPressure(bpm: number, peaks: number[]): { systolic: number; diastolic: number } {
+    if (bpm === 0) return { systolic: 0, diastolic: 0 };
 
-  private estimateBloodPressure(): { systolic: number; diastolic: number } {
-    // Simulación básica de presión arterial
-    const quality = this.calculateSignalQuality();
-    const bpm = this.calculateBPM();
+    const intervals = peaks.slice(1).map((peak, i) => peak - peaks[i]);
+    const variability = this.calculateVariability(intervals);
     
     const baseSystemic = 120;
     const baseDiastolic = 80;
     
-    const systolic = Math.round(baseSystemic + ((bpm - 70) * 0.5 * quality));
-    const diastolic = Math.round(baseDiastolic + ((bpm - 70) * 0.3 * quality));
-    
-    return { systolic, diastolic };
-  }
-
-  private analyzeArrhythmia(): { hasArrhythmia: boolean; arrhythmiaType: ArrhythmiaType } {
-    if (this.buffer.length < 3) {
-      return { hasArrhythmia: false, arrhythmiaType: 'Normal' as ArrhythmiaType };
-    }
+    const systolic = Math.round(baseSystemic + ((bpm - 70) * 0.5 + variability * 10));
+    const diastolic = Math.round(baseDiastolic + ((bpm - 70) * 0.3 + variability * 5));
     
     return { 
-      hasArrhythmia: false, 
-      arrhythmiaType: 'Normal' as ArrhythmiaType 
+      systolic: Math.min(Math.max(systolic, 90), 180),
+      diastolic: Math.min(Math.max(diastolic, 60), 120)
     };
+  }
+
+  private calculateVariability(intervals: number[]): number {
+    if (intervals.length < 2) return 0;
+    const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+    return intervals.reduce((a, b) => a + Math.abs(b - mean), 0) / intervals.length / mean;
+  }
+
+  private analyzeArrhythmia(peaks: number[]): { hasArrhythmia: boolean; arrhythmiaType: ArrhythmiaType } {
+    if (peaks.length < 5) {
+      return { hasArrhythmia: false, arrhythmiaType: 'Normal' };
+    }
+
+    const intervals = peaks.slice(1).map((peak, i) => peak - peaks[i]);
+    const variability = this.calculateVariability(intervals);
+    const hasArrhythmia = variability > 0.2;
+
+    return {
+      hasArrhythmia,
+      arrhythmiaType: hasArrhythmia ? 'Irregular' : 'Normal'
+    };
+  }
+
+  private shouldBeep(peaks: number[]): boolean {
+    return peaks.includes(this.buffer.length - 1);
+  }
+
+  public updateSettings(settings: SensitivitySettings): void {
+    this.settings = { ...this.settings, ...settings };
+  }
+
+  public stop(): void {
+    this.buffer = [];
+    this.lastProcessedTime = 0;
+    this.components.beepPlayer.stop();
   }
 }
