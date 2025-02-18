@@ -1,3 +1,4 @@
+
 export class WaveletAnalyzer {
   private readonly waveletLevels = 4;
   private readonly motherWavelet = 'db4';
@@ -106,35 +107,6 @@ export class WaveletAnalyzer {
     return combined;
   }
 
-  private isPeak(signal: number[], index: number): boolean {
-    return signal[index] > signal[index - 1] &&
-           signal[index] > signal[index + 1] &&
-           signal[index] > this.calculateThreshold(signal);
-  }
-
-  private calculateThreshold(signal: number[]): number {
-    const mean = signal.reduce((a, b) => a + b, 0) / signal.length;
-    const stdDev = Math.sqrt(
-      signal.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / signal.length
-    );
-    return mean + stdDev * 1.5;
-  }
-
-  private filterPeaks(peaks: number[], signal: number[]): number[] {
-    if (peaks.length < 2) return peaks;
-
-    const filteredPeaks: number[] = [peaks[0]];
-    const minDistance = Math.floor(signal.length * 0.1);
-
-    for (let i = 1; i < peaks.length; i++) {
-      if (peaks[i] - filteredPeaks[filteredPeaks.length - 1] >= minDistance) {
-        filteredPeaks.push(peaks[i]);
-      }
-    }
-
-    return filteredPeaks;
-  }
-
   private calculateSignalQuality(coefficients: number[][], originalSignal: number[]): number {
     const energyRatio = this.calculateEnergyRatio(coefficients);
     const peakConsistency = this.calculatePeakConsistency(coefficients[0]);
@@ -196,5 +168,34 @@ export class WaveletAnalyzer {
     }
     
     return smoothed;
+  }
+
+  private isPeak(signal: number[], index: number): boolean {
+    return signal[index] > signal[index - 1] &&
+           signal[index] > signal[index + 1] &&
+           signal[index] > this.calculateThreshold(signal);
+  }
+
+  private calculateThreshold(signal: number[]): number {
+    const mean = signal.reduce((a, b) => a + b, 0) / signal.length;
+    const stdDev = Math.sqrt(
+      signal.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / signal.length
+    );
+    return mean + stdDev * 1.5;
+  }
+
+  private filterPeaks(peaks: number[], signal: number[]): number[] {
+    if (peaks.length < 2) return peaks;
+
+    const filteredPeaks: number[] = [peaks[0]];
+    const minDistance = Math.floor(signal.length * 0.1);
+
+    for (let i = 1; i < peaks.length; i++) {
+      if (peaks[i] - filteredPeaks[filteredPeaks.length - 1] >= minDistance) {
+        filteredPeaks.push(peaks[i]);
+      }
+    }
+
+    return filteredPeaks;
   }
 }
