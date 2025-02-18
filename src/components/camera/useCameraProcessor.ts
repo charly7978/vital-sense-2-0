@@ -49,6 +49,7 @@ export const useCameraProcessor = ({
       const centerY = Math.floor(canvas.height / 2);
       const regionSize = Math.floor(Math.min(canvas.width, canvas.height) * 0.4);
 
+      // Mejoras para captura sin linterna
       context.filter = 'brightness(150%) contrast(120%) saturate(120%)';
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       context.filter = 'none';
@@ -60,6 +61,7 @@ export const useCameraProcessor = ({
         regionSize * 2
       );
 
+      // Amplificación del canal rojo
       if (frameData && frameData.data.length >= 4) {
         for (let i = 0; i < frameData.data.length; i += 4) {
           frameData.data[i] = Math.min(frameData.data[i] * 1.2, 255);

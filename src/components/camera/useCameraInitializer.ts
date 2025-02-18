@@ -29,15 +29,22 @@ export const useCameraInitializer = ({
 
       const track = stream.getVideoTracks()[0];
       
-      // Aplicamos configuraciones básicas primero
+      // Optimizaciones para captura sin linterna
       await track.applyConstraints({
         advanced: [{
-          exposureMode: "continuous",
-          whiteBalanceMode: "continuous"
+          exposureMode: "manual",
+          exposureTime: 10000,
+          exposureCompensation: 2.0,
+          brightness: 1.0,
+          contrast: 1.2,
+          whiteBalanceMode: "manual",
+          colorTemperature: 3300,
+          saturation: 1.5,
+          sharpness: 1.2
         }]
       });
 
-      // Esperamos un momento para que la cámara se estabilice
+      // Tiempo de estabilización
       await new Promise(resolve => setTimeout(resolve, 500));
 
       return true;
