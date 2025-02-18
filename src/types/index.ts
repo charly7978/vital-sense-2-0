@@ -111,6 +111,7 @@ export interface ExtendedMediaTrackCapabilities extends MediaTrackCapabilities {
     step: number;
   };
   whiteBalance?: string[];
+  torch?: boolean;
 }
 
 export interface ExtendedMediaTrackSettings extends MediaTrackSettings {
@@ -129,4 +130,7 @@ export interface MediaTrackConstraintsExtended extends MediaTrackConstraints {
   height?: number | { ideal: number };
   frameRate?: number | { ideal: number };
   facingMode?: string | { ideal: string };
+  advanced?: {
+    torch?: boolean;
+  }[];
 }

@@ -7,7 +7,7 @@ import CameraStatus from "./camera/CameraStatus";
 import { useCameraProcessor } from "./camera/useCameraProcessor";
 import { useCameraInitializer } from "./camera/useCameraInitializer";
 import { useToast } from "@/hooks/use-toast";
-import { MediaTrackConstraintsExtended } from "@/types";
+import { MediaTrackConstraintsExtended, ExtendedMediaTrackCapabilities } from "@/types";
 
 interface CameraViewProps {
   onFrame: (imageData: ImageData) => void;
@@ -53,7 +53,7 @@ const CameraView: React.FC<CameraViewProps> = ({
         video: { facingMode: "environment" }
       })).getVideoTracks()[0];
 
-      const capabilities = track.getCapabilities();
+      const capabilities = track.getCapabilities() as ExtendedMediaTrackCapabilities;
       
       // Verificar si el dispositivo tiene linterna
       if (!capabilities.torch) {
