@@ -24,13 +24,8 @@ export const useCameraInitializer = ({
           width: { ideal: 1280 },
           height: { ideal: 720 },
           advanced: [{
-            brightness: 100,         // Aumentar brillo
-            contrast: 128,           // Mejorar contraste
-            saturation: 128,         // Mejorar saturación
-            sharpness: 128,          // Mejorar nitidez
-            exposureMode: 'manual',  // Control manual de exposición
-            exposureTime: 10000,     // Tiempo de exposición más largo
-            exposureCompensation: 2, // Compensación de exposición positiva
+            exposureMode: 'manual',
+            exposureCompensation: 2,
             whiteBalance: 'continuous'
           }]
         },
@@ -44,23 +39,14 @@ export const useCameraInitializer = ({
         const settings: ExtendedMediaTrackSettings = {};
 
         // Configurar controles si están disponibles
-        if (capabilities.brightness) {
-          settings.brightness = 100;
+        if (capabilities.exposureMode?.includes('manual')) {
+          await track.applyConstraints({
+            advanced: [{
+              exposureMode: 'manual',
+              exposureCompensation: 2
+            }]
+          });
         }
-        if (capabilities.contrast) {
-          settings.contrast = 128;
-        }
-        if (capabilities.saturation) {
-          settings.saturation = 128;
-        }
-        if (capabilities.exposureTime) {
-          settings.exposureTime = 10000;
-        }
-
-        // Aplicar configuraciones mejoradas
-        await track.applyConstraints({
-          advanced: [settings as MediaTrackConstraintSet]
-        });
 
       } catch (constraintError) {
         console.log('Usando configuración automática de cámara');

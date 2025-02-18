@@ -94,12 +94,34 @@ export interface ExtendedMediaTrackCapabilities extends MediaTrackCapabilities {
     min: number;
     step: number;
   };
+  sharpness?: {
+    max: number;
+    min: number;
+    step: number;
+  };
+  exposureTime?: {
+    max: number;
+    min: number;
+    step: number;
+  };
+  exposureMode?: string[];
+  exposureCompensation?: {
+    max: number;
+    min: number;
+    step: number;
+  };
+  whiteBalance?: string[];
 }
 
 export interface ExtendedMediaTrackSettings extends MediaTrackSettings {
   brightness?: number;
   contrast?: number;
   saturation?: number;
+  sharpness?: number;
+  exposureTime?: number;
+  exposureMode?: string;
+  exposureCompensation?: number;
+  whiteBalance?: string;
 }
 
 export interface MediaTrackConstraintsExtended extends MediaTrackConstraints {
@@ -107,4 +129,14 @@ export interface MediaTrackConstraintsExtended extends MediaTrackConstraints {
   height?: number | { ideal: number };
   frameRate?: number | { ideal: number };
   facingMode?: string | { ideal: string };
+  advanced?: {
+    brightness?: number;
+    contrast?: number;
+    saturation?: number;
+    sharpness?: number;
+    exposureMode?: string;
+    exposureTime?: number;
+    exposureCompensation?: number;
+    whiteBalance?: string;
+  }[];
 }

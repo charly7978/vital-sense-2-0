@@ -19,13 +19,8 @@ const CameraPreview: React.FC<CameraPreviewProps> = ({
       videoConstraints={{
         ...videoConstraints,
         advanced: [{
-          brightness: 100,         // Aumentar brillo
-          contrast: 128,           // Mejorar contraste
-          saturation: 128,         // Mejorar saturación
-          sharpness: 128,         // Mejorar nitidez
-          exposureMode: 'manual',  // Control manual de exposición
-          exposureTime: 10000,     // Tiempo de exposición más largo
-          exposureCompensation: 2, // Compensación de exposición positiva
+          exposureMode: 'manual',
+          exposureCompensation: 2,
           whiteBalance: 'continuous'
         }]
       }}
