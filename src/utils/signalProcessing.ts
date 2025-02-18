@@ -1,250 +1,385 @@
-import { PTTProcessor } from './pttProcessor';
-import { PPGFeatureExtractor } from './ppgFeatureExtractor';
-import { SignalFilter } from './signalFilter';
-import { SignalFrequencyAnalyzer } from './signalFrequencyAnalyzer';
-import { SignalQualityAnalyzer } from './signalQualityAnalyzer';
+// ==================== SignalProcessor.ts ====================
+
+import { SignalFilter } from './SignalFilter';
+import { SignalQualityAnalyzer } from './SignalQualityAnalyzer';
+import { PPGFeatureExtractor } from './PPGFeatureExtractor';
+import type { VitalSigns, BloodPressure, ArrhythmiaType } from '@/types';
 
 export class SignalProcessor {
-  private readonly windowSize: number;
-  private readonly sampleRate = 30;
-  private readonly spO2CalibrationCoefficients = {
-    a: 110,
-    b: 25,
-    c: 1.5,
-    perfusionIndexThreshold: 0.3
-  };
+  // OPTIMIZACIÓN: Constantes ajustadas para mejor detección sin linterna
+  private readonly MAX_BPM = 180;
+  private readonly MIN_BPM = 45;
+  private readonly MIN_VALID_INTERVALS = 4;
+  private readonly CALIBRATION_FACTOR = 1.15;
+  private readonly MIN_RED_VALUE = 35;    // Antes: 15 (muy permisivo)
+  private readonly MAX_RED_VALUE = 150;   // Antes: 245 (permitía saturación)
+  private readonly MIN_IR_VALUE = 25;     // Antes: no existía
+  private readonly MIN_SIGNAL_QUALITY = 0.45;  // Antes: 0.25
+  private readonly MIN_STABILITY = 0.7;   // Antes: 0.5
+  private readonly REQUIRED_CONSISTENT_FRAMES = 5;  // Antes: 2
 
-  private readonly pttProcessor: PTTProcessor;
-  private readonly featureExtractor: PPGFeatureExtractor;
+  // OPTIMIZACIÓN: Buffers mejorados
+  private redBuffer: number[] = [];
+  private irBuffer: number[] = [];
+  private lastValidFrames: number = 0;
+  private previousValues: number[] = [];
+  private peakTimes: number[] = [];
+  private lastValidBpm: number = 0;
+  private lastValidTime: number = 0;
+  private readonly bufferSize = 60;  // Antes: 30
+
+  // OPTIMIZACIÓN: Componentes mejorados
   private readonly signalFilter: SignalFilter;
-  private readonly frequencyAnalyzer: SignalFrequencyAnalyzer;
   private readonly qualityAnalyzer: SignalQualityAnalyzer;
-  
-  constructor(windowSize: number) {
-    this.windowSize = windowSize;
-    this.pttProcessor = new PTTProcessor();
-    this.featureExtractor = new PPGFeatureExtractor();
-    this.signalFilter = new SignalFilter(this.sampleRate);
-    this.frequencyAnalyzer = new SignalFrequencyAnalyzer(this.sampleRate);
+  private readonly featureExtractor: PPGFeatureExtractor;
+
+  constructor() {
+    this.signalFilter = new SignalFilter();
     this.qualityAnalyzer = new SignalQualityAnalyzer();
+    this.featureExtractor = new PPGFeatureExtractor();
   }
 
-  private applySmoothingFilter(signal: number[]): number[] {
-    const windowSize = 5;
-    const halfWindow = Math.floor(windowSize / 2);
-    const smoothed = [...signal];
-
-    for (let i = halfWindow; i < signal.length - halfWindow; i++) {
-      let sum = 0;
-      for (let j = -halfWindow; j <= halfWindow; j++) {
-        const coeff = j === 0 ? 0.7 : (j === -1 || j === 1) ? 0.2 : -0.1;
-        sum += signal[i + j] * coeff;
-      }
-      smoothed[i] = sum;
+  // OPTIMIZACIÓN: Procesamiento principal mejorado
+  processFrame(imageData: ImageData): VitalSigns | null {
+    if (!this.validateFingerPresence(imageData)) {
+      return null;
     }
 
-    return smoothed;
+    const { red, ir } = this.extractChannels(imageData);
+    this.updateBuffers(red, ir);
+
+    // OPTIMIZACIÓN: Pipeline de procesamiento mejorado
+    const filteredRed = this.signalFilter.processSignal(this.redBuffer);
+    const filteredIr = this.signalFilter.processSignal(this.irBuffer);
+
+    const peaks = this.detectPeaks(filteredRed);
+    const intervals = this.calculateIntervals(peaks);
+
+    return this.calculateVitals(intervals);
   }
 
-  analyzeHRV(intervals: number[]): { 
-    hasArrhythmia: boolean; 
-    type: string; 
-    sdnn: number; 
-    rmssd: number; 
-    pnn50: number; 
-    lfhf: number; 
-  } {
-    if (intervals.length < 2) {
-      return {
-        hasArrhythmia: false,
-        type: 'Normal',
-        sdnn: 0,
-        rmssd: 0,
-        pnn50: 0,
-        lfhf: 0
-      };
-    }
-
-    const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-    const sdnn = Math.sqrt(
-      intervals.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / 
-      (intervals.length - 1)
-    );
-
-    const successiveDiffs = intervals.slice(1).map((val, i) => 
-      Math.pow(val - intervals[i], 2)
-    );
-    const rmssd = Math.sqrt(
-      successiveDiffs.reduce((a, b) => a + b, 0) / successiveDiffs.length
-    );
-
-    const nn50 = intervals.slice(1).filter((val, i) => 
-      Math.abs(val - intervals[i]) > 50
-    ).length;
-    const pnn50 = (nn50 / (intervals.length - 1)) * 100;
-
-    const { lf, hf } = this.frequencyAnalyzer.calculateFrequencyDomainMetrics(intervals);
-    const lfhf = hf !== 0 ? lf / hf : 0;
-
-    const hasArrhythmia = sdnn > 100 || rmssd > 50 || pnn50 > 20;
-    let type = 'Normal';
+  // OPTIMIZACIÓN: Validación de dedo mejorada
+  private validateFingerPresence(imageData: ImageData): boolean {
+    const { red, ir } = this.extractChannels(imageData);
     
-    if (hasArrhythmia) {
-      if (sdnn > 150 && rmssd > 70) {
-        type = 'Fibrilación Auricular';
-      } else if (pnn50 > 30) {
-        type = 'Arritmia Sinusal';
-      } else {
-        type = 'Arritmia No Específica';
+    // OPTIMIZACIÓN: Validaciones múltiples
+    const isInRange = 
+      red >= this.MIN_RED_VALUE && 
+      red <= this.MAX_RED_VALUE && 
+      ir >= this.MIN_IR_VALUE;
+
+    if (!isInRange) {
+      this.lastValidFrames = 0;
+      return false;
+    }
+
+    // OPTIMIZACIÓN: Validación de ratio mejorada
+    const ratio = red / (ir + 1e-6);
+    const isValidRatio = ratio > 1.2 && ratio < 2.5;
+    
+    if (!isValidRatio) {
+      this.lastValidFrames = 0;
+      return false;
+    }
+
+    // OPTIMIZACIÓN: Validación de estabilidad
+    this.previousValues.push(red);
+    if (this.previousValues.length > 10) {
+      this.previousValues.shift();
+    }
+
+    const stability = this.calculateStability(this.previousValues);
+    if (stability < this.MIN_STABILITY) {
+      this.lastValidFrames = 0;
+      return false;
+    }
+
+    // OPTIMIZACIÓN: Validación de cobertura
+    const coverage = this.calculateFingerCoverage(imageData);
+    if (coverage < 0.6) {
+      this.lastValidFrames = 0;
+      return false;
+    }
+
+    // OPTIMIZACIÓN: Validación temporal
+    this.lastValidFrames++;
+    return this.lastValidFrames >= this.REQUIRED_CONSISTENT_FRAMES;
+  }
+
+  // OPTIMIZACIÓN: Extracción de canales mejorada
+  private extractChannels(imageData: ImageData): { red: number; ir: number } {
+    const data = imageData.data;
+    let redSum = 0;
+    let irSum = 0;
+    let pixelCount = 0;
+
+    // OPTIMIZACIÓN: Análisis de región central
+    const width = imageData.width;
+    const height = imageData.height;
+    const margin = Math.floor(Math.min(width, height) * 0.2);
+
+    for (let y = margin; y < height - margin; y++) {
+      for (let x = margin; x < width - margin; x++) {
+        const i = (y * width + x) * 4;
+        redSum += data[i];     // Canal rojo
+        irSum += data[i + 2];  // Canal azul como IR
+        pixelCount++;
       }
     }
 
     return {
-      hasArrhythmia,
-      type,
-      sdnn,
-      rmssd,
-      pnn50,
-      lfhf
+      red: redSum / pixelCount,
+      ir: irSum / pixelCount
     };
   }
 
-  calculateSpO2(redSignal: number[], irSignal: number[]): { spo2: number; confidence: number } {
-    if (redSignal.length !== irSignal.length || redSignal.length < 2) {
-      return { spo2: 0, confidence: 0 };
-    }
-
-    const filteredRed = this.applySmoothingFilter(this.signalFilter.lowPassFilter(redSignal, 4));
-    const filteredIr = this.applySmoothingFilter(this.signalFilter.lowPassFilter(irSignal, 4));
-
-    const windowSize = Math.min(30, filteredRed.length);
-    let redAC = 0, redDC = 0, irAC = 0, irDC = 0;
-    const perfusionIndices: number[] = [];
-
-    for (let i = filteredRed.length - windowSize; i < filteredRed.length; i++) {
-      const redACTemp = Math.abs(filteredRed[i] - (i > 0 ? filteredRed[i-1] : filteredRed[i]));
-      const irACTemp = Math.abs(filteredIr[i] - (i > 0 ? filteredIr[i-1] : filteredIr[i]));
-      
-      redAC += redACTemp;
-      irAC += irACTemp;
-      redDC += filteredRed[i];
-      irDC += filteredIr[i];
-
-      const perfusionIndex = (redACTemp / filteredRed[i]) * 100;
-      perfusionIndices.push(perfusionIndex);
-    }
-
-    redDC /= windowSize;
-    irDC /= windowSize;
-    redAC /= windowSize;
-    irAC /= windowSize;
-
-    const R = ((redAC * irDC) / (irAC * redDC)) * this.spO2CalibrationCoefficients.c;
+  // OPTIMIZACIÓN: Cálculo de vitales mejorado
+  private calculateVitals(intervals: number[]): VitalSigns {
+    const validIntervals = this.filterIntervals(intervals);
     
-    let spo2 = this.spO2CalibrationCoefficients.a - 
-               (this.spO2CalibrationCoefficients.b * Math.pow(R, 1.1));
+    if (validIntervals.length < this.MIN_VALID_INTERVALS) {
+      return this.getEmptyReading();
+    }
 
-    spo2 = Math.min(Math.max(Math.round(spo2), 70), 100);
+    const bpm = this.calculateCorrectedBPM(validIntervals);
+    const spo2 = this.calculateCorrectedSpO2();
+    const bloodPressure = this.calculateCorrectedBloodPressure(bpm);
+    const arrhythmia = this.analyzeArrhythmia(validIntervals);
 
-    const avgPerfusionIndex = perfusionIndices.reduce((a, b) => a + b, 0) / perfusionIndices.length;
-    const signalStability = this.calculateSignalStability(perfusionIndices);
-    const confidence = Math.min(
-      (avgPerfusionIndex / this.spO2CalibrationCoefficients.perfusionIndexThreshold) * 
-      signalStability * 100, 
-      100
-    );
-
-    return { spo2, confidence };
+    return {
+      bpm,
+      spo2,
+      ...bloodPressure,
+      hasArrhythmia: arrhythmia.hasArrhythmia,
+      arrhythmiaType: arrhythmia.type,
+      quality: this.qualityAnalyzer.analyzeSignalQuality(this.redBuffer)
+    };
   }
 
-  private calculateSignalStability(values: number[]): number {
-    const mean = values.reduce((a, b) => a + b, 0) / values.length;
-    const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / values.length;
-    return Math.exp(-variance / (2 * Math.pow(mean, 2)));
-  }
-
-  detectPeaks(intervals: number[]): number {
-    let peaks = 0;
-    let threshold = 0;
-    const minPeakDistance = Math.floor(this.sampleRate * 0.3);
-    let lastPeakIndex = -minPeakDistance;
-
-    const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-    const stdDev = Math.sqrt(
-      intervals.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / intervals.length
-    );
-    threshold = mean + 0.3 * stdDev;
-
-    for (let i = 2; i < intervals.length - 2; i++) {
-      if (
-        i - lastPeakIndex >= minPeakDistance &&
-        intervals[i] > threshold &&
-        intervals[i] > intervals[i - 1] &&
-        intervals[i] > intervals[i + 1] &&
-        intervals[i] > intervals[i - 2] &&
-        intervals[i] > intervals[i + 2]
-      ) {
-        peaks++;
-        lastPeakIndex = i;
-        
-        const localMean = intervals
-          .slice(Math.max(0, i - 5), Math.min(intervals.length, i + 6))
-          .reduce((a, b) => a + b, 0) / 11;
-        threshold = localMean * 0.7;
+  // OPTIMIZACIÓN: Cálculo de BPM mejorado
+  private calculateCorrectedBPM(intervals: number[]): number {
+    const sortedIntervals = [...intervals].sort((a, b) => a - b);
+    const median = sortedIntervals[Math.floor(intervals.length / 2)];
+    
+    let bpm = Math.round((60000 / median) * this.CALIBRATION_FACTOR);
+    
+    if (bpm >= this.MIN_BPM && bpm <= this.MAX_BPM) {
+      if (this.lastValidBpm === 0 || Math.abs(bpm - this.lastValidBpm) <= 15) {
+        this.lastValidBpm = bpm;
+        this.lastValidTime = Date.now();
       }
     }
 
-    const timeWindow = intervals.length / this.sampleRate;
-    const bpm = (peaks * 60) / timeWindow;
-
-    return Math.min(Math.max(Math.round(bpm), 40), 200);
+    return this.lastValidBpm;
   }
 
-  estimateBloodPressure(signal: number[], peakTimes: number[]): { systolic: number; diastolic: number } {
-    if (peakTimes.length < 2) {
-      return { systolic: 0, diastolic: 0 };
+  // OPTIMIZACIÓN: Cálculo de SpO2 mejorado
+  private calculateCorrectedSpO2(): number {
+    const redAC = this.calculateAC(this.redBuffer);
+    const redDC = this.calculateDC(this.redBuffer);
+    const irAC = this.calculateAC(this.irBuffer);
+    const irDC = this.calculateDC(this.irBuffer);
+
+    if (redDC === 0 || irDC === 0) return 0;
+
+    const R = (redAC / redDC) / (irAC / irDC);
+    
+    // OPTIMIZACIÓN: Calibración no lineal mejorada
+    let spo2 = 110 - 25 * R;
+    
+    if (R > 0.4 && R < 1.0) {
+      spo2 = 110 - 22 * R;
+    } else if (R >= 1.0) {
+      spo2 = 105 - 20 * R;
     }
 
-    const pttResult = this.pttProcessor.calculatePTT(signal);
-    const ppgFeatures = this.featureExtractor.extractFeatures(signal);
+    return Math.min(Math.max(Math.round(spo2), 70), 100);
+  }
 
-    if (!pttResult || !ppgFeatures) {
-      return { systolic: 0, diastolic: 0 };
-    }
+  // OPTIMIZACIÓN: Cálculo de presión arterial mejorado
+  private calculateCorrectedBloodPressure(bpm: number): BloodPressure {
+    if (bpm === 0) return { systolic: 0, diastolic: 0 };
 
-    const ptt = pttResult.ptt;
-    const { augmentationIndex, stiffnessIndex } = ppgFeatures;
+    // OPTIMIZACIÓN: Análisis de forma de onda PPG
+    const waveformFeatures = this.analyzePPGWaveform();
+    
+    const baselineSystolic = 120;
+    const baselineDiastolic = 80;
+    
+    const systolicFactor = this.calculateSystolicFactor(waveformFeatures);
+    const diastolicFactor = this.calculateDiastolicFactor(waveformFeatures);
 
-    const coefficients = {
-      ptt: -0.9,
-      aix: 30,
-      si: 3,
-      baselineSys: 120,
-      baselineDia: 80
+    const systolic = Math.round(baselineSystolic * systolicFactor);
+    const diastolic = Math.round(baselineDiastolic * diastolicFactor);
+
+    return {
+      systolic: this.validatePressure(systolic, 90, 180),
+      diastolic: this.validatePressure(diastolic, 60, 120)
     };
-
-    let systolic = Math.min(Math.max(Math.round(
-      coefficients.baselineSys +
-      (coefficients.ptt * (1000 / ptt - 5)) +
-      (coefficients.aix * augmentationIndex) +
-      (coefficients.si * stiffnessIndex)
-    ), 90), 180);
-
-    let diastolic = Math.min(Math.max(Math.round(
-      coefficients.baselineDia +
-      (coefficients.ptt * (1000 / ptt - 5) * 0.8) +
-      (coefficients.aix * augmentationIndex * 0.6) +
-      (coefficients.si * stiffnessIndex * 0.5)
-    ), 60), 120);
-
-    if (systolic <= diastolic) {
-      systolic = diastolic + 40;
-    }
-
-    return { systolic, diastolic };
   }
 
-  analyzeSignalQuality(signal: number[]): number {
-    return this.qualityAnalyzer.analyzeSignalQuality(signal);
+  // OPTIMIZACIÓN: Análisis de arritmia mejorado
+  private analyzeArrhythmia(intervals: number[]): {
+    hasArrhythmia: boolean;
+    type: ArrhythmiaType;
+  } {
+    if (intervals.length < 6) {
+      return { hasArrhythmia: false, type: 'Normal' };
+    }
+
+    const rmssd = this.calculateRMSSD(intervals);
+    const pnn50 = this.calculatePNN50(intervals);
+    const variability = this.calculateIntervalVariability(intervals);
+
+    // OPTIMIZACIÓN: Detección mejorada
+    const hasHighVariability = rmssd > 50;
+    const hasIrregularIntervals = pnn50 > 20;
+    const hasAbnormalPattern = variability > 0.2;
+
+    if (!hasHighVariability && !hasIrregularIntervals && !hasAbnormalPattern) {
+      return { hasArrhythmia: false, type: 'Normal' };
+    }
+
+    // OPTIMIZACIÓN: Clasificación mejorada
+    if (hasHighVariability && rmssd > 100) {
+      return { hasArrhythmia: true, type: 'Fibrilación Auricular' };
+    }
+
+    if (hasIrregularIntervals && !hasHighVariability) {
+      return { hasArrhythmia: true, type: 'Extrasístoles' };
+    }
+
+    return { hasArrhythmia: true, type: 'Arritmia No Específica' };
+  }
+
+  // OPTIMIZACIÓN: Métodos auxiliares mejorados
+  private calculateAC(signal: number[]): number {
+    const mean = signal.reduce((a, b) => a + b, 0) / signal.length;
+    return Math.sqrt(signal.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / signal.length);
+  }
+
+  private calculateDC(signal: number[]): number {
+    return signal.reduce((a, b) => a + b, 0) / signal.length;
+  }
+
+  private calculateStability(values: number[]): number {
+    if (values.length < 2) return 0;
+    
+    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / values.length;
+    
+    return Math.exp(-Math.sqrt(variance) / mean);
+  }
+
+  private calculateRMSSD(intervals: number[]): number {
+    if (intervals.length < 2) return 0;
+    
+    let sum = 0;
+    for (let i = 1; i < intervals.length; i++) {
+      sum += Math.pow(intervals[i] - intervals[i-1], 2);
+    }
+    
+    return Math.sqrt(sum / (intervals.length - 1));
+  }
+
+  private calculatePNN50(intervals: number[]): number {
+    if (intervals.length < 2) return 0;
+    
+    let nn50 = 0;
+    for (let i = 1; i < intervals.length; i++) {
+      if (Math.abs(intervals[i] - intervals[i-1]) > 50) {
+        nn50++;
+      }
+    }
+    
+    return (nn50 / (intervals.length - 1)) * 100;
+  }
+
+  private calculateIntervalVariability(intervals: number[]): number {
+    if (intervals.length < 2) return 0;
+    
+    const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+    const variance = intervals.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / intervals.length;
+    
+    return Math.sqrt(variance) / mean;
+  }
+
+  private validatePressure(value: number, min: number, max: number): number {
+    return Math.min(Math.max(value, min), max);
+  }
+
+  private getEmptyReading(): VitalSigns {
+    return {
+      bpm: 0,
+      spo2: 0,
+      systolic: 0,
+      diastolic: 0,
+      hasArrhythmia: false,
+      arrhythmiaType: 'Normal',
+      quality: 0
+    };
+  }
+
+  // OPTIMIZACIÓN: Actualización de buffers mejorada
+  private updateBuffers(red: number, ir: number): void {
+    this.redBuffer.push(red);
+    this.irBuffer.push(ir);
+
+    if (this.redBuffer.length > this.bufferSize) {
+      this.redBuffer.shift();
+      this.irBuffer.shift();
+    }
+  }
+
+  // OPTIMIZACIÓN: Análisis de forma de onda PPG mejorado
+  private analyzePPGWaveform() {
+    return this.featureExtractor.extractFeatures(this.redBuffer);
+  }
+
+  private calculateSystolicFactor(features: any): number {
+    const { amplitude, width, slope } = features;
+    return 1 + (amplitude * 0.3 + width * 0.2 + slope * 0.1);
+  }
+
+  private calculateDiastolicFactor(features: any): number {
+    const { amplitude, width, slope } = features;
+    return 1 + (amplitude * 0.2 + width * 0.1 + slope * 0.1);
+  }
+
+  // OPTIMIZACIÓN: Filtrado de intervalos mejorado
+  private filterIntervals(intervals: number[]): number[] {
+    if (intervals.length < 4) return intervals;
+
+    const sorted = [...intervals].sort((a, b) => a - b);
+    const q1 = sorted[Math.floor(intervals.length * 0.25)];
+    const q3 = sorted[Math.floor(intervals.length * 0.75)];
+    const iqr = q3 - q1;
+    const lower = q1 - 1.5 * iqr;
+    const upper = q3 + 1.5 * iqr;
+
+    return intervals.filter(v => v >= lower && v <= upper);
+  }
+
+  // OPTIMIZACIÓN: Cálculo de cobertura de dedo mejorado
+  private calculateFingerCoverage(imageData: ImageData): number {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    let coveredPixels = 0;
+    let totalPixels = 0;
+
+    const margin = Math.floor(Math.min(width, height) * 0.2);
+
+    for (let y = margin; y < height - margin; y++) {
+      for (let x = margin; x < width - margin; x++) {
+        const i = (y * width + x) * 4;
+        if (data[i] >= this.MIN_RED_VALUE && data[i] <= this.MAX_RED_VALUE) {
+          coveredPixels++;
+        }
+        totalPixels++;
+      }
+    }
+
+    return coveredPixels / totalPixels;
   }
 }
