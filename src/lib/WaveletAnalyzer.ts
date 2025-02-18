@@ -1,349 +1,198 @@
-// ==================== WaveletAnalyzer.ts ====================
-
 export class WaveletAnalyzer {
-  // OPTIMIZACIÓN: Configuración de wavelets mejorada
-  private readonly WAVELET_CONFIG = {
-    levels: 5,                    // Niveles de descomposición
-    motherWavelet: 'db4',        // Wavelet Daubechies-4
-    threshold: 0.1,              // Umbral de denoising
-    minFrequency: 0.75,          // 45 BPM
-    maxFrequency: 3.0,           // 180 BPM
-    samplingRate: 30             // 30 fps
-  };
+  private readonly waveletLevels = 4;
+  private readonly motherWavelet = 'db4';
+  private readonly minScale = 2;
+  private readonly maxScale = 32;
+  private readonly scaleStep = 1;
+  private readonly qualityThreshold = 0.6;
 
-  // OPTIMIZACIÓN: Buffers mejorados
-  private readonly bufferSize = 256;  // Potencia de 2 para FFT
-  private signalBuffer: number[] = [];
-  private coefficientsBuffer: number[][] = [];
-  private lastAnalysis: WaveletAnalysis | null = null;
+  analyzeSignal(signal: number[]): { quality: number; peaks: number[] } {
+    if (!signal || signal.length < 4) {
+      return { quality: 0, peaks: [] };
+    }
 
-  // OPTIMIZACIÓN: Análisis wavelet mejorado
-  analyzeSignal(signal: number[]): SignalCharacteristics {
     try {
-      // OPTIMIZACIÓN: Actualización de buffer
-      this.updateBuffer(signal);
+      // Normalizar señal
+      const normalizedSignal = this.normalizeSignal(signal);
 
-      // OPTIMIZACIÓN: Descomposición wavelet
-      const wavelets = this.discreteWaveletTransform();
+      // Descomposición wavelet
+      const coefficients = this.waveletDecomposition(normalizedSignal);
 
-      // OPTIMIZACIÓN: Extracción de características
-      const features = this.extractWaveletFeatures(wavelets);
+      // Detectar picos
+      const peaks = this.detectPeaks(coefficients);
 
-      // OPTIMIZACIÓN: Análisis de calidad
-      const quality = this.calculateSignalQuality(features);
-
-      // OPTIMIZACIÓN: Detección de picos
-      const peaks = this.detectReliablePeaks(features);
-
-      // OPTIMIZACIÓN: Estimación de ruido
-      const noise = this.estimateNoiseLevel(features);
-
-      // OPTIMIZACIÓN: Análisis de frecuencia
-      const frequency = this.analyzeFrequencyContent(features);
-
-      this.lastAnalysis = {
-        features,
-        quality,
-        peaks,
-        noise,
-        frequency
-      };
+      // Calcular calidad
+      const quality = this.calculateSignalQuality(coefficients, normalizedSignal);
 
       return {
-        quality,
-        peaks,
-        noise,
-        frequency,
-        characteristics: this.extractSignalCharacteristics(features)
+        quality: Math.min(quality, 1),
+        peaks: peaks
       };
+
     } catch (error) {
       console.error('Error en análisis wavelet:', error);
-      return this.getEmptyAnalysis();
+      return { quality: 0, peaks: [] };
     }
   }
 
-  // OPTIMIZACIÓN: Transformada wavelet discreta mejorada
-  private discreteWaveletTransform(): WaveletDecomposition {
-    const signal = [...this.signalBuffer];
+  private normalizeSignal(signal: number[]): number[] {
+    const max = Math.max(...signal);
+    const min = Math.min(...signal);
+    const range = max - min;
+
+    if (range === 0) return signal.map(() => 0);
+
+    return signal.map(value => (value - min) / range);
+  }
+
+  private waveletDecomposition(signal: number[]): number[][] {
     const coefficients: number[][] = [];
-    
-    // OPTIMIZACIÓN: Implementación de Mallat
-    for (let level = 0; level < this.WAVELET_CONFIG.levels; level++) {
-      const { approximation, detail } = this.decompose(signal);
+    let currentSignal = [...signal];
+
+    for (let level = 0; level < this.waveletLevels; level++) {
+      const { approximation, detail } = this.singleLevelDWT(currentSignal);
       coefficients.push(detail);
-      signal.length = approximation.length;
-      signal.set(approximation);
+      currentSignal = approximation;
     }
-    
-    coefficients.push(signal); // Aproximación final
 
-    return {
-      coefficients,
-      levels: this.WAVELET_CONFIG.levels
-    };
+    return coefficients;
   }
 
-  // OPTIMIZACIÓN: Extracción de características mejorada
-  private extractWaveletFeatures(wavelets: WaveletDecomposition): WaveletFeatures {
-    const energies = this.calculateSubbandEnergies(wavelets);
-    const entropy = this.calculateWaveletEntropy(wavelets);
-    const peaks = this.findWaveletPeaks(wavelets);
-    
-    return {
-      energies,
-      entropy,
-      peaks,
-      coefficients: wavelets.coefficients
-    };
-  }
-
-  // OPTIMIZACIÓN: Cálculo de calidad de señal mejorado
-  private calculateSignalQuality(features: WaveletFeatures): number {
-    const energyQuality = this.calculateEnergyQuality(features.energies);
-    const entropyQuality = this.calculateEntropyQuality(features.entropy);
-    const peakQuality = this.calculatePeakQuality(features.peaks);
-    
-    return (
-      energyQuality * 0.4 +
-      entropyQuality * 0.3 +
-      peakQuality * 0.3
-    );
-  }
-
-  // OPTIMIZACIÓN: Detección de picos mejorada
-  private detectReliablePeaks(features: WaveletFeatures): Peak[] {
-    const candidates = this.findPeakCandidates(features);
-    const validated = this.validatePeaks(candidates);
-    
-    return this.rankPeaks(validated);
-  }
-
-  // OPTIMIZACIÓN: Estimación de ruido mejorada
-  private estimateNoiseLevel(features: WaveletFeatures): number {
-    const detailCoefficients = features.coefficients[0];
-    const medianAbsDev = this.calculateMedianAbsoluteDeviation(detailCoefficients);
-    
-    return medianAbsDev / 0.6745; // Estimador robusto de ruido
-  }
-
-  // OPTIMIZACIÓN: Métodos de descomposición mejorados
-  private decompose(signal: number[]): {
-    approximation: number[];
-    detail: number[];
-  } {
+  private singleLevelDWT(signal: number[]): { approximation: number[]; detail: number[] } {
     const N = signal.length;
-    const half = Math.floor(N/2);
-    
-    const approximation = new Array(half);
-    const detail = new Array(half);
-    
-    for (let i = 0; i < half; i++) {
-      let sum_a = 0;
-      let sum_d = 0;
-      
-      for (let k = 0; k < 4; k++) {
-        const idx = 2*i + k;
-        if (idx < N) {
-          sum_a += signal[idx] * this.getScalingCoefficient(k);
-          sum_d += signal[idx] * this.getWaveletCoefficient(k);
-        }
+    const approximation: number[] = [];
+    const detail: number[] = [];
+
+    for (let i = 0; i < N; i += 2) {
+      if (i + 1 < N) {
+        approximation.push((signal[i] + signal[i + 1]) / Math.sqrt(2));
+        detail.push((signal[i] - signal[i + 1]) / Math.sqrt(2));
+      } else {
+        approximation.push(signal[i] / Math.sqrt(2));
+        detail.push(signal[i] / Math.sqrt(2));
       }
-      
-      approximation[i] = sum_a;
-      detail[i] = sum_d;
     }
-    
+
     return { approximation, detail };
   }
 
-  // OPTIMIZACIÓN: Coeficientes wavelet mejorados
-  private getScalingCoefficient(k: number): number {
-    // Coeficientes Daubechies-4
-    const h = [0.4829629131445341,
-               0.8365163037378079,
-               0.2241438680420134,
-               -0.1294095225512604];
-    return h[k];
+  private detectPeaks(coefficients: number[][]): number[] {
+    const peaks: number[] = [];
+    const combinedCoefficients = this.combineCoefficients(coefficients);
+
+    for (let i = 1; i < combinedCoefficients.length - 1; i++) {
+      if (this.isPeak(combinedCoefficients, i)) {
+        peaks.push(i);
+      }
+    }
+
+    return this.filterPeaks(peaks, combinedCoefficients);
   }
 
-  private getWaveletCoefficient(k: number): number {
-    // Coeficientes wavelet
-    const g = [-0.1294095225512604,
-               -0.2241438680420134,
-               0.8365163037378079,
-               -0.4829629131445341];
-    return g[k];
-  }
+  private combineCoefficients(coefficients: number[][]): number[] {
+    const combined = new Array(coefficients[0].length).fill(0);
 
-  // OPTIMIZACIÓN: Análisis de energía mejorado
-  private calculateSubbandEnergies(wavelets: WaveletDecomposition): number[] {
-    return wavelets.coefficients.map(band => {
-      return band.reduce((energy, coef) => energy + coef * coef, 0);
-    });
-  }
-
-  // OPTIMIZACIÓN: Cálculo de entropía mejorado
-  private calculateWaveletEntropy(wavelets: WaveletDecomposition): number {
-    const totalEnergy = wavelets.coefficients.reduce((sum, band) => 
-      sum + band.reduce((e, coef) => e + coef * coef, 0), 0
-    );
-    
-    return wavelets.coefficients.reduce((entropy, band) => {
-      const bandEnergy = band.reduce((e, coef) => e + coef * coef, 0);
-      const p = bandEnergy / totalEnergy;
-      return entropy - (p > 0 ? p * Math.log2(p) : 0);
-    }, 0);
-  }
-
-  // OPTIMIZACIÓN: Búsqueda de picos mejorada
-  private findWaveletPeaks(wavelets: WaveletDecomposition): Peak[] {
-    const peaks: Peak[] = [];
-    
-    for (let level = 0; level < wavelets.levels; level++) {
-      const band = wavelets.coefficients[level];
-      const threshold = this.calculateAdaptiveThreshold(band);
-      
-      for (let i = 1; i < band.length - 1; i++) {
-        if (this.isPeak(band, i, threshold)) {
-          peaks.push({
-            position: i,
-            magnitude: band[i],
-            width: this.estimatePeakWidth(band, i),
-            level
-          });
+    for (let level = 0; level < coefficients.length; level++) {
+      const weight = Math.pow(0.5, level);
+      for (let i = 0; i < combined.length; i++) {
+        if (i < coefficients[level].length) {
+          combined[i] += coefficients[level][i] * weight;
         }
       }
     }
-    
-    return this.mergeSimilarPeaks(peaks);
+
+    return combined;
   }
 
-  // OPTIMIZACIÓN: Validación de picos mejorada
-  private validatePeaks(peaks: Peak[]): Peak[] {
-    return peaks.filter(peak => {
-      const isPhysiological = this.isPhysiologicallyValid(peak);
-      const hasGoodShape = this.hasGoodPeakShape(peak);
-      const isStable = this.isPeakStable(peak);
-      
-      return isPhysiological && hasGoodShape && isStable;
-    });
+  private isPeak(signal: number[], index: number): boolean {
+    return signal[index] > signal[index - 1] &&
+           signal[index] > signal[index + 1] &&
+           signal[index] > this.calculateThreshold(signal);
   }
 
-  // OPTIMIZACIÓN: Métodos auxiliares mejorados
-  private calculateAdaptiveThreshold(band: number[]): number {
-    const mad = this.calculateMedianAbsoluteDeviation(band);
-    return mad * 2.5;
+  private calculateThreshold(signal: number[]): number {
+    const mean = signal.reduce((a, b) => a + b, 0) / signal.length;
+    const stdDev = Math.sqrt(
+      signal.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / signal.length
+    );
+    return mean + stdDev * 1.5;
   }
 
-  private calculateMedianAbsoluteDeviation(values: number[]): number {
-    const median = this.calculateMedian(values);
-    const deviations = values.map(v => Math.abs(v - median));
-    return this.calculateMedian(deviations);
-  }
+  private filterPeaks(peaks: number[], signal: number[]): number[] {
+    if (peaks.length < 2) return peaks;
 
-  private calculateMedian(values: number[]): number {
-    const sorted = [...values].sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-  }
+    const filteredPeaks: number[] = [peaks[0]];
+    const minDistance = Math.floor(signal.length * 0.1);
 
-  private isPeak(band: number[], index: number, threshold: number): boolean {
-    return band[index] > threshold &&
-           band[index] > band[index - 1] &&
-           band[index] > band[index + 1];
-  }
-
-  private estimatePeakWidth(band: number[], peakIndex: number): number {
-    let width = 1;
-    let left = peakIndex - 1;
-    let right = peakIndex + 1;
-    const threshold = band[peakIndex] * 0.5;
-    
-    while (left >= 0 && band[left] > threshold) {
-      width++;
-      left--;
-    }
-    while (right < band.length && band[right] > threshold) {
-      width++;
-      right++;
-    }
-    
-    return width;
-  }
-
-  private mergeSimilarPeaks(peaks: Peak[]): Peak[] {
-    const merged: Peak[] = [];
-    const maxDistance = 3;
-    
-    peaks.sort((a, b) => b.magnitude - a.magnitude);
-    
-    for (const peak of peaks) {
-      const similarPeak = merged.find(p => 
-        Math.abs(p.position - peak.position) <= maxDistance &&
-        p.level === peak.level
-      );
-      
-      if (!similarPeak) {
-        merged.push(peak);
+    for (let i = 1; i < peaks.length; i++) {
+      if (peaks[i] - filteredPeaks[filteredPeaks.length - 1] >= minDistance) {
+        filteredPeaks.push(peaks[i]);
       }
     }
+
+    return filteredPeaks;
+  }
+
+  private calculateSignalQuality(coefficients: number[][], originalSignal: number[]): number {
+    const energyRatio = this.calculateEnergyRatio(coefficients);
+    const peakConsistency = this.calculatePeakConsistency(coefficients[0]);
+    const signalToNoise = this.calculateSignalToNoise(originalSignal);
+
+    return (energyRatio * 0.4 + peakConsistency * 0.3 + signalToNoise * 0.3);
+  }
+
+  private calculateEnergyRatio(coefficients: number[][]): number {
+    const totalEnergy = coefficients.reduce((sum, level) =>
+      sum + level.reduce((e, c) => e + c * c, 0), 0);
+
+    if (totalEnergy === 0) return 0;
+
+    const usefulEnergy = coefficients.slice(1, 3).reduce((sum, level) =>
+      sum + level.reduce((e, c) => e + c * c, 0), 0);
+
+    return usefulEnergy / totalEnergy;
+  }
+
+  private calculatePeakConsistency(detail: number[]): number {
+    const peaks = this.detectPeaks([detail]);
+    if (peaks.length < 2) return 0;
+
+    const intervals = peaks.slice(1).map((peak, i) => peak - peaks[i]);
+    const meanInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+    const variance = intervals.reduce((a, b) => a + Math.pow(b - meanInterval, 2), 0) / intervals.length;
+
+    return Math.exp(-variance / (meanInterval * meanInterval));
+  }
+
+  private calculateSignalToNoise(signal: number[]): number {
+    const mean = signal.reduce((a, b) => a + b, 0) / signal.length;
+    const variance = signal.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / signal.length;
+
+    if (variance === 0) return 0;
+
+    const smoothed = this.smoothSignal(signal);
+    const noise = signal.map((v, i) => v - smoothed[i]);
+    const noiseVariance = noise.reduce((a, b) => a + b * b, 0) / noise.length;
+
+    return Math.min(1, variance / (noiseVariance + 1e-6));
+  }
+
+  private smoothSignal(signal: number[]): number[] {
+    const windowSize = 5;
+    const smoothed = [];
     
-    return merged;
-  }
-
-  private getEmptyAnalysis(): SignalCharacteristics {
-    return {
-      quality: 0,
-      peaks: [],
-      noise: 0,
-      frequency: 0,
-      characteristics: {
-        energy: 0,
-        entropy: 0,
-        dominantFrequency: 0,
-        signalToNoise: 0
+    for (let i = 0; i < signal.length; i++) {
+      let sum = 0;
+      let count = 0;
+      
+      for (let j = Math.max(0, i - windowSize); j < Math.min(signal.length, i + windowSize + 1); j++) {
+        sum += signal[j];
+        count++;
       }
-    };
+      
+      smoothed.push(sum / count);
+    }
+    
+    return smoothed;
   }
-}
-
-// OPTIMIZACIÓN: Interfaces mejoradas
-interface WaveletDecomposition {
-  coefficients: number[][];
-  levels: number;
-}
-
-interface WaveletFeatures {
-  energies: number[];
-  entropy: number;
-  peaks: Peak[];
-  coefficients: number[][];
-}
-
-interface Peak {
-  position: number;
-  magnitude: number;
-  width: number;
-  level: number;
-}
-
-interface SignalCharacteristics {
-  quality: number;
-  peaks: Peak[];
-  noise: number;
-  frequency: number;
-  characteristics: {
-    energy: number;
-    entropy: number;
-    dominantFrequency: number;
-    signalToNoise: number;
-  };
-}
-
-interface WaveletAnalysis {
-  features: WaveletFeatures;
-  quality: number;
-  peaks: Peak[];
-  noise: number;
-  frequency: number;
 }

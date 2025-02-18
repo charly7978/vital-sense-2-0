@@ -1,3 +1,10 @@
+import { SignalFilter } from '@/lib/SignalFilter';
+import { FingerDetector } from '@/lib/FingerDetector';
+import { PPGSynchronizer } from '@/lib/PPGSynchronizer';
+import { AdaptiveCalibrator } from '@/lib/AdaptiveCalibrator';
+import { WaveletAnalyzer } from '@/lib/WaveletAnalyzer';
+import { SignalQualityAnalyzer } from '@/lib/SignalQualityAnalyzer';
+import type { VitalSigns, BloodPressure, ArrhythmiaType, SignalConditions } from '@/types';
 
 export class SignalProcessor {
   private buffer: number[] = [];
