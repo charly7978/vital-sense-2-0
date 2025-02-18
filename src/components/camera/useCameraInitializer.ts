@@ -1,7 +1,7 @@
 
 import { useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { MediaTrackConstraintsExtended, ExtendedMediaTrackCapabilities, ExtendedMediaTrackSettings } from "@/types";
+import { MediaTrackConstraintsExtended } from "@/types";
 
 interface UseCameraInitializerProps {
   videoConstraints: MediaTrackConstraintsExtended;
@@ -18,60 +18,38 @@ export const useCameraInitializer = ({
 
   const initializeCamera = useCallback(async () => {
     try {
-      console.log('Iniciando cámara con configuración:', videoConstraints);
-
+      console.log('Intentando iniciar cámara con config básica');
+      
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          ...videoConstraints,
           width: { ideal: 1280 },
           height: { ideal: 720 },
           frameRate: { ideal: 30 },
-          advanced: [{
-            exposureMode: 'manual',
-            exposureCompensation: 2,
-            whiteBalance: 'continuous'
-          }]
+          facingMode: "environment"
         },
         audio: false
       });
 
-      console.log('Stream obtenido:', stream.getVideoTracks()[0].getSettings());
-      
-      const track = stream.getVideoTracks()[0];
-      
-      try {
-        const capabilities = track.getCapabilities() as ExtendedMediaTrackCapabilities;
-        console.log('Capacidades de la cámara:', capabilities);
-        
-        const settings: ExtendedMediaTrackSettings = {};
-
-        if (capabilities.exposureMode?.includes('manual')) {
-          console.log('Aplicando configuración manual de exposición');
-          await track.applyConstraints({
-            advanced: [{
-              exposureMode: 'manual',
-              exposureCompensation: 2
-            }]
-          });
-        }
-
-      } catch (constraintError) {
-        console.log('Usando configuración automática de cámara:', constraintError);
+      if (!stream) {
+        console.error('No se pudo obtener el stream de la cámara');
+        throw new Error('No stream available');
       }
 
-      // Tiempo de estabilización
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      console.log('Inicialización de cámara completada');
+      const track = stream.getVideoTracks()[0];
+      console.log('Cámara iniciada exitosamente:', {
+        label: track.label,
+        settings: track.getSettings()
+      });
+
       return true;
 
     } catch (error) {
-      console.error('Error inicializando cámara:', error);
+      console.error('Error al iniciar la cámara:', error);
       setHasError(true);
       
       toast({
         title: "Error de cámara",
-        description: "Verifique los permisos de la cámara",
+        description: "No se pudo acceder a la cámara. Por favor, verifique los permisos.",
         variant: "destructive",
         className: "bg-black/40 backdrop-blur-sm text-sm text-white/80"
       });

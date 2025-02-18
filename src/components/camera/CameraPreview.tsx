@@ -16,16 +16,14 @@ const CameraPreview: React.FC<CameraPreviewProps> = ({
     <Webcam
       ref={webcamRef}
       audio={false}
+      screenshotFormat="image/jpeg"
       videoConstraints={{
-        ...videoConstraints,
-        advanced: [{
-          exposureMode: 'manual',
-          exposureCompensation: 2,
-          whiteBalance: 'continuous'
-        }]
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        frameRate: { ideal: 30 },
+        facingMode: "environment"
       }}
       className="absolute w-full h-full object-cover z-0"
-      screenshotFormat="image/jpeg"
       screenshotQuality={1}
     />
   );

@@ -129,14 +129,4 @@ export interface MediaTrackConstraintsExtended extends MediaTrackConstraints {
   height?: number | { ideal: number };
   frameRate?: number | { ideal: number };
   facingMode?: string | { ideal: string };
-  advanced?: {
-    brightness?: number;
-    contrast?: number;
-    saturation?: number;
-    sharpness?: number;
-    exposureMode?: string;
-    exposureTime?: number;
-    exposureCompensation?: number;
-    whiteBalance?: string;
-  }[];
 }
