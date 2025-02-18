@@ -4,9 +4,10 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { SignalProcessor } from '@/lib/SignalProcessor';
 import { PPGProcessor } from '@/lib/PPGProcessor';
 import { BeepPlayer } from '@/lib/BeepPlayer';
+import { useToast } from "@/hooks/use-toast";
 import type { VitalReading, SensitivitySettings, PPGData } from '@/types';
 
-// OPTIMIZACIÓN: Tipos mejorados para mejor control
+// OPTIMIZACIÓN: Tipos mejorados
 interface VitalsContextType {
   bpm: number;
   spo2: number;
@@ -28,7 +29,7 @@ interface VitalsContextType {
 const VitalsContext = createContext<VitalsContextType | undefined>(undefined);
 
 export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // OPTIMIZACIÓN: Estados iniciales mejorados
+  // OPTIMIZACIÓN: Estados mejorados
   const [bpm, setBpm] = useState<number>(0);
   const [spo2, setSpo2] = useState<number>(0);
   const [systolic, setSystolic] = useState<number>(0);
@@ -47,43 +48,63 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const startTime = useRef<number>(0);
   const frameCount = useRef<number>(0);
   const lastValidBpm = useRef<number>(0);
-  private readonly measurementDuration = 12000; // 12 segundos exactos
+  const { toast } = useToast();
 
-  // OPTIMIZACIÓN: Configuración optimizada para móviles
+  // OPTIMIZACIÓN: Constantes mejoradas
+  const measurementDuration = 12000; // 12 segundos exactos
+  const minQualityThreshold = 0.45;
+  const stabilityThreshold = 0.7;
+
+  // OPTIMIZACIÓN: Configuración mejorada
   const [sensitivitySettings, setSensitivitySettings] = useState<SensitivitySettings>({
-    signalAmplification: 1.2,    // Antes: 1.5 (más estable)
-    noiseReduction: 1.5,         // Antes: 1.2 (mejor filtrado)
-    peakDetection: 1.1,          // Antes: 1.3 (menos falsos positivos)
-    heartbeatThreshold: 0.7,     // Antes: 0.5 (mejor detección)
-    responseTime: 1.2,           // Antes: 1.0 (mejor estabilidad)
-    signalStability: 0.7,        // Antes: 0.5 (mejor calidad)
+    signalAmplification: 1.2,    // Optimizado para luz ambiente
+    noiseReduction: 1.5,         // Mejor filtrado
+    peakDetection: 1.1,          // Menos falsos positivos
+    heartbeatThreshold: 0.7,     // Mejor detección
+    responseTime: 1.2,           // Mejor estabilidad
+    signalStability: 0.7,        // Mejor calidad
     brightness: 0.8,             // Optimizado para luz tenue
-    redIntensity: 1.2            // Ajustado para mejor señal
+    redIntensity: 1.2            // Mejor señal
   });
 
   // OPTIMIZACIÓN: Toggle de medición mejorado
   const toggleMeasurement = useCallback(() => {
     if (!isStarted) {
-      // OPTIMIZACIÓN: Inicio de medición mejorado
-      setIsStarted(true);
-      startTime.current = Date.now();
-      frameCount.current = 0;
-      lastValidBpm.current = 0;
-      setMeasurementProgress(0);
-      setMeasurementQuality(0);
-      setBpm(0);
-      setSpo2(0);
-      setSystolic(0);
-      setDiastolic(0);
-      setHasArrhythmia(false);
-      setArrhythmiaType('Normal');
-      setReadings([]);
+      startMeasurement();
     } else {
-      // OPTIMIZACIÓN: Finalización de medición mejorada
-      setIsStarted(false);
-      beepPlayer.current.stop();
+      stopMeasurement();
     }
   }, [isStarted]);
+
+  // OPTIMIZACIÓN: Inicio de medición mejorado
+  const startMeasurement = () => {
+    setIsStarted(true);
+    startTime.current = Date.now();
+    frameCount.current = 0;
+    lastValidBpm.current = 0;
+    resetMeasurements();
+    
+    toast({
+      title: "Medición iniciada",
+      description: "Coloque su dedo en la cámara",
+      className: "bg-black/40 backdrop-blur-sm text-sm text-white/80"
+    });
+  };
+
+  // OPTIMIZACIÓN: Fin de medición mejorado
+  const stopMeasurement = () => {
+    setIsStarted(false);
+    beepPlayer.current.stop();
+    ppgProcessor.current.stop();
+    
+    if (measurementQuality > minQualityThreshold) {
+      toast({
+        title: "Medición completada",
+        description: "Resultados guardados",
+        className: "bg-black/40 backdrop-blur-sm text-sm text-white/80"
+      });
+    }
+  };
 
   // OPTIMIZACIÓN: Procesamiento de frames mejorado
   const processFrame = useCallback(async (imageData: ImageData) => {
@@ -102,58 +123,109 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const result = await ppgProcessor.current.processFrame(imageData);
       
       if (result) {
-        // OPTIMIZACIÓN: Actualización de calidad mejorada
-        setMeasurementQuality(result.signalQuality);
-
-        // OPTIMIZACIÓN: Validación de BPM mejorada
-        if (result.bpm > 0 && result.signalQuality > 0.4) {
-          if (lastValidBpm.current === 0 || 
-              Math.abs(result.bpm - lastValidBpm.current) <= 15) {
-            setBpm(result.bpm);
-            lastValidBpm.current = result.bpm;
-          }
-        }
-
-        // OPTIMIZACIÓN: Actualización de SpO2 mejorada
-        if (result.spo2 > 0 && result.confidence > 70) {
-          setSpo2(result.spo2);
-        }
-
-        // OPTIMIZACIÓN: Actualización de presión arterial mejorada
-        if (result.systolic > 0 && result.diastolic > 0 && result.signalQuality > 0.6) {
-          setSystolic(result.systolic);
-          setDiastolic(result.diastolic);
-        }
-
-        // OPTIMIZACIÓN: Actualización de arritmia mejorada
-        setHasArrhythmia(result.hasArrhythmia);
-        setArrhythmiaType(result.arrhythmiaType);
-
-        // OPTIMIZACIÓN: Actualización de lecturas mejorada
-        if (result.readings.length > 0) {
-          setReadings(prev => {
-            const newReadings = [...prev, ...result.readings];
-            return newReadings.slice(-360); // 12 segundos de datos
-          });
-        }
-
-        // OPTIMIZACIÓN: Reproducción de beep mejorada
-        if (result.isPeak && result.signalQuality > 0.6) {
-          beepPlayer.current.play();
-        }
+        updateMeasurements(result);
       }
 
       // OPTIMIZACIÓN: Finalización automática mejorada
       if (progress >= 100) {
-        toggleMeasurement();
+        handleMeasurementCompletion();
       }
 
     } catch (error) {
       console.error('Error procesando frame:', error);
+      handleProcessingError();
     } finally {
       setIsProcessing(false);
     }
-  }, [isStarted, isProcessing, toggleMeasurement]);
+  }, [isStarted, isProcessing]);
+
+  // OPTIMIZACIÓN: Actualización de mediciones mejorada
+  const updateMeasurements = (result: PPGData) => {
+    setMeasurementQuality(result.quality);
+
+    if (result.quality > minQualityThreshold) {
+      updateVitalSigns(result);
+      updateReadings(result);
+    }
+  };
+
+  // OPTIMIZACIÓN: Actualización de signos vitales mejorada
+  const updateVitalSigns = (result: PPGData) => {
+    if (result.bpm > 0 && isStableMeasurement(result.bpm, lastValidBpm.current)) {
+      setBpm(result.bpm);
+      lastValidBpm.current = result.bpm;
+    }
+
+    if (result.spo2 > 0) {
+      setSpo2(result.spo2);
+    }
+
+    if (result.systolic > 0 && result.diastolic > 0) {
+      setSystolic(result.systolic);
+      setDiastolic(result.diastolic);
+    }
+
+    setHasArrhythmia(result.hasArrhythmia);
+    setArrhythmiaType(result.arrhythmiaType);
+  };
+
+  // OPTIMIZACIÓN: Actualización de lecturas mejorada
+  const updateReadings = (result: PPGData) => {
+    setReadings(prev => {
+      const newReadings = [...prev, {
+        timestamp: result.timestamp,
+        value: result.value,
+        isPeak: result.isPeak
+      }];
+      return newReadings.slice(-360); // 12 segundos de datos
+    });
+  };
+
+  // OPTIMIZACIÓN: Métodos auxiliares mejorados
+  const isStableMeasurement = (current: number, previous: number): boolean => {
+    if (previous === 0) return true;
+    return Math.abs(current - previous) <= 15;
+  };
+
+  const resetMeasurements = () => {
+    setMeasurementProgress(0);
+    setMeasurementQuality(0);
+    setBpm(0);
+    setSpo2(0);
+    setSystolic(0);
+    setDiastolic(0);
+    setHasArrhythmia(false);
+    setArrhythmiaType('Normal');
+    setReadings([]);
+  };
+
+  const handleMeasurementCompletion = () => {
+    if (measurementQuality > minQualityThreshold) {
+      toast({
+        title: "Medición exitosa",
+        description: `Calidad: ${(measurementQuality * 100).toFixed(0)}%`,
+        className: "bg-black/40 backdrop-blur-sm text-sm text-white/80"
+      });
+    } else {
+      toast({
+        title: "Calidad insuficiente",
+        description: "Intente nuevamente",
+        variant: "destructive",
+        className: "bg-black/40 backdrop-blur-sm text-sm text-white/80"
+      });
+    }
+    toggleMeasurement();
+  };
+
+  const handleProcessingError = () => {
+    toast({
+      title: "Error de procesamiento",
+      description: "Intente nuevamente",
+      variant: "destructive",
+      className: "bg-black/40 backdrop-blur-sm text-sm text-white/80"
+    });
+    toggleMeasurement();
+  };
 
   // OPTIMIZACIÓN: Actualización de configuración mejorada
   const updateSensitivitySettings = useCallback((settings: SensitivitySettings) => {
@@ -165,6 +237,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     return () => {
       beepPlayer.current.stop();
+      ppgProcessor.current.stop();
     };
   }, []);
 
