@@ -66,25 +66,6 @@ export class SignalProcessor {
     };
   }
 
-  private createSignalConditions(signalQuality: number): SignalConditions {
-    return {
-      brightness: this.calculateLightLevel(),
-      stability: this.calculateStability(),
-      quality: signalQuality,
-      signalQuality,
-      lightLevel: this.calculateLightLevel(),
-      movement: this.calculateMovement(),
-      coverage: this.calculateCoverage(),
-      measurementType: 'bpm',
-      temperature: this.estimateTemperature()
-    };
-  }
-
-  private calculateStability(): number {
-    // Implementación básica
-    return 0.8;
-  }
-
   private calculateLightLevel(): number {
     if (!this.lastImageData) return 0;
     const data = this.lastImageData.data;
@@ -108,16 +89,29 @@ export class SignalProcessor {
     return this.fingerDetector.detectFinger(this.lastImageData).confidence;
   }
 
-  private estimateTemperature(): number {
-    // Estimación simple basada en el brillo promedio
-    return 20 + (this.calculateLightLevel() * 10);
-  }
-
   private calculateStability(): number {
     if (this.buffer.length < 10) return 0;
     const recentValues = this.buffer.slice(-10);
     const mean = recentValues.reduce((a, b) => a + b, 0) / recentValues.length;
     const variance = recentValues.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / recentValues.length;
     return Math.exp(-Math.sqrt(variance) / mean);
+  }
+
+  private estimateTemperature(): number {
+    return 20 + (this.calculateLightLevel() * 10);
+  }
+
+  private createSignalConditions(signalQuality: number): SignalConditions {
+    return {
+      brightness: this.calculateLightLevel(),
+      stability: this.calculateStability(),
+      quality: signalQuality,
+      signalQuality,
+      lightLevel: this.calculateLightLevel(),
+      movement: this.calculateMovement(),
+      coverage: this.calculateCoverage(),
+      measurementType: 'bpm',
+      temperature: this.estimateTemperature()
+    };
   }
 }
