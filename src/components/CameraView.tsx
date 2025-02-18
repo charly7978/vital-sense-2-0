@@ -27,7 +27,7 @@ const CameraView: React.FC<CameraViewProps> = ({
   const [hasError, setHasError] = useState(false);
   const [frameCount, setFrameCount] = useState(0);
 
-  // OPTIMIZACIÓN: Configuración de cámara mejorada
+  // OPTIMIZACIÓN: Configuración de cámara mejorada para poca luz
   const videoConstraints = {
     width: 1280,
     height: 720,
@@ -35,14 +35,17 @@ const CameraView: React.FC<CameraViewProps> = ({
     frameRate: 30,
     aspectRatio: 16/9,
     advanced: [{
-      // OPTIMIZACIÓN: Configuración para luz ambiente
+      // OPTIMIZACIÓN: Configuración para poca luz
       exposureMode: "manual",
-      exposureTime: 2000,           // Aumentado para luz ambiente
-      exposureCompensation: 1.0,    // Positivo para captar más luz
-      brightness: 0.5,              // Aumentado para luz ambiente
+      exposureTime: 10000,        // Aumentado para más luz
+      exposureCompensation: 2,    // Valor positivo para más brillo
+      brightness: 1.0,            // Máximo brillo
+      contrast: 1.2,              // Más contraste
       whiteBalanceMode: "manual",
-      colorTemperature: 3300,       // Optimizado para captar rojo
-      torch: false                  // Sin linterna
+      colorTemperature: 3300,     // Optimizado para captar rojo
+      saturation: 1.5,            // Aumentar saturación
+      sharpness: 1.2,             // Aumentar nitidez
+      torch: false                // Sin linterna
     }]
   };
 
@@ -69,9 +72,10 @@ const CameraView: React.FC<CameraViewProps> = ({
       await track.applyConstraints({
         advanced: [{
           exposureMode: "manual",
-          exposureTime: 2000,
-          exposureCompensation: 1.0,
-          brightness: 0.5
+          exposureTime: 10000,
+          exposureCompensation: 2,
+          brightness: 1.0,
+          contrast: 1.2
         }]
       });
 
@@ -118,12 +122,15 @@ const CameraView: React.FC<CameraViewProps> = ({
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
 
-      // OPTIMIZACIÓN: Procesamiento de región central
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
+      // OPTIMIZACIÓN: Procesamiento de región central con mejoras
       const centerX = Math.floor(canvas.width / 2);
       const centerY = Math.floor(canvas.height / 2);
-      const regionSize = Math.floor(Math.min(canvas.width, canvas.height) * 0.3);
+      const regionSize = Math.floor(Math.min(canvas.width, canvas.height) * 0.4);
+
+      // OPTIMIZACIÓN: Mejora del contraste y brillo
+      context.filter = 'contrast(120%) brightness(120%) saturate(120%)';
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      context.filter = 'none';
       
       const frameData = context.getImageData(
         centerX - regionSize,
@@ -132,7 +139,13 @@ const CameraView: React.FC<CameraViewProps> = ({
         regionSize * 2
       );
 
+      // OPTIMIZACIÓN: Mejora de señal
       if (frameData && frameData.data.length >= 4) {
+        // Aumentar canal rojo
+        for (let i = 0; i < frameData.data.length; i += 4) {
+          frameData.data[i] = Math.min(frameData.data[i] * 1.2, 255);
+        }
+        
         onFrame(frameData);
         setFrameCount(prev => prev + 1);
       }
