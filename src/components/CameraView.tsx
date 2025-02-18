@@ -1,3 +1,4 @@
+
 // ==================== CameraView.tsx ====================
 
 import React, { useRef, useEffect, useState, useCallback } from "react";
@@ -16,40 +17,24 @@ const CameraView: React.FC<CameraViewProps> = ({
   isActive, 
   onMeasurementEnd 
 }) => {
-  // OPTIMIZACIÓN: Referencias mejoradas
   const webcamRef = useRef<Webcam>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number | null>(null);
   const { toast } = useToast();
 
-  // OPTIMIZACIÓN: Estados mejorados
   const [isInitializing, setIsInitializing] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [frameCount, setFrameCount] = useState(0);
 
-  // OPTIMIZACIÓN: Configuración de cámara mejorada para poca luz
-  const videoConstraints = {
+  // Configuración básica de la cámara
+  const videoConstraints: MediaTrackConstraints = {
     width: 1280,
     height: 720,
     facingMode: "environment",
-    frameRate: 30,
-    aspectRatio: 16/9,
-    advanced: [{
-      // OPTIMIZACIÓN: Configuración para poca luz
-      exposureMode: "manual",
-      exposureTime: 10000,        // Aumentado para más luz
-      exposureCompensation: 2,    // Valor positivo para más brillo
-      brightness: 1.0,            // Máximo brillo
-      contrast: 1.2,              // Más contraste
-      whiteBalanceMode: "manual",
-      colorTemperature: 3300,     // Optimizado para captar rojo
-      saturation: 1.5,            // Aumentar saturación
-      sharpness: 1.2,             // Aumentar nitidez
-      torch: false                // Sin linterna
-    }]
+    frameRate: { ideal: 30 },
+    aspectRatio: 16/9
   };
 
-  // OPTIMIZACIÓN: Inicialización de cámara mejorada
   const initializeCamera = useCallback(async () => {
     try {
       setIsInitializing(true);
@@ -64,20 +49,23 @@ const CameraView: React.FC<CameraViewProps> = ({
 
       const track = stream.getVideoTracks()[0];
       
-      // OPTIMIZACIÓN: Verificar capacidades
+      // Verificar capacidades
       const capabilities = track.getCapabilities();
       console.log('Capacidades de la cámara:', capabilities);
 
-      // OPTIMIZACIÓN: Aplicar configuración óptima
-      await track.applyConstraints({
-        advanced: [{
-          exposureMode: "manual",
-          exposureTime: 10000,
-          exposureCompensation: 2,
-          brightness: 1.0,
-          contrast: 1.2
-        }]
-      });
+      const settings: MediaTrackConstraints = {
+        brightness: { ideal: 100 },
+        contrast: { ideal: 95 },
+        saturation: { ideal: 100 },
+        sharpness: { ideal: 85 },
+      };
+
+      // Intentar aplicar configuraciones si están soportadas
+      try {
+        await track.applyConstraints(settings);
+      } catch (e) {
+        console.warn('No se pudieron aplicar todas las configuraciones avanzadas:', e);
+      }
 
       setIsInitializing(false);
 
@@ -95,7 +83,7 @@ const CameraView: React.FC<CameraViewProps> = ({
     }
   }, [toast]);
 
-  // OPTIMIZACIÓN: Procesamiento de frames mejorado
+  // Procesamiento de frames mejorado
   const processFrame = useCallback(() => {
     if (!isActive || !webcamRef.current?.video || !canvasRef.current) {
       if (animationFrameRef.current) {
@@ -118,16 +106,13 @@ const CameraView: React.FC<CameraViewProps> = ({
     }
 
     try {
-      // OPTIMIZACIÓN: Ajuste de dimensiones
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
 
-      // OPTIMIZACIÓN: Procesamiento de región central con mejoras
       const centerX = Math.floor(canvas.width / 2);
       const centerY = Math.floor(canvas.height / 2);
       const regionSize = Math.floor(Math.min(canvas.width, canvas.height) * 0.4);
 
-      // OPTIMIZACIÓN: Mejora del contraste y brillo
       context.filter = 'contrast(120%) brightness(120%) saturate(120%)';
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       context.filter = 'none';
@@ -139,7 +124,6 @@ const CameraView: React.FC<CameraViewProps> = ({
         regionSize * 2
       );
 
-      // OPTIMIZACIÓN: Mejora de señal
       if (frameData && frameData.data.length >= 4) {
         // Aumentar canal rojo
         for (let i = 0; i < frameData.data.length; i += 4) {
@@ -163,7 +147,6 @@ const CameraView: React.FC<CameraViewProps> = ({
     animationFrameRef.current = requestAnimationFrame(processFrame);
   }, [isActive, onFrame, toast]);
 
-  // OPTIMIZACIÓN: Efectos mejorados
   useEffect(() => {
     if (isActive) {
       initializeCamera();
@@ -183,7 +166,6 @@ const CameraView: React.FC<CameraViewProps> = ({
     };
   }, [isActive, isInitializing, hasError, processFrame]);
 
-  // OPTIMIZACIÓN: Renderizado mejorado
   return (
     <div className="relative w-full h-screen bg-black">
       {isActive && (
@@ -202,16 +184,13 @@ const CameraView: React.FC<CameraViewProps> = ({
             style={{ display: "none" }}
           />
 
-          {/* OPTIMIZACIÓN: Guía visual mejorada */}
           <div className="absolute inset-0 flex items-center justify-center z-10">
             <div className="relative w-32 h-32">
-              {/* Círculo guía */}
               <div className={cn(
                 "absolute inset-0 border-2 rounded-full transition-all duration-300",
                 frameCount > 0 ? "border-white/30" : "border-white/10"
               )} />
               
-              {/* Líneas de referencia */}
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="w-full h-[1px] bg-white/20" />
               </div>
@@ -219,7 +198,6 @@ const CameraView: React.FC<CameraViewProps> = ({
                 <div className="w-[1px] h-full bg-white/20" />
               </div>
               
-              {/* Texto de instrucción */}
               <div className="absolute inset-0 flex flex-col items-center justify-center p-2">
                 <span className="text-white/60 text-xs text-center">
                   {isInitializing ? "Iniciando cámara..." :
@@ -237,7 +215,6 @@ const CameraView: React.FC<CameraViewProps> = ({
         </>
       )}
 
-      {/* OPTIMIZACIÓN: Estados de error/carga */}
       {isInitializing && (
         <div className="absolute inset-0 flex items-center justify-center bg-black">
           <span className="text-white/60 text-sm">
@@ -258,3 +235,4 @@ const CameraView: React.FC<CameraViewProps> = ({
 };
 
 export default CameraView;
+
