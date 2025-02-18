@@ -132,6 +132,24 @@ export class PPGProcessor {
     };
   }
 
+  public stop(): void {
+    // Limpiar el estado del procesador
+    this.samplesProcessed = 0;
+    this.bufferIndex = 0;
+    this.lastPeakTime = 0;
+    this.lastValidBPM = 0;
+    this.confidenceScore = 0;
+    this.calibrationData = [];
+    this.isCalibrating = true;
+    this.hrvBuffer.length = 0;
+    this.arrhythmiaHistory.length = 0;
+    
+    // Limpiar buffers
+    this.signalBuffer.fill(0);
+    this.timeBuffer.fill(0);
+    this.qualityBuffer.fill(0);
+  }
+
   private extractPPGSignal(
     imageData: ImageData, 
     position: { x: number; y: number }

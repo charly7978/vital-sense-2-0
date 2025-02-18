@@ -1,3 +1,4 @@
+
 export class BeepPlayer {
     private audioContext: AudioContext | null = null;
     private oscillator: OscillatorNode | null = null;
@@ -22,9 +23,5 @@ export class BeepPlayer {
             this.audioContext.close();
             this.audioContext = null;
         }
-    }
-
-    public dispose(): void {
-        this.stop();
     }
 }
