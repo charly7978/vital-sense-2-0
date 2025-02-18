@@ -18,7 +18,7 @@ export class SignalFrequencyAnalyzer {
       paddedSignal.push(0);
     }
     
-    // Aplicar ventana Hanning
+    // Apply Hanning window to reduce spectral leakage
     for (let i = 0; i < paddedSignal.length; i++) {
       const hann = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (paddedSignal.length - 1)));
       paddedSignal[i] *= hann;
@@ -29,43 +29,30 @@ export class SignalFrequencyAnalyzer {
     const frequencies: number[] = [];
     const magnitudes: number[] = [];
     
-    // Analizamos frecuencias relevantes para ritmo cardíaco (0.5-4 Hz = 30-240 BPM)
+    // Analyze frequencies relevant for heart rate (0.5-4 Hz)
     const minFreqIdx = Math.floor(0.5 * fft.size / this.sampleRate);
     const maxFreqIdx = Math.ceil(4 * fft.size / this.sampleRate);
     
     for (let i = minFreqIdx; i < maxFreqIdx; i++) {
-      const freq = (i * this.sampleRate) / fft.size;
-      if (freq >= 0.5 && freq <= 4) { // Solo frecuencias válidas para HR
-        frequencies.push(freq);
-        // Mejoramos el cálculo de magnitud
-        const magnitude = Math.sqrt(phasors[2*i]**2 + phasors[2*i+1]**2);
-        magnitudes.push(magnitude);
-      }
-    }
-    
-    // Normalizamos magnitudes
-    const maxMag = Math.max(...magnitudes);
-    if (maxMag > 0) {
-      for (let i = 0; i < magnitudes.length; i++) {
-        magnitudes[i] = magnitudes[i] / maxMag;
-      }
+      frequencies.push((i * this.sampleRate) / fft.size);
+      magnitudes.push(2 * Math.sqrt(phasors[2*i]**2 + phasors[2*i+1]**2) / fft.size);
     }
     
     return { frequencies, magnitudes };
   }
 
   calculateFrequencyDomainMetrics(intervals: number[]): { lf: number; hf: number } {
-    if (intervals.length < 2) return { lf: 0, hf: 0 };
-
-    const samplingRate = 4; // Hz para remuestreo
+    const samplingRate = 4; // Hz for resampling
     const interpolatedSignal = this.interpolateRRIntervals(intervals, samplingRate);
     
+    // Apply FFT
     const fft = new FFT(Math.pow(2, Math.ceil(Math.log2(interpolatedSignal.length))));
     const signal = fft.createComplexArray();
     fft.realTransform(signal, interpolatedSignal);
     
-    let lfPower = 0; // 0.04-0.15 Hz (Baja Frecuencia)
-    let hfPower = 0; // 0.15-0.4 Hz (Alta Frecuencia)
+    // Calculate power in frequency bands
+    let lfPower = 0; // 0.04-0.15 Hz (Low Frequency)
+    let hfPower = 0; // 0.15-0.4 Hz (High Frequency)
     
     const freqResolution = samplingRate / fft.size;
     
@@ -84,8 +71,6 @@ export class SignalFrequencyAnalyzer {
   }
 
   private interpolateRRIntervals(intervals: number[], samplingRate: number): number[] {
-    if (intervals.length === 0) return [];
-
     const totalTime = intervals.reduce((a, b) => a + b, 0);
     const numSamples = Math.floor(totalTime * samplingRate / 1000);
     const interpolated = new Array(numSamples).fill(0);
@@ -101,6 +86,7 @@ export class SignalFrequencyAnalyzer {
         intervalIndex++;
       }
       
+      const alpha = (t - currentTime) / intervals[intervalIndex];
       interpolated[i] = intervals[intervalIndex];
     }
     

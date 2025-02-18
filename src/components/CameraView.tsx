@@ -1,6 +1,9 @@
-import React, { useRef, useEffect, useState } from "react";
+// ==================== CameraView.tsx ====================
+
+import React, { useRef, useEffect, useState, useCallback } from "react";
 import Webcam from "react-webcam";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface CameraViewProps {
   onFrame: (imageData: ImageData) => void;
@@ -8,101 +11,235 @@ interface CameraViewProps {
   onMeasurementEnd?: () => void;
 }
 
-const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasurementEnd }) => {
+const CameraView: React.FC<CameraViewProps> = ({ 
+  onFrame, 
+  isActive, 
+  onMeasurementEnd 
+}) => {
+  // OPTIMIZACIÓN: Referencias mejoradas
   const webcamRef = useRef<Webcam>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number | null>(null);
   const { toast } = useToast();
-  const [bpm, setBpm] = useState(0);
-  const [spo2, setSpo2] = useState(98);
-  const [quality, setQuality] = useState(0);
-  const beepAudio = useRef(new Audio("/beep.mp3"));
 
-  useEffect(() => {
-    beepAudio.current.volume = 1.0;
-  }, []);
+  // OPTIMIZACIÓN: Estados mejorados
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [hasError, setHasError] = useState(false);
+  const [frameCount, setFrameCount] = useState(0);
 
-  const processFrame = () => {
+  // OPTIMIZACIÓN: Configuración de cámara mejorada
+  const videoConstraints = {
+    width: 1280,
+    height: 720,
+    facingMode: "environment",
+    frameRate: 30,
+    aspectRatio: 16/9,
+    advanced: [{
+      // OPTIMIZACIÓN: Configuración para luz ambiente
+      exposureMode: "manual",
+      exposureTime: 2000,           // Aumentado para luz ambiente
+      exposureCompensation: 1.0,    // Positivo para captar más luz
+      brightness: 0.5,              // Aumentado para luz ambiente
+      whiteBalanceMode: "manual",
+      colorTemperature: 3300,       // Optimizado para captar rojo
+      torch: false                  // Sin linterna
+    }]
+  };
+
+  // OPTIMIZACIÓN: Inicialización de cámara mejorada
+  const initializeCamera = useCallback(async () => {
+    try {
+      setIsInitializing(true);
+      setHasError(false);
+
+      if (!webcamRef.current) return;
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: videoConstraints,
+        audio: false
+      });
+
+      const track = stream.getVideoTracks()[0];
+      
+      // OPTIMIZACIÓN: Verificar capacidades
+      const capabilities = track.getCapabilities();
+      console.log('Capacidades de la cámara:', capabilities);
+
+      // OPTIMIZACIÓN: Aplicar configuración óptima
+      await track.applyConstraints({
+        advanced: [{
+          exposureMode: "manual",
+          exposureTime: 2000,
+          exposureCompensation: 1.0,
+          brightness: 0.5
+        }]
+      });
+
+      setIsInitializing(false);
+
+    } catch (error) {
+      console.error('Error inicializando cámara:', error);
+      setHasError(true);
+      setIsInitializing(false);
+      
+      toast({
+        title: "Error de cámara",
+        description: "Verifique los permisos de la cámara",
+        variant: "destructive",
+        className: "bg-black/40 backdrop-blur-sm text-sm text-white/80"
+      });
+    }
+  }, [toast]);
+
+  // OPTIMIZACIÓN: Procesamiento de frames mejorado
+  const processFrame = useCallback(() => {
     if (!isActive || !webcamRef.current?.video || !canvasRef.current) {
-      animationFrameRef.current = requestAnimationFrame(processFrame);
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
       return;
     }
 
     const video = webcamRef.current.video;
     const canvas = canvasRef.current;
-    const context = canvas.getContext("2d");
+    const context = canvas.getContext('2d', { 
+      willReadFrequently: true,
+      alpha: false
+    });
 
-    if (!context || !video || video.readyState !== video.HAVE_ENOUGH_DATA) {
+    if (!context || video.readyState !== video.HAVE_ENOUGH_DATA) {
       animationFrameRef.current = requestAnimationFrame(processFrame);
       return;
     }
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
     try {
+      // OPTIMIZACIÓN: Ajuste de dimensiones
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      // OPTIMIZACIÓN: Procesamiento de región central
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const frameData = context.getImageData(0, 0, canvas.width, canvas.height);
 
-      if (!frameData || frameData.data.length < 4) {
-        animationFrameRef.current = requestAnimationFrame(processFrame);
-        return;
-      }
+      const centerX = Math.floor(canvas.width / 2);
+      const centerY = Math.floor(canvas.height / 2);
+      const regionSize = Math.floor(Math.min(canvas.width, canvas.height) * 0.3);
+      
+      const frameData = context.getImageData(
+        centerX - regionSize,
+        centerY - regionSize,
+        regionSize * 2,
+        regionSize * 2
+      );
 
-      const { bpm, spo2, quality, isValid } = analyzeVitalSigns(frameData);
-      if (isValid) {
-        setBpm(bpm);
-        setSpo2(spo2);
-        setQuality(quality);
+      if (frameData && frameData.data.length >= 4) {
         onFrame(frameData);
+        setFrameCount(prev => prev + 1);
       }
+
     } catch (error) {
-      console.error("❌ Error al procesar el frame:", error);
+      console.error("Error procesando frame:", error);
+      toast({
+        title: "Error de procesamiento",
+        description: "Error al procesar la imagen",
+        variant: "destructive",
+        className: "bg-black/40 backdrop-blur-sm text-sm text-white/80"
+      });
     }
 
     animationFrameRef.current = requestAnimationFrame(processFrame);
-  };
+  }, [isActive, onFrame, toast]);
 
+  // OPTIMIZACIÓN: Efectos mejorados
   useEffect(() => {
     if (isActive) {
-      processFrame();
-    } else if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
+      initializeCamera();
     }
-  }, [isActive]);
+  }, [isActive, initializeCamera]);
 
+  useEffect(() => {
+    if (isActive && !isInitializing && !hasError) {
+      processFrame();
+    }
+
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+    };
+  }, [isActive, isInitializing, hasError, processFrame]);
+
+  // OPTIMIZACIÓN: Renderizado mejorado
   return (
-    <div className="relative w-full h-screen">
-      {/* 🔹 Cámara a pantalla completa, aseguramos que no se vea borrosa */}
+    <div className="relative w-full h-screen bg-black">
       {isActive && (
-        <Webcam
-          ref={webcamRef}
-          audio={false}
-          videoConstraints={{ width: 1280, height: 720, facingMode: "environment" }}
-          className="absolute w-full h-full object-cover z-0"
-        />
+        <>
+          <Webcam
+            ref={webcamRef}
+            audio={false}
+            videoConstraints={videoConstraints}
+            className="absolute w-full h-full object-cover z-0"
+            screenshotFormat="image/jpeg"
+            screenshotQuality={1}
+          />
+
+          <canvas 
+            ref={canvasRef} 
+            style={{ display: "none" }}
+          />
+
+          {/* OPTIMIZACIÓN: Guía visual mejorada */}
+          <div className="absolute inset-0 flex items-center justify-center z-10">
+            <div className="relative w-32 h-32">
+              {/* Círculo guía */}
+              <div className={cn(
+                "absolute inset-0 border-2 rounded-full transition-all duration-300",
+                frameCount > 0 ? "border-white/30" : "border-white/10"
+              )} />
+              
+              {/* Líneas de referencia */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-full h-[1px] bg-white/20" />
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-[1px] h-full bg-white/20" />
+              </div>
+              
+              {/* Texto de instrucción */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center p-2">
+                <span className="text-white/60 text-xs text-center">
+                  {isInitializing ? "Iniciando cámara..." :
+                   hasError ? "Error de cámara" :
+                   "Coloque su dedo"}
+                </span>
+                {!isInitializing && !hasError && (
+                  <span className="text-white/40 text-[10px] text-center mt-1">
+                    Cubra el círculo
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
       )}
-      <canvas ref={canvasRef} style={{ display: "none" }} />
 
-      {/* 🔹 Contenedor de datos sobre la cámara, ajustado para mejor visibilidad */}
-      <div className="absolute top-0 left-0 w-full h-full flex flex-col items-center justify-center bg-black/10 backdrop-blur-sm text-white p-4 z-10">
-        <div className="bg-black/40 rounded-lg p-3 w-3/4 text-center">
-          {/* 🔹 BPM */}
-          <div className="text-4xl font-bold">BPM: {bpm}</div>
-
-          {/* 🔹 SpO2 */}
-          <div className="text-2xl mt-2">SpO2: {spo2}%</div>
-
-          {/* 🔹 Calidad de la señal */}
-          <div className="text-lg mt-2">Señal: {quality}%</div>
+      {/* OPTIMIZACIÓN: Estados de error/carga */}
+      {isInitializing && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black">
+          <span className="text-white/60 text-sm">
+            Iniciando cámara...
+          </span>
         </div>
+      )}
 
-        {/* 🔹 Gráfico de señal PPG, ahora más visible */}
-        <div className="absolute bottom-5 left-1/2 transform -translate-x-1/2 bg-black/30 p-3 rounded-xl text-sm">
-          📊 Gráfico PPG (Placeholder)
+      {hasError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black">
+          <span className="text-red-400/60 text-sm">
+            Error al iniciar la cámara
+          </span>
         </div>
-      </div>
+      )}
     </div>
   );
 };
