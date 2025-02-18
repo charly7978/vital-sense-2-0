@@ -18,9 +18,6 @@ export const useCameraInitializer = ({
 
   const initializeCamera = useCallback(async () => {
     try {
-      setIsInitializing(true);
-      setHasError(false);
-
       const stream = await navigator.mediaDevices.getUserMedia({
         video: videoConstraints,
         audio: false
@@ -42,7 +39,7 @@ export const useCameraInitializer = ({
         console.warn('Algunas configuraciones no están soportadas:', e);
       }
 
-      setIsInitializing(false);
+      return true;
 
     } catch (error) {
       console.error('Error inicializando cámara:', error);
@@ -55,6 +52,8 @@ export const useCameraInitializer = ({
         variant: "destructive",
         className: "bg-black/40 backdrop-blur-sm text-sm text-white/80"
       });
+
+      return false;
     }
   }, [videoConstraints, setIsInitializing, setHasError, toast]);
 
