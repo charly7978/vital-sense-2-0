@@ -1,106 +1,73 @@
 
-// IMPORTANTE: NO MODIFICAR FUNCIONALIDAD
-// Este archivo contiene definiciones de tipos base
+import { SignalQualityLevelType, Float64Type } from './common';
+import type { NoiseAnalysis, MotionAnalysis } from './analysis';
+import type { CalibrationState } from './config';
 
-import { SignalQualityLevel } from './index';
-
-export interface ProcessorEvent {
-  type: string;
-  data?: any;
+// Base interfaces
+export interface Metadata {
   timestamp: number;
+  duration?: number;
+  frameIndex?: number;
 }
 
-export interface CircularBuffer<T> {
-  push(value: T): void;
-  get(index: number): T;
-  length: number;
-  clear(): void;
+export interface DataPoint extends Metadata {
+  value: number;
+  confidence?: number;
 }
 
-export interface MotionVector {
-  dx: number;
-  dy: number;
-  magnitude: number;
+export interface DataRange {
+  start: number;
+  end: number;
+  step?: number;
 }
 
-export interface ROI {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-export interface SystemConfig {
-  processing: {
-    mode: 'normal' | 'calibration' | 'debug';
-    sampleRate?: number;
-    sensitivity: SensitivitySettings;
-    calibration: CalibrationState;
-  };
-  camera: {
-    constraints: MediaStreamConstraints;
-    settings: {
-      width: number;
-      height: number;
-      frameRate: number;
-      facingMode: 'user' | 'environment';
-    };
-  };
-  sensitivity: SensitivitySettings;
-  calibration: CalibrationState;
-  sampling?: {
-    rate: number;
-    interval: number;
-  };
-}
-
-export interface SensitivitySettings {
-  brightness: number;
-  redIntensity: number;
-  signalAmplification: number;
-  noiseReduction: number;
-  peakDetection: number;
-  heartbeatThreshold: number;
-  responseTime: number;
-  signalStability: number;
-  filterStrength?: number;
-  adaptiveThreshold?: number;
-}
-
-export interface SignalQualityParams {
-  signal: number[];
-  noise: NoiseAnalysis;
-  motion: MotionAnalysis;
-  heartRate: number;
-  features: any;
-}
-
-export interface ColorProfile {
-  mean: number[];
-  std: number[];
-  histogram: number[];
-  skinLikelihood: number;
-}
-
-export interface DetectionQuality {
-  level: SignalQualityLevel;
-  coverage: number;
-  stability: number;
-  contrast: number;
-}
-
-export interface MotionEstimate {
-  dx: number;
-  dy: number;
+export interface ProcessingResult extends Metadata {
+  value: number;
   confidence: number;
-  transform?: any;
+  quality: SignalQualityLevelType;
 }
 
-export type LightConditions = 'low' | 'normal' | 'high' | 'unknown';
-
-export interface DetectionMetrics {
-  frameCount: number;
-  errorRate: number;
-  stability: number;
-  coverage: number;
+export interface CalibrationResult {
+  isValid: boolean;
+  calibration: CalibrationState;
+  referenceValue: number;
+  confidence: number;
 }
+
+export interface AnalysisResult extends ProcessingResult {
+  features: Float64Type;
+  metrics: {[key: string]: number};
+  quality: SignalQualityLevelType;
+}
+
+export interface ValidationResult {
+  isValid: boolean;
+  confidence: number;
+  metrics: {[key: string]: number};
+  details?: string[];
+}
+
+export interface DetectionResult extends ProcessingResult {
+  artifacts?: NoiseAnalysis;
+  motion?: MotionAnalysis;
+  segments?: number[][];
+}
+
+export interface BaseConfig {
+  enabled: boolean;
+  threshold?: number;
+  windowSize?: number;
+}
+
+// Common types
+export type Frequency = number;
+export type Amplitude = number;
+export type Phase = number;
+export type Energy = number;
+export type Power = number;
+export type SNR = number;
+
+export type ProcessingCallback = (result: ProcessingResult) => void;
+export type ValidationCallback = (result: ValidationResult) => void;
+export type CalibrationCallback = (state: CalibrationState) => void;
+

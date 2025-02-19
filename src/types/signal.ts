@@ -1,91 +1,41 @@
 
-import { SignalQuality } from './quality';
-import { ProcessingConfig } from './config';
-import { Float64Array } from './common';
+import { SignalQualityLevelType, Float64Type } from './common';
+import type { Metadata, ValidationResult } from './core';
 
-export interface SignalAnalysis {
-  features: SignalFeatures;
-  quality: SignalQuality;
-  metrics: ProcessorMetrics;
+export interface SignalPoint extends Metadata {
+  value: Float64Type;
+  quality?: SignalQualityLevelType;
 }
 
-export interface SignalFeatures {
-  temporal: TemporalFeatures;
-  spectral: SpectralFeatures;
-  statistical: StatisticalFeatures;
+export interface SignalSegment {
+  start: number;
+  end: number;
+  data: Float64Type;
+  quality: SignalQualityLevelType;
 }
 
-export interface ProcessorMetrics {
-  snr: number;
-  bpm: number;
-  quality: SignalQuality;
-  timestamp: number;
-}
-
-export interface FilterConfig {
-  order: number;
-  cutoff: number[];
-  type: 'lowpass' | 'highpass' | 'bandpass';
-  window?: 'hamming' | 'hanning' | 'blackman';
-  sampleRate?: number;
-  bands?: {
-    vlf: [number, number];
-    lf: [number, number];
-    hf: [number, number];
-    total: [number, number];
-    cardiac?: [number, number];
-    respiratory?: [number, number];
-    mains?: [number, number];
-  };
-  adaptive?: boolean;
-  bank?: boolean;
-}
-
-export interface TemporalFeatures {
-  peaks: number[];
-  valleys: number[];
-  intervals: number[];
-  amplitudes: number[];
-}
-
-export interface SpectralFeatures {
-  mainFrequency: number;
-  harmonics: number[];
-  bandwidth: number;
-  energy: number[];
-}
-
-export interface StatisticalFeatures {
+export interface SignalMetrics {
   mean: number;
-  variance: number;
-  skewness: number;
-  kurtosis: number;
-}
-
-export interface SignalValidation {
-  isValid: boolean;
-  confidence: number;
-  errors: string[];
-}
-
-export interface ProcessingQuality {
+  std: number;
   snr: number;
+  power: number;
+  quality: SignalQualityLevelType;
+}
+
+export interface SignalValidation extends ValidationResult {
   stability: number;
   artifacts: number;
-  overall: number;
+  coverage: number;
 }
 
-export type AnalysisMode = 'realtime' | 'offline' | 'batch';
-
-export interface ProcessingPipeline {
-  filters: FilterConfig[];
-  features: string[];
-  validators: string[];
+export interface SignalConditions {
+  brightness: number;
+  contrast: number;
+  noise: number;
+  stability: number;
+  signalQuality: number;
+  lightLevel: number;
+  movement: number;
+  coverage: number;
 }
 
-export interface ProcessorOptimization {
-  cacheSize: number;
-  batchSize: number;
-  parallel: boolean;
-  precision: 'single' | 'double';
-}

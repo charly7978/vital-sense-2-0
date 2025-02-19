@@ -1,31 +1,45 @@
 
-// IMPORTANTE: NO MODIFICAR FUNCIONALIDAD
-// Este archivo solo contiene definiciones de tipos
-
-import { SignalConditions } from './signal';
+import { SignalQualityLevelType, Float64Type } from './common';
+import type { ValidationResult } from './core';
 
 export interface CalibrationEntry {
   timestamp: number;
-  values: number[];
-  conditions: SignalConditions;
-  factor: number;
-  raw?: number[];
+  value: number;
+  reference?: number;
+  confidence: number;
+  quality: SignalQualityLevelType;
+}
+
+export interface CalibrationConditions {
+  brightness: number;
+  contrast: number;
+  stability: number;
+  coverage: number;
+  quality: SignalQualityLevelType;
+}
+
+export interface CalibrationValidation extends ValidationResult {
+  conditions: CalibrationConditions;
+  threshold: number;
+  duration: number;
 }
 
 export interface CalibratedResult {
-  values: number[];
-  quality: number;
-  isValid: boolean;
+  timestamp: number;
+  value: number;
+  reference: number;
+  error: number;
+  confidence: number;
 }
 
-export interface CalibrationState {
-  isCalibrating: boolean;
-  progress: number;
-  message: string;
-  isCalibrated?: boolean;
-  calibrationTime?: number;
-  referenceValues?: Float64Array;
-  calibrationQuality?: number;
-  lastCalibration?: number;
-  duration?: number;
+export interface CalibrationConfig {
+  duration: number;
+  samples: number;
+  reference?: number;
+  threshold?: number;
+  validation?: {
+    minQuality: SignalQualityLevelType;
+    maxError: number;
+    minConfidence: number;
+  };
 }
