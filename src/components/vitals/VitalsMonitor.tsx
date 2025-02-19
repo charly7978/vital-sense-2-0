@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useVitals } from '@/contexts/VitalsContext';
 import CameraView from '../CameraView';
@@ -159,7 +158,7 @@ function QualityIndicator({ label, value, color }: QualityIndicatorProps) {
   );
 }
 
-function getQualityColor(level: SignalQualityLevel): string {
+function getQualityColor(level: typeof SignalQualityLevel[keyof typeof SignalQualityLevel]): string {
   switch (level) {
     case SignalQualityLevel.Excellent:
       return 'bg-emerald-500 text-white';

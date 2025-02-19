@@ -301,11 +301,10 @@ export class PPGProcessor {
   }
 
   private analyzeNoise(signal: Float64Type): NoiseAnalysis {
-    const { magnitude, phase } = this.computeFFT(signal);
     const mean = signal.reduce((a, b) => a + b) / signal.length;
     const variance = signal.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / signal.length;
     
-    // Calculate signal and noise power
+    const { magnitude, phase } = this.computeFFT(signal);
     const signalPower = magnitude.reduce((a, b) => a + b * b, 0);
     const noisePower = variance - signalPower;
     const snr = signalPower / (noisePower + 1e-10);
@@ -316,30 +315,36 @@ export class PPGProcessor {
       spectrum: toFloat64Array(phase),
       entropy: this.calculateEntropy(magnitude),
       kurtosis: this.calculateKurtosis(signal, mean, Math.sqrt(variance)),
-      variance
+      variance,
+      dispose: () => {
+        // Cleanup resources
+        magnitude.fill(0);
+        phase.fill(0);
+      }
     };
   }
 
-  private analyzeMotion(signal: Float64Type): MotionAnalysis {
-    const displacement: number[] = [];
-    const velocity: number[] = [];
-    const acceleration: number[] = [];
+  private analyzeMotion(signal: Float64Type): { displacement: number, velocity: number, acceleration: number } {
+    const dt = 1 / this.state.sampleRate;
+    const velocity = [];
+    const acceleration = [];
+    let displacement = 0;
 
+    // Calculate velocity and acceleration
     for (let i = 1; i < signal.length; i++) {
-      displacement.push(Math.abs(signal[i] - signal[i - 1]));
+      const v = (signal[i] - signal[i - 1]) / dt;
+      velocity.push(v);
       if (i > 1) {
-        const v = displacement[i - 1] - displacement[i - 2];
-        velocity.push(v);
-        if (i > 2) {
-          acceleration.push(v - velocity[velocity.length - 2]);
-        }
+        acceleration.push((velocity[i - 1] - velocity[i - 2]) / dt);
       }
+      displacement += Math.abs(signal[i] - signal[i - 1]);
     }
 
+    // Return scalar metrics
     return {
       displacement,
-      velocity,
-      acceleration
+      velocity: Math.max(...velocity.map(Math.abs)),
+      acceleration: Math.max(...acceleration.map(Math.abs))
     };
   }
 

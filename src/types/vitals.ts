@@ -2,6 +2,30 @@
 import { SignalQuality } from './quality';
 import { Float64Type } from './common';
 
+export interface ProcessingState {
+  isProcessing: boolean;
+  frameCount: number;
+  buffer: Float64Array;
+  timeBuffer: Float64Array;
+  lastTimestamp: number;
+  sampleRate: number;
+  calibration: {
+    isCalibrating: boolean;
+    progress: number;
+    message: string;
+    isCalibrated: boolean;
+    calibrationTime: number;
+    referenceValues: Float64Array;
+    calibrationQuality: number;
+  };
+  quality: SignalQuality;
+  optimization: {
+    cache: Map<string, any>;
+    performance: Map<string, number>;
+    resources: Map<string, any>;
+  };
+}
+
 export interface VitalReading {
   [key: string]: any;
   value: number;

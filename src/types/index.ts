@@ -35,7 +35,6 @@ export type {
   VitalReading,
   PPGData,
   PPGProcessingConfig,
-  ProcessingState,
   VitalSigns,
   BloodPressure,
   ArrhythmiaType,
@@ -73,4 +72,3 @@ export type {
 
 // Constants
 export { SignalQualityLevel } from './quality';
-
