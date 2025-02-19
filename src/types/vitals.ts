@@ -1,7 +1,7 @@
 
 import { SignalQuality } from './quality';
-import { CalibrationState } from './config';
-import { MeasurementType } from './common';
+import { CalibrationState, ProcessingConfig, SensitivitySettings } from './config';
+import { MeasurementType, MediaTrackConstraintsExtended } from './common';
 
 export interface VitalReading {
   timestamp: number;
@@ -31,3 +31,30 @@ export interface VitalConfig {
   calibrationDuration: number;
   updateInterval: number;
 }
+
+export interface ProcessingState {
+  isProcessing: boolean;
+  frameCount: number;
+  buffer: Float64Array;
+  timeBuffer: Float64Array;
+  lastTimestamp: number;
+  sampleRate: number;
+  calibration: CalibrationState;
+  quality: SignalQuality;
+  optimization: {
+    cache: Map<string, any>;
+    performance: Map<string, number>;
+    resources: Map<string, any>;
+  };
+}
+
+export interface ProcessorMetrics {
+  fps: number;
+  cpuTime: number;
+  memoryUsage: number;
+  cacheHits: number;
+  cacheMisses: number;
+  latency: number;
+}
+
+export { MediaTrackConstraintsExtended };

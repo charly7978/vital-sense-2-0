@@ -19,6 +19,9 @@ export interface FrequencyBands {
   lf: [number, number];
   hf: [number, number];
   total: [number, number];
+  respiratory?: [number, number];
+  cardiac?: [number, number];
+  mains?: [number, number];
   ratios?: {
     lfHf: number;
     vlfTotal: number;
@@ -54,6 +57,7 @@ export interface NoiseAnalysis extends Disposable {
   threshold?: number;
   waveletNoise?: number;
   impulseNoise?: number;
+  baselineNoise?: number;
 }
 
 export interface MotionAnalysis extends Disposable {
@@ -63,4 +67,47 @@ export interface MotionAnalysis extends Disposable {
   threshold?: number;
   features?: any[];
   detection?: number;
+}
+
+export interface CalibrationEntry {
+  timestamp: number;
+  raw: number;
+  calibrated: number;
+  conditions: any;
+  factor: number;
+}
+
+export interface CalibratedResult {
+  value: number;
+  confidence: number;
+  factor: number;
+}
+
+export interface WaveletTransform {
+  coefficients: WaveletCoefficients;
+  bases: WaveletBasis[];
+  packets: WaveletPacket[];
+  space: ScaleSpace;
+}
+
+export interface WaveletBasis {
+  scale: number;
+  translation: number;
+  coefficients: Float64Type;
+}
+
+export interface WaveletPacket {
+  level: number;
+  index: number;
+  coefficients: Float64Type;
+}
+
+export interface ScaleSpace {
+  scales: number[];
+  coefficients: Float64Type[][];
+}
+
+export interface OptimizedDWT {
+  forward: (signal: Float64Type) => WaveletTransform;
+  inverse: (transform: WaveletTransform) => Float64Type;
 }
