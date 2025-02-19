@@ -1,6 +1,5 @@
-
 import React, { useRef, useEffect } from 'react';
-import { MediaTrackConstraintsExtended } from '@/types/vitals';
+import { MediaTrackConstraintsExtended } from '@/types';
 
 interface CameraViewProps {
   onFrame: (frame: ImageData) => void;

@@ -16,15 +16,19 @@ export type {
 // Quality types
 export type {
   SignalQuality,
-  QualityMetrics
+  QualityMetrics,
+  QualityConfig,
+  SignalStability
 } from './quality';
 
 // Config types
 export type {
   CalibrationState,
+  CalibrationEntry,
+  CalibratedResult,
   ProcessingConfig,
   SensitivitySettings
-} from './config';
+} from './calibration';
 
 // Vital types
 export type {
@@ -37,6 +41,25 @@ export type {
   ArrhythmiaType,
   SignalConditions
 } from './vitals';
+
+// Frequency types
+export type {
+  FrequencyBands,
+  FrequencyConfig,
+  SpectralFeatures,
+  SpectralAnalysis,
+  HarmonicAnalysis,
+  FrequencyMetrics,
+  SpectralQuality,
+  BandPower,
+  PhaseAnalysis
+} from './analysis';
+
+// Motion types
+export type {
+  MotionAnalysis,
+  NoiseAnalysis
+} from './artifacts';
 
 // Constants
 export { SignalQualityLevel } from './quality';

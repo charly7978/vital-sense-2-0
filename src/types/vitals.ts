@@ -15,7 +15,7 @@ export interface PPGData {
   values: number[];
   bpm: number;
   confidence: number;
-  quality?: SignalQuality; // Add quality field
+  quality?: SignalQuality;
 }
 
 export interface PPGProcessingConfig {
@@ -28,6 +28,18 @@ export interface PPGProcessingConfig {
     lowCut: number;
     highCut: number;
     order: number;
+  };
+  filterOrder?: number;
+  lowCutoff?: number;
+  highCutoff?: number;
+  peakThreshold?: number;
+  minPeakDistance?: number;
+  adaptiveThreshold?: boolean;
+  calibrationDuration?: number;
+  calibration?: {
+    enabled: boolean;
+    duration: number;
+    reference: Float64Type;
   };
 }
 
@@ -67,6 +79,20 @@ export interface ProcessingState {
   };
 }
 
+export interface SignalConditions {
+  noiseLevel: number;
+  motionArtifacts: boolean;
+  signalStrength: number;
+  lighting: 'good' | 'poor' | 'invalid';
+  signalQuality: number;
+  lightLevel: number;
+  movement: number;
+  coverage: number;
+  temperature: number;
+  stability: number;
+  measurementType: string;
+}
+
 // Add new types for PPG analysis
 export interface VitalSigns {
   bpm: number;
@@ -84,10 +110,3 @@ export interface BloodPressure {
 }
 
 export type ArrhythmiaType = 'normal' | 'bradycardia' | 'tachycardia' | 'irregular';
-
-export interface SignalConditions {
-  noiseLevel: number;
-  motionArtifacts: boolean;
-  signalStrength: number;
-  lighting: 'good' | 'poor' | 'invalid';
-}
