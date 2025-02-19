@@ -46,7 +46,7 @@ export interface SpectralFeatures {
   mainFrequency: number;
   harmonics: number[];
   bandwidth: number;
-  energy: number[];
+  energy: Float64Type;
 }
 
 export interface WaveletCoefficients {
@@ -55,15 +55,15 @@ export interface WaveletCoefficients {
 }
 
 export interface SubbandFeatures {
-  energy: number[];
-  entropy: number[];
-  variance: number[];
+  energy: Float64Type;
+  entropy: Float64Type;
+  variance: Float64Type;
 }
 
 export interface NoiseAnalysis extends Disposable {
   snr: number;
-  distribution: number[];
-  spectrum: number[];
+  distribution: Float64Type;
+  spectrum: Float64Type;
   entropy: number;
   kurtosis: number;
   variance: number;
@@ -76,10 +76,10 @@ export interface NoiseAnalysis extends Disposable {
 }
 
 export interface MotionAnalysis extends Disposable {
-  displacement: number[];
-  velocity: number[];
-  acceleration: number[];
-  features?: any[];
+  displacement: Float64Type;
+  velocity: Float64Type;
+  acceleration: Float64Type;
+  features?: Float64Type[];
   detection?: number;
   threshold?: number;
 }
@@ -97,21 +97,21 @@ export interface WaveletBasis {
   filters?: Float64Type[];
 }
 
-export interface WaveletPacket extends Array<number> {
+export interface WaveletPacket {
   level: number;
   index: number;
   coefficients: Float64Type;
   tree?: any;
-  initialize?: () => void;
-  decomposeAll?: () => void;
-  selectBestBasis?: () => void;
+  initialize: () => void;
+  decomposeAll: () => void;
+  selectBestBasis: () => void;
   dispose?: () => void;
 }
 
 export interface ScaleSpace {
-  scales: number[];
+  scales: Float64Type;
   coefficients: Float64Type[][];
-  energies?: number[];
+  energies?: Float64Type;
 }
 
 export interface OptimizedDWT {

@@ -1,14 +1,14 @@
 
-// Tipos numéricos básicos
-export type Float64Type = number[];
-export type Float32Type = number[];
+// Numeric types
+export type Float64Type = Float64Array; // Changed from number[] to Float64Array
+export type Float32Type = Float32Array;
 
-// Tipos básicos
+// Basic types
 export type ProcessingMode = 'normal' | 'calibration' | 'debug';
 export type ColorSpace = 'rgb' | 'yuv' | 'hsv';
 export type MeasurementType = 'ppg' | 'bp' | 'spo2' | 'resp';
 
-// Interfaces básicas
+// Basic interfaces
 export interface BasicMetrics {
   timestamp: number;
   value: number;

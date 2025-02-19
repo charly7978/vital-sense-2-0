@@ -1,7 +1,7 @@
 
 import { Float64Type, Disposable } from './common';
 import { SignalQuality } from './quality';
-import { FrequencyBands } from './analysis';
+import { SpectralFeatures } from './analysis';
 
 export interface SignalConditions extends Disposable {
   isValid: boolean;
@@ -22,8 +22,8 @@ export interface TemporalFeatures {
   variance: number;
   skewness: number;
   kurtosis: number;
-  peaks: number[];
-  valleys: number[];
+  peaks: Float64Type;
+  valleys: Float64Type;
 }
 
 export interface StatisticalFeatures {
@@ -51,6 +51,7 @@ export interface ArtifactDetection {
   type: string;
   features: ArtifactFeatures;
   metrics: ArtifactMetrics;
+  dispose?: () => void;
 }
 
 export interface ArtifactFeatures {
@@ -74,21 +75,23 @@ export interface ArtifactClassification {
 
 export interface SignalSegmentation {
   segments: Float64Type[];
-  boundaries: number[];
+  boundaries: Float64Type;
   features: SignalFeatures[];
 }
 
 export interface TemplateMatching {
   templates: Float64Type[];
-  scores: number[];
+  scores: Float64Type;
   bestMatch: number;
   features: SignalFeatures;
+  dispose?: () => void;
 }
 
 export interface ArtifactValidation {
   isValid: boolean;
   confidence: number;
   metrics: ArtifactMetrics;
+  dispose?: () => void;
 }
 
 export interface BPConfig {
@@ -111,10 +114,10 @@ export interface BPEstimation {
   quality: SignalQuality;
 }
 
-// Add more interfaces as needed for BloodPressureEstimator
 export interface WaveformAnalysis {
   features: WaveformFeatures;
   quality: WaveformQuality;
+  dispose?: () => void;
 }
 
 export interface WaveformFeatures {
@@ -134,4 +137,7 @@ export interface QualityMetrics {
   snr: number;
   stability: number;
   artifacts: number;
+  noise?: number;
+  frequency?: number;
+  amplitude?: number;
 }
