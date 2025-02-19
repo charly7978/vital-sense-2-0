@@ -1,597 +1,449 @@
 import { 
-  PPGData, ProcessingMode, SensitivitySettings, 
-  FingerDetection, DeviceInfo, CalibrationState,
-  ProcessorEvent, VitalReading, SignalQualityLevel,
-  WaveletFeatures, SpectralAnalysis, CalibrationPhase,
-  ProcessingConfig, ProcessingState, QualityParams,
-  ProcessorMetrics, CircularBuffer
+  PPGData,
+  SignalQuality,
+  ProcessingConfig,
+  CalibrationState
 } from '@/types';
 
-import { SignalFilter } from './SignalFilter';
-import { FingerDetector } from './FingerDetector';
-import { WaveletAnalyzer } from './WaveletAnalyzer';
-import { HeartRateEstimator } from './HeartRateEstimator';
-import { MovementCompensator } from './MovementCompensator';
-import { MLProcessor } from './MLProcessor';
-import { BeepPlayer } from './BeepPlayer';
-
-/**
- * Procesador PPG avanzado optimizado para cámaras traseras sin flash
- * Implementa las últimas técnicas en procesamiento de señales y ML
- * @version 2.0.0
- * @optimizedFor Cámaras traseras sin flash
- */
 export class PPGProcessor {
-  // Configuración principal
-  private readonly config: ProcessingConfig = {
-    sampleRate: 30,           // fps esperados
-    bufferSize: 512,         // tamaño del buffer circular
-    windowSize: 256,         // ventana de análisis
-    minQuality: 0.6,         // calidad mínima aceptable
-    adaptiveThreshold: true, // umbrales adaptativos
-    useML: true,            // uso de machine learning
-    debugMode: false        // modo debug
+  private config: ProcessingConfig;
+  private state: {
+    buffer: Float64Array;
+    timeBuffer: Float64Array;
+    lastTimestamp: number;
+    frameCount: number;
+    sampleRate: number;
+    isProcessing: boolean;
+    calibration: CalibrationState;
+    quality: SignalQuality;
   };
 
-  // Componentes del sistema
-  private readonly signalFilter: SignalFilter;
-  private readonly fingerDetector: FingerDetector;
-  private readonly waveletAnalyzer: WaveletAnalyzer;
-  private readonly hrEstimator: HeartRateEstimator;
-  private readonly movementCompensator: MovementCompensator;
-  private readonly mlProcessor: MLProcessor;
-  private readonly beepPlayer: BeepPlayer;
-
-  // Buffers circulares optimizados
-  private readonly signalBuffer: CircularBuffer<number>;
-  private readonly timeBuffer: CircularBuffer<number>;
-  private readonly qualityBuffer: CircularBuffer<number>;
-  private readonly heartRateBuffer: CircularBuffer<number>;
-
-  // Estado del procesador
-  private processingState: ProcessingState = {
-    isProcessing: false,
-    calibrationPhase: 'initial',
-    lastProcessingTime: 0,
-    frameCount: 0,
-    validFrames: 0,
-    errorCount: 0,
-    startTime: 0,
-    lastHeartRate: 0,
-    stability: 0,
-    confidence: 0,
-    isCalibrating: false,
-    calibration: {
-      isCalibrating: false,
-      progress: 0,
-      message: ''
-    }
-  };
-
-  // Métricas y análisis
-  private metrics = {
-    signalQuality: 0,
-    signalToNoise: 0,
-    movementIndex: 0,
-    perfusionIndex: 0,
-    confidence: 0,
-    stability: 0,
-    coverage: 0
-  };
-
-  // Sistema de eventos
-  private eventListeners: Map<ProcessorEvent, Function[]> = new Map();
-  private readonly eventQueue: ProcessorEvent[] = [];
-
-  // Constantes y umbrales
-  private static readonly CONSTANTS = {
-    MIN_FRAMES_FOR_CALIBRATION: 30,
-    MAX_HEART_RATE: 200,
-    MIN_HEART_RATE: 40,
-    MAX_MOVEMENT: 0.3,
-    MIN_SIGNAL_STRENGTH: 0.4,
-    QUALITY_THRESHOLD: 0.6,
-    STABILITY_WINDOW: 5
-  };
-
-  constructor(config?: Partial<ProcessingConfig>) {
-    try {
-      // Inicialización de componentes
-      this.initializeComponents(config);
-      this.initializeBuffers();
-      this.setupEventSystem();
-      this.validateSystem();
-    } catch (error) {
-      this.handleInitializationError(error);
-    }
-  }
-
-  /**
-   * Sistema de eventos
-   */
-  private setupEventSystem(): void {
-    this.eventListeners = new Map();
-    this.on('error', () => {
-      console.error('PPG Processor Error');
-    });
-  }
-
-  public on(event: keyof typeof ProcessorEvent, callback: Function): void {
-    if (!this.eventListeners.has(event)) {
-      this.eventListeners.set(event, []);
-    }
-    this.eventListeners.get(event)?.push(callback);
-  }
-
-  public off(event: keyof typeof ProcessorEvent, callback: Function): void {
-    const listeners = this.eventListeners.get(event);
-    if (listeners) {
-      const index = listeners.indexOf(callback);
-      if (index > -1) {
-        listeners.splice(index, 1);
-      }
-    }
-  }
-
-  protected emit(event: keyof typeof ProcessorEvent, data?: any): void {
-    const listeners = this.eventListeners.get(event);
-    if (listeners) {
-      listeners.forEach(callback => callback(data));
-    }
-  }
-
-  private handleInitializationError(error: any): void {
-    console.error('Error initializing PPG processor:', error);
-    this.metrics = {
-      signalQuality: 0,
-      signalToNoise: 0,
-      movementIndex: 0,
-      perfusionIndex: 0,
-      confidence: 0,
-      stability: 0,
-      coverage: 0
+  private components: {
+    filter: {
+      coefficients: Float64Array;
+      state: Float64Array;
     };
-    this.processingState = {
-      isProcessing: false,
-      calibrationPhase: 'initial',
-      lastProcessingTime: 0,
+    detector: {
+      threshold: number;
+      minPeakDistance: number;
+      peaks: number[];
+      valleys: number[];
+    };
+    analyzer: {
+      fftSize: number;
+      spectrum: Float64Array;
+      phase: Float64Array;
+      magnitude: Float64Array;
+    };
+  };
+
+  constructor() {
+    // Configuración inicial
+    this.config = {
+      bufferSize: 512,
+      sampleRate: 30,
+      filterOrder: 32,
+      lowCutoff: 0.5,
+      highCutoff: 4.0,
+      peakThreshold: 0.3,
+      minPeakDistance: 0.3,
+      calibrationDuration: 5000,
+      adaptiveThreshold: true
+    };
+
+    // Estado inicial
+    this.state = {
+      buffer: new Float64Array(this.config.bufferSize),
+      timeBuffer: new Float64Array(this.config.bufferSize),
+      lastTimestamp: 0,
       frameCount: 0,
-      validFrames: 0,
-      errorCount: 0,
-      startTime: 0,
-      lastHeartRate: 0,
-      stability: 0,
-      confidence: 0,
-      isCalibrating: false,
+      sampleRate: this.config.sampleRate,
+      isProcessing: false,
       calibration: {
+        isCalibrated: false,
         isCalibrating: false,
         progress: 0,
-        message: ''
+        referenceValues: new Float64Array(),
+        quality: 0
+      },
+      quality: {
+        overall: 0,
+        signal: 0,
+        noise: 0,
+        movement: 0
       }
     };
+
+    // Componentes de procesamiento
+    this.components = {
+      filter: {
+        coefficients: this.designFilter(),
+        state: new Float64Array(this.config.filterOrder)
+      },
+      detector: {
+        threshold: this.config.peakThreshold,
+        minPeakDistance: this.config.minPeakDistance,
+        peaks: [],
+        valleys: []
+      },
+      analyzer: {
+        fftSize: 512,
+        spectrum: new Float64Array(256),
+        phase: new Float64Array(256),
+        magnitude: new Float64Array(256)
+      }
+    };
+
+    this.initialize();
+  }
+
+  private initialize(): void {
+    this.state.isProcessing = true;
+    this.updateFilterCoefficients();
+    this.resetBuffers();
+  }
+
+  private resetBuffers(): void {
+    this.state.buffer.fill(0);
+    this.state.timeBuffer.fill(0);
+    this.components.detector.peaks = [];
+    this.components.detector.valleys = [];
+    this.state.frameCount = 0;
+  }
+
+  private designFilter(): Float64Array {
+    // Diseño de filtro FIR paso banda
+    const coefficients = new Float64Array(this.config.filterOrder);
+    const omega1 = 2 * Math.PI * this.config.lowCutoff / this.state.sampleRate;
+    const omega2 = 2 * Math.PI * this.config.highCutoff / this.state.sampleRate;
     
-    this.emit('error', { 
-      type: 'initialization_error',
-      message: error.message || 'Failed to initialize PPG processor'
-    });
+    for (let n = 0; n < this.config.filterOrder; n++) {
+      if (n === this.config.filterOrder / 2) {
+        coefficients[n] = (omega2 - omega1) / Math.PI;
+      } else {
+        const k = n - this.config.filterOrder / 2;
+        coefficients[n] = (Math.sin(omega2 * k) - Math.sin(omega1 * k)) / (Math.PI * k);
+      }
+      // Aplicar ventana Hamming
+      coefficients[n] *= 0.54 - 0.46 * Math.cos(2 * Math.PI * n / this.config.filterOrder);
+    }
+    
+    return coefficients;
   }
 
-  /**
-   * Procesa un nuevo frame de video
-   * @param frame Frame de la cámara
-   * @returns Datos procesados de PPG
-   */
-  public processFrame(frame: ImageData): PPGData {
+  private updateFilterCoefficients(): void {
+    this.components.filter.coefficients = this.designFilter();
+    this.components.filter.state.fill(0);
+  }
+
+  public processFrame(imageData: ImageData): PPGData {
     try {
-      // Validación inicial
-      if (!this.validateFrame(frame)) {
-        return this.getEmptyResult('Frame inválido');
+      if (!this.state.isProcessing) {
+        throw new Error('Processor not initialized');
       }
 
-      // Medición de tiempo
-      const startTime = performance.now();
-      this.processingState.frameCount++;
+      // Extraer señal PPG del frame
+      const signal = this.extractPPGSignal(imageData);
+      
+      // Actualizar buffer circular
+      this.updateBuffers(signal);
 
-      // 1. Detección de dedo
-      const fingerDetection = this.detectFinger(frame);
-      if (!fingerDetection.isPresent) {
-        return this.getEmptyResult('Dedo no detectado');
+      // Filtrar señal
+      const filteredSignal = this.filterSignal(this.state.buffer);
+
+      // Detectar picos y valles
+      this.detectPeaks(filteredSignal);
+
+      // Calcular BPM y métricas
+      const bpm = this.calculateBPM();
+      const quality = this.assessQuality(filteredSignal);
+      
+      // Actualizar estado de calibración si es necesario
+      if (this.state.calibration.isCalibrating) {
+        this.updateCalibration(signal);
       }
 
-      // 2. Extracción de señal
-      const signal = this.extractSignal(frame, fingerDetection);
-      if (!this.validateSignal(signal)) {
-        return this.getEmptyResult('Señal inválida');
-      }
-
-      // 3. Procesamiento de señal
-      const processedSignal = this.processSignal(signal);
-      
-      // 4. Análisis wavelet
-      const waveletFeatures = this.analyzeSignal(processedSignal);
-
-      // 5. Estimación de ritmo cardíaco
-      const heartRate = this.estimateHeartRate(waveletFeatures);
-
-      // 6. Análisis de calidad
-      const quality = this.assessQuality({
-        signal: processedSignal,
-        features: waveletFeatures,
-        fingerDetection,
-        heartRate
-      });
-
-      // 7. Actualización de estado
-      this.updateState({
-        signal,
-        processedSignal,
-        features: waveletFeatures,
-        quality,
-        heartRate
-      });
-
-      // 8. Generación de resultado
-      const result = this.generateResult({
-        heartRate,
-        quality,
-        confidence: this.metrics.confidence,
-        processingTime: performance.now() - startTime
-      });
-
-      // 9. Notificación de eventos
-      this.notifyUpdate(result);
-
-      return result;
-
-    } catch (error) {
-      return this.handleProcessingError(error);
-    }
-  }
-
-  /**
-   * Detección avanzada de dedo con compensación ambiental
-   */
-  private detectFinger(frame: ImageData): FingerDetection {
-    try {
-      // Análisis de condiciones ambientales
-      const conditions = this.analyzeAmbientConditions(frame);
-      
-      // Ajuste de parámetros según ambiente
-      this.adjustDetectionParameters(conditions);
-      
-      // Detección de dedo
-      const detection = this.fingerDetector.detect(frame);
-      
-      // Validación y mejora de detección
-      return this.enhanceDetection(detection, conditions);
-      
-    } catch (error) {
-      console.error('Error en detección:', error);
-      return this.getEmptyDetection();
-    }
-  }
-
-  /**
-   * Extracción optimizada de señal PPG
-   */
-  private extractSignal(frame: ImageData, detection: FingerDetection): number[] {
-    const roi = detection.roi;
-    const signal: number[] = [];
-
-    try {
-      // Análisis de canales RGB
-      const channels = this.extractColorChannels(frame, roi);
-      
-      // Cálculo de ratio de perfusión
-      const perfusion = this.calculatePerfusionRatio(channels);
-      
-      // Normalización y filtrado inicial
-      const normalizedSignal = this.normalizeSignal(perfusion);
-      
-      // Compensación de movimiento
-      const compensatedSignal = this.movementCompensator.compensate(normalizedSignal);
-      
-      return compensatedSignal;
-
-    } catch (error) {
-      console.error('Error en extracción de señal:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Procesamiento avanzado de señal
-   */
-  private processSignal(signal: number[]): number[] {
-    try {
-      // 1. Filtrado adaptativo
-      let processed = this.signalFilter.filterAdaptive(signal);
-
-      // 2. Eliminación de tendencia
-      processed = this.removeTrend(processed);
-
-      // 3. Detección y eliminación de artefactos
-      processed = this.removeArtifacts(processed);
-
-      // 4. Análisis espectral
-      const spectral = this.performSpectralAnalysis(processed);
-
-      // 5. Mejora de señal basada en espectro
-      processed = this.enhanceSignal(processed, spectral);
-
-      // 6. Normalización final
-      return this.normalizeProcessedSignal(processed);
-
-    } catch (error) {
-      console.error('Error en procesamiento:', error);
-      return signal;
-    }
-  }
-
-  /**
-   * Análisis wavelet multi-resolución
-   */
-  private analyzeSignal(signal: number[]): WaveletFeatures {
-    try {
-      // Análisis wavelet
-      const wavelet = this.waveletAnalyzer.analyze(signal);
-
-      // Extracción de características
-      const features = this.extractWaveletFeatures(wavelet);
-
-      // Análisis de componentes
-      const components = this.analyzeComponents(features);
-
-      // Detección de patrones
-      const patterns = this.detectPatterns(components);
+      // Análisis espectral
+      this.performSpectralAnalysis(filteredSignal);
 
       return {
-        features,
-        components,
-        patterns,
-        quality: this.assessWaveletQuality(features)
+        bpm: Math.round(bpm),
+        confidence: quality.overall,
+        timestamp: Date.now()
       };
 
     } catch (error) {
-      console.error('Error en análisis wavelet:', error);
-      return this.getEmptyWaveletFeatures();
+      console.error('Error processing frame:', error);
+      return {
+        bpm: 0,
+        confidence: 0,
+        timestamp: Date.now()
+      };
     }
   }
 
-  /**
-   * Estimación avanzada de ritmo cardíaco
-   */
-  private estimateHeartRate(features: WaveletFeatures): number {
-    try {
-      // Estimación inicial
-      const initial = this.hrEstimator.estimate(features);
+  private extractPPGSignal(imageData: ImageData): number {
+    let redSum = 0;
+    let greenSum = 0;
+    let pixelCount = 0;
 
-      // Validación con histórico
-      const validated = this.validateHeartRate(initial);
-
-      // Refinamiento con ML
-      const refined = this.refineWithML(validated);
-
-      // Actualización de confianza
-      this.updateConfidence(refined);
-
-      return refined;
-
-    } catch (error) {
-      console.error('Error en estimación:', error);
-      return 0;
+    for (let i = 0; i < imageData.data.length; i += 4) {
+      redSum += imageData.data[i];
+      greenSum += imageData.data[i + 1];
+      pixelCount++;
     }
+
+    // Usar principalmente el canal verde con algo de información del rojo
+    return (greenSum * 0.7 + redSum * 0.3) / pixelCount;
   }
 
-  /**
-   * Sistema de calibración multi-fase
-   */
-  private calibrate(): void {
-    try {
-      switch (this.processingState.calibrationPhase) {
-        case 'initial':
-          this.performInitialCalibration();
-          break;
-        case 'ambient':
-          this.calibrateAmbientLight();
-          break;
-        case 'signal':
-          this.calibrateSignalLevels();
-          break;
-        case 'final':
-          this.finalizeCalibracion();
-          break;
+  private updateBuffers(signal: number): void {
+    // Desplazar buffer
+    this.state.buffer.copyWithin(0, 1);
+    this.state.timeBuffer.copyWithin(0, 1);
+
+    // Añadir nueva muestra
+    const timestamp = Date.now();
+    this.state.buffer[this.state.buffer.length - 1] = signal;
+    this.state.timeBuffer[this.state.timeBuffer.length - 1] = timestamp;
+
+    // Actualizar tasa de muestreo
+    if (this.state.lastTimestamp) {
+      const dt = timestamp - this.state.lastTimestamp;
+      this.state.sampleRate = 1000 / dt;
+    }
+    this.state.lastTimestamp = timestamp;
+    this.state.frameCount++;
+  }
+
+  private filterSignal(signal: Float64Array): Float64Array {
+    const filtered = new Float64Array(signal.length);
+    const { coefficients, state } = this.components.filter;
+
+    // Filtrado FIR con estado
+    for (let n = 0; n < signal.length; n++) {
+      let y = 0;
+      // Desplazar estado
+      state.copyWithin(1, 0);
+      state[0] = signal[n];
+
+      // Aplicar coeficientes
+      for (let k = 0; k < coefficients.length; k++) {
+        y += coefficients[k] * state[k];
       }
-    } catch (error) {
-      this.handleCalibrationError(error);
+      filtered[n] = y;
     }
+
+    return filtered;
   }
 
-  /**
-   * Inicia el proceso de calibración
-   */
+  private detectPeaks(signal: Float64Array): void {
+    const { threshold, minPeakDistance } = this.components.detector;
+    const peaks: number[] = [];
+    const valleys: number[] = [];
+
+    // Detección de picos y valles
+    for (let i = 1; i < signal.length - 1; i++) {
+      if (signal[i] > signal[i-1] && signal[i] > signal[i+1] && 
+          signal[i] > threshold * Math.max(...signal)) {
+        peaks.push(i);
+      }
+      if (signal[i] < signal[i-1] && signal[i] < signal[i+1] && 
+          signal[i] < -threshold * Math.max(...signal)) {
+        valleys.push(i);
+      }
+    }
+
+    // Filtrar picos muy cercanos
+    this.components.detector.peaks = this.filterClosePeaks(peaks, minPeakDistance);
+    this.components.detector.valleys = this.filterClosePeaks(valleys, minPeakDistance);
+  }
+
+  private filterClosePeaks(peaks: number[], minDistance: number): number[] {
+    const filtered: number[] = [];
+    let lastPeak = -minDistance * this.state.sampleRate;
+
+    for (const peak of peaks) {
+      if (peak - lastPeak >= minDistance * this.state.sampleRate) {
+        filtered.push(peak);
+        lastPeak = peak;
+      }
+    }
+
+    return filtered;
+  }
+
+  private calculateBPM(): number {
+    const { peaks } = this.components.detector;
+    if (peaks.length < 2) return 0;
+
+    // Calcular intervalos entre picos
+    const intervals: number[] = [];
+    for (let i = 1; i < peaks.length; i++) {
+      const interval = (this.state.timeBuffer[peaks[i]] - 
+                       this.state.timeBuffer[peaks[i-1]]) / 1000;
+      intervals.push(interval);
+    }
+
+    // Calcular BPM promedio
+    const avgInterval = intervals.reduce((a, b) => a + b) / intervals.length;
+    const bpm = 60 / avgInterval;
+
+    // Limitar rango válido de BPM
+    return Math.min(Math.max(bpm, 40), 200);
+  }
+
+  private performSpectralAnalysis(signal: Float64Array): void {
+    const { fftSize } = this.components.analyzer;
+    
+    // Aplicar ventana Hanning
+    const windowed = new Float64Array(fftSize);
+    for (let i = 0; i < signal.length; i++) {
+      windowed[i] = signal[i] * (0.5 - 0.5 * Math.cos(2 * Math.PI * i / (signal.length - 1)));
+    }
+
+    // Calcular FFT (implementación simplificada)
+    const { magnitude, phase } = this.computeFFT(windowed);
+    
+    this.components.analyzer.magnitude = magnitude;
+    this.components.analyzer.phase = phase;
+  }
+
+  private computeFFT(signal: Float64Array): { magnitude: Float64Array; phase: Float64Array } {
+    const n = signal.length;
+    const magnitude = new Float64Array(n/2);
+    const phase = new Float64Array(n/2);
+
+    // FFT simplificada (en producción usar una biblioteca FFT optimizada)
+    for (let k = 0; k < n/2; k++) {
+      let re = 0, im = 0;
+      for (let t = 0; t < n; t++) {
+        const angle = 2 * Math.PI * t * k / n;
+        re += signal[t] * Math.cos(angle);
+        im -= signal[t] * Math.sin(angle);
+      }
+      magnitude[k] = Math.sqrt(re*re + im*im);
+      phase[k] = Math.atan2(im, re);
+    }
+
+    return { magnitude, phase };
+  }
+
+  private assessQuality(signal: Float64Array): SignalQuality {
+    // Calcular SNR
+    const signalPower = this.calculateSignalPower(signal);
+    const noisePower = this.calculateNoisePower(signal);
+    const snr = signalPower / (noisePower + 1e-10);
+
+    // Detectar movimiento
+    const movement = this.detectMovement(signal);
+
+    // Calcular calidad general
+    const quality = {
+      signal: Math.min(Math.max(snr / 10, 0), 1),
+      noise: Math.min(Math.max(1 - noisePower / signalPower, 0), 1),
+      movement: Math.min(Math.max(1 - movement, 0), 1),
+      overall: 0
+    };
+
+    // Calidad general ponderada
+    quality.overall = (quality.signal * 0.4 + 
+                      quality.noise * 0.3 + 
+                      quality.movement * 0.3);
+
+    this.state.quality = quality;
+    return quality;
+  }
+
+  private calculateSignalPower(signal: Float64Array): number {
+    return signal.reduce((sum, x) => sum + x * x, 0) / signal.length;
+  }
+
+  private calculateNoisePower(signal: Float64Array): number {
+    const trend = this.estimateTrend(signal);
+    return signal.reduce((sum, x, i) => sum + Math.pow(x - trend[i], 2), 0) / signal.length;
+  }
+
+  private estimateTrend(signal: Float64Array): Float64Array {
+    const trend = new Float64Array(signal.length);
+    const windowSize = Math.floor(signal.length / 4);
+
+    for (let i = 0; i < signal.length; i++) {
+      let sum = 0;
+      let count = 0;
+      for (let j = Math.max(0, i - windowSize); j < Math.min(signal.length, i + windowSize); j++) {
+        sum += signal[j];
+        count++;
+      }
+      trend[i] = sum / count;
+    }
+
+    return trend;
+  }
+
+  private detectMovement(signal: Float64Array): number {
+    const diff = new Float64Array(signal.length - 1);
+    for (let i = 0; i < diff.length; i++) {
+      diff[i] = signal[i + 1] - signal[i];
+    }
+    return Math.sqrt(diff.reduce((sum, x) => sum + x * x, 0) / diff.length);
+  }
+
   public startCalibration(): void {
-    this.processingState.isCalibrating = true;
-    this.processingState.calibration = {
+    this.state.calibration = {
+      isCalibrated: false,
       isCalibrating: true,
       progress: 0,
-      message: 'Starting calibration...'
-    };
-    this.calibrate();
-  }
-
-  /**
-   * Análisis de calidad multi-métrica
-   */
-  private assessQuality(params: QualityParams): SignalQualityLevel {
-    const metrics = {
-      signalStrength: this.calculateSignalStrength(params.signal),
-      signalToNoise: this.calculateSNR(params.signal),
-      movement: this.calculateMovementIndex(params.features),
-      perfusion: this.calculatePerfusionIndex(params.signal),
-      stability: this.calculateStability(params.heartRate)
+      referenceValues: new Float64Array(this.config.bufferSize),
+      quality: 0
     };
 
-    // Pesos adaptativos
-    const weights = this.calculateAdaptiveWeights(metrics);
-
-    // Cálculo de calidad general
-    const overallQuality = this.calculateOverallQuality(metrics, weights);
-
-    return this.determineQualityLevel(overallQuality);
+    // Detener calibración después del tiempo configurado
+    setTimeout(() => {
+      this.finalizeCalibration();
+    }, this.config.calibrationDuration);
   }
 
-  /**
-   * Sistema de eventos y notificaciones
-   */
-  private notifyUpdate(data: PPGData): void {
-    try {
-      // Notificar actualización
-      this.eventListeners.get('update')?.forEach(callback => callback(data));
+  private updateCalibration(signal: number): void {
+    if (!this.state.calibration.isCalibrating) return;
 
-      // Procesar eventos en cola
-      while (this.eventQueue.length > 0) {
-        const event = this.eventQueue.shift();
-        this.processEvent(event);
-      }
+    const { referenceValues } = this.state.calibration;
+    const progress = this.state.frameCount / (this.config.calibrationDuration / 1000 * this.state.sampleRate);
 
-    } catch (error) {
-      console.error('Error en notificación:', error);
-    }
+    referenceValues[this.state.frameCount % referenceValues.length] = signal;
+    this.state.calibration.progress = Math.min(progress, 1);
   }
 
-  /**
-   * Manejo avanzado de errores
-   */
-  private handleProcessingError(error: any): PPGData {
-    // Incrementar contador de errores
-    this.processingState.errorCount++;
+  private finalizeCalibration(): void {
+    if (!this.state.calibration.isCalibrating) return;
 
-    // Logging detallado
-    console.error('Error en procesamiento:', {
-      error,
-      state: this.processingState,
-      metrics: this.metrics
-    });
+    const { referenceValues } = this.state.calibration;
+    
+    // Calcular estadísticas de calibración
+    const mean = referenceValues.reduce((a, b) => a + b) / referenceValues.length;
+    const std = Math.sqrt(
+      referenceValues.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / referenceValues.length
+    );
 
-    // Recuperación si es posible
-    if (this.canRecover()) {
-      return this.attemptRecovery();
-    }
-
-    // Resultado vacío en caso de error no recuperable
-    return this.getEmptyResult('Error en procesamiento');
+    // Actualizar umbrales basados en la calibración
+    this.components.detector.threshold = std * 2;
+    
+    // Finalizar calibración
+    this.state.calibration.isCalibrating = false;
+    this.state.calibration.isCalibrated = true;
+    this.state.calibration.quality = this.calculateCalibrationQuality();
   }
 
-  /**
-   * Optimizaciones de rendimiento
-   */
-  private optimizePerformance(): void {
-    // Limpiar buffers antiguos
-    this.cleanBuffers();
-
-    // Optimizar uso de memoria
-    this.optimizeMemoryUsage();
-
-    // Ajustar parámetros según rendimiento
-    this.adjustProcessingParameters();
-  }
-
-  /**
-   * Métodos públicos adicionales
-   */
-  public start(): void {
-    this.processingState.isProcessing = true;
-    this.processingState.startTime = Date.now();
-    this.calibrate();
+  private calculateCalibrationQuality(): number {
+    const { referenceValues } = this.state.calibration;
+    const filtered = this.filterSignal(referenceValues);
+    const quality = this.assessQuality(filtered);
+    return quality.overall;
   }
 
   public stop(): void {
-    this.processingState.isProcessing = false;
-    this.cleanupResources();
-  }
-
-  public getMetrics(): ProcessorMetrics {
-    return {
-      ...this.metrics,
-      processingTime: performance.now() - this.processingState.lastProcessingTime,
-      frameRate: this.calculateFrameRate(),
-      errorRate: this.calculateErrorRate()
-    };
-  }
-
-  public setConfig(config: Partial<ProcessingConfig>): void {
-    Object.assign(this.config, config);
-    this.reconfigure();
-  }
-
-  /**
-   * Limpieza y disposición
-   */
-  public dispose(): void {
-    try {
-      // Detener procesamiento
-      this.stop();
-
-      // Limpiar eventos
-      this.eventListeners.clear();
-
-      // Liberar recursos
-      this.cleanupResources();
-
-      // Resetear estado
-      this.resetState();
-
-    } catch (error) {
-      console.error('Error en dispose:', error);
-    }
-  }
-
-  // Métodos auxiliares privados
-  private validateFrame(frame: ImageData): boolean {
-    return frame && frame.data && frame.width > 0 && frame.height > 0;
-  }
-
-  private validateSignal(signal: number[]): boolean {
-    return signal && signal.length > 0 && !signal.some(isNaN);
-  }
-
-  private canRecover(): boolean {
-    return this.processingState.errorCount < 3;
-  }
-
-  private attemptRecovery(): PPGData {
-    this.resetState();
-    return this.getEmptyResult('Recuperando...');
-  }
-
-  private calculateFrameRate(): number {
-    const elapsed = (Date.now() - this.processingState.startTime) / 1000;
-    return this.processingState.frameCount / elapsed;
-  }
-
-  private calculateErrorRate(): number {
-    return this.processingState.errorCount / this.processingState.frameCount;
-  }
-
-  private resetState(): void {
-    this.processingState = {
-      isProcessing: false,
-      calibrationPhase: 'initial',
-      lastProcessingTime: 0,
-      frameCount: 0,
-      validFrames: 0,
-      errorCount: 0,
-      startTime: 0,
-      lastHeartRate: 0,
-      stability: 0,
-      confidence: 0,
-      isCalibrating: false,
-      calibration: {
-        isCalibrating: false,
-        progress: 0,
-        message: ''
-      }
-    };
+    this.state.isProcessing = false;
+    this.resetBuffers();
+    this.state.calibration.isCalibrating = false;
   }
 }
