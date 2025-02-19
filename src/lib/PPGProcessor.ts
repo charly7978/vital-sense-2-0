@@ -6,18 +6,19 @@ import {
   NoiseAnalysis,
   MotionAnalysis,
   SignalQualityLevel,
-  SignalQualityLevelType
+  SignalQualityLevelType,
+  Float64Type
 } from '@/types';
 import { config } from '../config';
 
 export class PPGProcessor {
   private config: PPGProcessingConfig;
   private state: ProcessingState;
-  private frameBuffer: Float64Array;
-  private timeBuffer: Float64Array;
-  private signalBuffer: Float64Array;
-  private fftBuffer: Float64Array;
-  private peakBuffer: number[];
+  private frameBuffer: Float64Type;
+  private timeBuffer: Float64Type;
+  private signalBuffer: Float64Type;
+  private fftBuffer: Float64Type;
+  private peakBuffer: Float64Type;
   private lastBPM: number = 0;
   
   constructor() {
@@ -62,7 +63,7 @@ export class PPGProcessor {
     this.timeBuffer = new Float64Array(this.config.bufferSize);
     this.signalBuffer = new Float64Array(this.config.bufferSize);
     this.fftBuffer = new Float64Array(this.config.bufferSize);
-    this.peakBuffer = [];
+    this.peakBuffer = new Float64Array(this.config.bufferSize);
     
     this.initialize();
   }
@@ -83,7 +84,7 @@ export class PPGProcessor {
     this.timeBuffer.fill(0);
     this.signalBuffer.fill(0);
     this.fftBuffer.fill(0);
-    this.peakBuffer = [];
+    this.peakBuffer.fill(0);
     this.state.frameCount = 0;
     this.lastBPM = 0;
   }
@@ -96,7 +97,7 @@ export class PPGProcessor {
     };
   }
 
-  private designFilter(): Float64Array {
+  private designFilter(): Float64Type {
     const coefficients = new Float64Array(this.config.filterOrder);
     const omega1 = 2 * Math.PI * this.config.lowCutoff / this.state.sampleRate;
     const omega2 = 2 * Math.PI * this.config.highCutoff / this.state.sampleRate;
@@ -178,9 +179,9 @@ export class PPGProcessor {
     this.state.frameCount++;
   }
 
-  private filterSignal(signal: Float64Array): Float64Array {
+  private filterSignal(signal: Float64Type): Float64Type {
     const filtered = new Float64Array(signal.length);
-    const coeffs = this.config.filterCoefficients as Float64Array;
+    const coeffs = this.config.filterCoefficients as Float64Type;
     
     for (let i = 0; i < signal.length; i++) {
       let sum = 0;
@@ -195,7 +196,7 @@ export class PPGProcessor {
     return filtered;
   }
 
-  private detectPeaks(signal: Float64Array): number[] {
+  private detectPeaks(signal: Float64Type): number[] {
     const peaks: number[] = [];
     const minDistance = this.config.minPeakDistance * this.state.sampleRate;
     const threshold = this.calculateAdaptiveThreshold(signal);
@@ -215,7 +216,7 @@ export class PPGProcessor {
     return peaks;
   }
 
-  private calculateAdaptiveThreshold(signal: Float64Array): number {
+  private calculateAdaptiveThreshold(signal: Float64Type): number {
     if (!this.config.adaptiveThreshold) {
       return this.config.peakThreshold;
     }
@@ -258,7 +259,7 @@ export class PPGProcessor {
     return Math.round(this.lastBPM);
   }
 
-  private analyzeSignalQuality(signal: Float64Array): SignalQuality {
+  private analyzeSignalQuality(signal: Float64Type): SignalQuality {
     const noise = this.analyzeNoise(signal);
     const motion = this.analyzeMotion(signal);
     
@@ -281,7 +282,7 @@ export class PPGProcessor {
     return quality;
   }
 
-  private analyzeNoise(signal: Float64Array): NoiseAnalysis {
+  private analyzeNoise(signal: Float64Type): NoiseAnalysis {
     const { magnitude, phase } = this.computeFFT(signal);
     const mean = signal.reduce((a, b) => a + b) / signal.length;
     const variance = signal.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / signal.length;
@@ -301,7 +302,7 @@ export class PPGProcessor {
     };
   }
 
-  private analyzeMotion(signal: Float64Array): MotionAnalysis {
+  private analyzeMotion(signal: Float64Type): MotionAnalysis {
     const displacement: number[] = [];
     const velocity: number[] = [];
     const acceleration: number[] = [];
@@ -324,7 +325,7 @@ export class PPGProcessor {
     };
   }
 
-  private computeFFT(signal: Float64Array): { magnitude: Float64Array, phase: Float64Array } {
+  private computeFFT(signal: Float64Type): { magnitude: Float64Type, phase: Float64Type } {
     const n = signal.length;
     const magnitude = new Float64Array(n / 2);
     const phase = new Float64Array(n / 2);
@@ -347,7 +348,7 @@ export class PPGProcessor {
     return { magnitude, phase };
   }
 
-  private calculateEntropy(distribution: Float64Array): number {
+  private calculateEntropy(distribution: Float64Type): number {
     const sum = distribution.reduce((a, b) => a + b, 0);
     let entropy = 0;
     
@@ -361,7 +362,7 @@ export class PPGProcessor {
     return entropy;
   }
 
-  private calculateKurtosis(signal: Float64Array, mean: number, std: number): number {
+  private calculateKurtosis(signal: Float64Type, mean: number, std: number): number {
     if (std === 0) return 0;
     
     const n = signal.length;
@@ -392,18 +393,19 @@ export class PPGProcessor {
     };
   }
 
-  private updateCalibration(signal: number): void {
+  private updateCalibration(rawSignal: number): void {
     if (!this.state.calibration.isCalibrating) return;
 
-    const { calibrationTime, referenceValues } = this.state.calibration;
-    const elapsed = Date.now() - calibrationTime!;
-    const progress = Math.min(elapsed / this.config.calibrationDuration, 1);
+    this.state.calibration = {
+      ...this.state.calibration,
+      calibrationQuality: this.state.quality.overall,
+      referenceValues: new Float64Array([...Array.from(this.state.calibration.referenceValues), rawSignal])
+    };
 
-    if (referenceValues) {
-      referenceValues[this.state.frameCount % referenceValues.length] = signal;
-    }
-
-    this.state.calibration.progress = progress;
+    const progress = Math.min(
+      (Date.now() - this.state.calibration.calibrationTime) / this.config.calibrationDuration,
+      1
+    );
 
     if (progress >= 1) {
       this.finalizeCalibration();
@@ -411,34 +413,9 @@ export class PPGProcessor {
   }
 
   private finalizeCalibration(): void {
-    if (!this.state.calibration.referenceValues) return;
-
-    const values = this.state.calibration.referenceValues;
-    const mean = values.reduce((a, b) => a + b) / values.length;
-    const std = Math.sqrt(
-      values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / values.length
-    );
-
-    // Ajustar sensibilidad basado en la calibración
-    this.config.sensitivity = {
-      ...this.config.sensitivity,
-      signalAmplification: 1.0 / std,
-      peakDetection: mean + 2 * std
-    };
-
-    this.state.calibration = {
-      ...this.state.calibration,
-      isCalibrating: false,
-      isCalibrated: true,
-      message: 'Calibration complete',
-      calibrationQuality: this.calculateCalibrationQuality(values)
-    };
-  }
-
-  private calculateCalibrationQuality(values: Float64Array): number {
-    const filtered = this.filterSignal(values);
-    const { snr } = this.analyzeNoise(filtered);
-    return Math.min(Math.max(snr / 10, 0), 1);
+    this.state.calibration.isCalibrating = false;
+    this.state.calibration.isCalibrated = true;
+    this.state.calibration.message = 'Calibration complete';
   }
 
   public stop(): void {
