@@ -64,22 +64,8 @@ export interface ProcessingConfig {
 }
 
 export interface SensitivitySettings {
-  [key: string]: any;
   brightness: number;
   redIntensity: number;
   signalAmplification: number;
   snr?: number;
-}
-
-export interface CalibrationInterface {
-  isCalibrating: boolean;
-  progress: number;
-  message: string;
-  isCalibrated: boolean;
-  calibrationTime: number;
-  referenceValues: Float64Type;
-  calibrationQuality: number;
-  enabled: boolean;
-  duration: number;
-  reference: Float64Type;
 }

@@ -1,4 +1,3 @@
-
 // Export common types
 export type {
   Float64Type,
@@ -88,6 +87,39 @@ export type {
   WaveletTransform,
   WaveletCoefficients
 } from './analysis';
+
+// Analyzer types
+export type {
+  BaseAnalyzer,
+  BeatConfig,
+  BeatDetection,
+  BeatFeatures,
+  BeatMorphology,
+  BeatQuality,
+  BeatValidation,
+  BeatMetrics,
+  IntervalAnalysis,
+  BeatClassification,
+  BeatSegmentation,
+  AdaptiveThreshold,
+  PeakEnhancement,
+  ProcessorOptimization,
+  SignalCalibration,
+  ProcessingQuality,
+  BPConfig,
+  BPEstimation,
+  FrequencyResponse,
+  PowerSpectrum,
+  SpectralDensity,
+  MotionConfig,
+  CompensationMode,
+  StabilizationMatrix,
+  WaveletBasis,
+  WaveletPacket,
+  ScaleSpace,
+  SubbandFeatures,
+  OptimizedDWT
+} from './analyzers';
 
 // Constants
 export { SignalQualityLevel } from './quality';
