@@ -10,6 +10,7 @@ import {
   Float64Type
 } from '@/types';
 import { config } from '../config';
+import { toFloat64Array, toNumberArray } from '../utils/arrayUtils';
 
 export class PPGProcessor {
   private config: PPGProcessingConfig;
@@ -138,7 +139,7 @@ export class PPGProcessor {
 
       return {
         timestamp,
-        values: Array.from(filteredSignal),
+        values: toNumberArray(filteredSignal),
         bpm,
         confidence: quality.confidence
       };
