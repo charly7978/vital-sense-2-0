@@ -1,7 +1,7 @@
 
 import { SignalQuality } from './quality';
 import { CalibrationState, ProcessingConfig, SensitivitySettings } from './config';
-import { MeasurementType } from './common';
+import { MeasurementType, MediaTrackConstraintsExtended } from './common';
 
 export interface VitalReading {
   timestamp: number;
@@ -65,4 +65,4 @@ export interface ProcessorMetrics {
   latency: number;
 }
 
-export type { MediaTrackConstraintsExtended } from './common';
+export type { MediaTrackConstraintsExtended };
