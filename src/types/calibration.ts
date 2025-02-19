@@ -1,6 +1,6 @@
 
-import { SignalConditions } from './vitals';
 import { Float64Type } from './common';
+import { SignalConditions } from './vitals';
 
 export interface CalibrationEntry {
   timestamp: number;
@@ -28,6 +28,9 @@ export interface CalibrationState {
   referenceValues: Float64Type;
   calibrationQuality: number;
   lastCalibration?: number;
+  enabled: boolean;
+  duration: number;
+  reference: Float64Type;
 }
 
 export interface ProcessingConfig {

@@ -28,6 +28,8 @@ export interface HarmonicAnalysis extends Disposable {
   amplitudes: Float64Type;
   phases: Float64Type;
   quality: number;
+  ratios: Float64Type;
+  powers: Float64Type;
 }
 
 export interface PhaseAnalysis extends Disposable {
@@ -40,11 +42,13 @@ export interface PhaseAnalysis extends Disposable {
 export interface WaveletAnalysis extends Disposable {
   analyze(signal: Float64Type): WaveletTransform;
   reconstruct(coeffs: WaveletCoefficients): Float64Type;
+  coefficients: Float64Type[];
 }
 
 export interface WaveletTransform {
   transform: Float64Type[];
   inverse: (coeffs: Float64Type[]) => Float64Type;
+  coefficients: Float64Type[];
 }
 
 export interface WaveletCoefficients {

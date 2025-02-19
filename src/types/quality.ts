@@ -51,4 +51,5 @@ export interface SignalStability {
   spectral: number;
   phase: number;
   overall: number;
+  dispose: () => void;
 }
