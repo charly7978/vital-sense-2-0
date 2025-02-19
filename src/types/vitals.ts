@@ -1,30 +1,8 @@
 
 import { SignalQuality } from './quality';
 import { Float64Type } from './common';
-
-export interface ProcessingState {
-  isProcessing: boolean;
-  frameCount: number;
-  buffer: Float64Array;
-  timeBuffer: Float64Array;
-  lastTimestamp: number;
-  sampleRate: number;
-  calibration: {
-    isCalibrating: boolean;
-    progress: number;
-    message: string;
-    isCalibrated: boolean;
-    calibrationTime: number;
-    referenceValues: Float64Array;
-    calibrationQuality: number;
-  };
-  quality: SignalQuality;
-  optimization: {
-    cache: Map<string, any>;
-    performance: Map<string, number>;
-    resources: Map<string, any>;
-  };
-}
+import { CalibrationState } from './calibration';
+import { ProcessingMode } from './common';
 
 export interface VitalReading {
   [key: string]: any;
@@ -43,7 +21,7 @@ export interface PPGData {
 }
 
 export interface PPGProcessingConfig {
-  mode: 'normal' | 'calibration' | 'debug';
+  mode: ProcessingMode;
   sampleRate: number;
   bufferSize: number;
   sensitivity: SensitivitySettings;
@@ -53,23 +31,26 @@ export interface PPGProcessingConfig {
     highCut: number;
     order: number;
   };
-  filterOrder?: number;
-  lowCutoff?: number;
-  highCutoff?: number;
-  peakThreshold?: number;
-  minPeakDistance?: number;
-  adaptiveThreshold?: boolean;
-  calibrationDuration?: number;
-  filterCoefficients?: Float64Type;
-  calibration?: {
-    enabled: boolean;
-    duration: number;
-    reference: Float64Type;
+  calibration: CalibrationState;
+}
+
+export interface ProcessingState {
+  isProcessing: boolean;
+  frameCount: number;
+  buffer: Float64Array;
+  timeBuffer: Float64Array;
+  lastTimestamp: number;
+  sampleRate: number;
+  calibration: CalibrationState;
+  quality: SignalQuality;
+  optimization: {
+    cache: Map<string, any>;
+    performance: Map<string, number>;
+    resources: Map<string, any>;
   };
 }
 
 export interface SensitivitySettings {
-  [key: string]: any;
   brightness: number;
   redIntensity: number;
   signalAmplification: number;
@@ -79,8 +60,6 @@ export interface SensitivitySettings {
   responseTime?: number;
   signalStability?: number;
 }
-
-export type MeasurementType = 'ppg' | 'bp' | 'spo2' | 'resp';
 
 export interface SignalConditions {
   noiseLevel: number;
@@ -96,9 +75,11 @@ export interface SignalConditions {
   measurementType: MeasurementType;
 }
 
+export type MeasurementType = 'ppg' | 'bp' | 'spo2' | 'resp';
+
 export interface VitalSigns {
   bpm: number;
-  spo2?: number;
+  spo2?: number;  
   respirationRate?: number;
   bloodPressure?: BloodPressure;
   quality: SignalQuality;

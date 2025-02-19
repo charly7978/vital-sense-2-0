@@ -1,9 +1,10 @@
+
 import React from 'react';
 import { useVitals } from '@/contexts/VitalsContext';
 import CameraView from '../CameraView';
 import MeasurementControls from './MeasurementControls';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts';
-import { SignalQualityLevel } from '@/types';
+import { SignalQualityLevel, SignalQualityLevelType } from '@/types';
 import { Card } from '../ui/card';
 
 export function VitalsMonitor() {
@@ -50,8 +51,8 @@ export function VitalsMonitor() {
                   {vitals?.bpm ? Math.round(vitals.bpm) : '--'}
                 </div>
                 <div className="text-white/60 mt-2">BPM</div>
-                <div className={`mt-4 px-3 py-1 rounded-full ${getQualityColor(signalQuality.level)}`}>
-                  {signalQuality.level}
+                <div className={`mt-4 px-3 py-1 rounded-full ${getQualityColor(signalQuality?.level)}`}>
+                  {signalQuality?.level || 'Invalid'}
                 </div>
               </div>
             </Card>
@@ -84,22 +85,22 @@ export function VitalsMonitor() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <QualityIndicator
               label="Signal"
-              value={signalQuality.overall}
+              value={signalQuality?.overall || 0}
               color="hsl(var(--primary))"
             />
             <QualityIndicator
               label="Confidence"
-              value={signalQuality.confidence}
+              value={signalQuality?.confidence || 0}
               color="hsl(var(--blue-500))"
             />
             <QualityIndicator
               label="Stability"
-              value={signalQuality.score}
+              value={signalQuality?.score || 0}
               color="hsl(var(--pink-500))"
             />
             <QualityIndicator
               label="Quality"
-              value={signalQuality.overall}
+              value={signalQuality?.overall || 0}
               color="hsl(var(--yellow-500))"
             />
           </div>
@@ -158,7 +159,9 @@ function QualityIndicator({ label, value, color }: QualityIndicatorProps) {
   );
 }
 
-function getQualityColor(level: typeof SignalQualityLevel[keyof typeof SignalQualityLevel]): string {
+function getQualityColor(level?: SignalQualityLevelType): string {
+  if (!level) return 'bg-red-500 text-white';
+  
   switch (level) {
     case SignalQualityLevel.Excellent:
       return 'bg-emerald-500 text-white';
