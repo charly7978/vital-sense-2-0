@@ -31,40 +31,63 @@ export class SignalQualityAnalyzer {
     }
   };
 
+  // Propiedades de clase
   private buffer: Float32Array;
-  private qualityHistory: number[];
+  private qualityHistory: number[] = [];
+  private motionHistory: number[] = [];
+  private frequencyHistory: number[] = [];
   private baselineNoise: number;
   private lastUpdate: number;
   private readonly hannWindow: Float32Array;
   private readonly fft: FFTAnalyzer;
   private readonly fftSize = 256;
+  private maxHistoryLength = 10;
+  private settings: SensitivitySettings = {
+    signalAmplification: 1,
+    noiseReduction: 1,
+    signalStability: 1
+  };
 
   constructor() {
     this.buffer = new Float32Array(this.config.windowSize);
-    this.initializeAnalyzer();  // <-- Este es el cambio importante
+    this.hannWindow = this.createHannWindow();
+    this.fft = new FFTAnalyzer(this.fftSize);
+    this.initializeAnalyzer();
   }
 
   private initializeAnalyzer(): void {
     this.qualityHistory = new Array(10).fill(0);
+    this.motionHistory = new Array(10).fill(0);
+    this.frequencyHistory = new Array(10).fill(0);
     this.baselineNoise = 0.1;
     this.lastUpdate = Date.now();
   }
 
   public analyzeQuality(signal: Float32Array): SignalQualityLevel {
-    // Actualizar buffer
-    this.updateBuffer(signal);
+    try {
+      if (!signal || signal.length === 0) {
+        throw new Error('Invalid signal input');
+      }
 
-    // Análisis completo
-    const metrics = this.calculateMetrics();
-    
-    // Calcular score de calidad
-    const qualityScore = this.calculateQualityScore(metrics);
-    
-    // Actualizar historiales
-    this.updateHistories(metrics, qualityScore);
-    
-    // Determinar nivel de calidad
-    return this.determineQualityLevel(qualityScore);
+      // Actualizar buffer
+      this.updateBuffer(signal);
+
+      // Análisis completo
+      const metrics = this.calculateMetrics();
+      
+      // Calcular score de calidad
+      const qualityScore = this.calculateQualityScore(metrics);
+      
+      // Actualizar historiales
+      this.updateHistories(metrics, qualityScore);
+      
+      // Determinar nivel de calidad
+      return this.determineQualityLevel(qualityScore);
+
+    } catch (error) {
+      console.error('Error analyzing quality:', error);
+      return SignalQualityLevel.Invalid;
+    }
   }
 
   private calculateMetrics(): {
@@ -77,24 +100,38 @@ export class SignalQualityAnalyzer {
     entropy: number;
     harmonics: number[];
   } {
-    // Preparar señal para análisis
-    const windowedSignal = this.applyWindow(this.buffer);
-    
-    // Análisis espectral
-    const spectrum = this.fft.forward(windowedSignal);
-    const harmonics = this.analyzeHarmonics(spectrum);
-    
-    // Calcular métricas individuales
-    return {
-      snr: this.calculateSNR(windowedSignal, spectrum),
-      stability: this.calculateStability(windowedSignal),
-      motion: this.calculateMotion(),
-      brightness: this.calculateBrightness(windowedSignal),
-      contrast: this.calculateContrast(windowedSignal),
-      frequency: this.estimateFrequency(spectrum),
-      entropy: this.calculateSpectralEntropy(spectrum),
-      harmonics
-    };
+    try {
+      // Preparar señal para análisis
+      const windowedSignal = this.applyWindow(this.buffer);
+      
+      // Análisis espectral
+      const spectrum = this.fft.forward(windowedSignal);
+      const harmonics = this.analyzeHarmonics(spectrum);
+      
+      // Calcular métricas individuales
+      return {
+        snr: this.calculateSNR(windowedSignal, spectrum),
+        stability: this.calculateStability(windowedSignal),
+        motion: this.calculateMotion(),
+        brightness: this.calculateBrightness(windowedSignal),
+        contrast: this.calculateContrast(windowedSignal),
+        frequency: this.estimateFrequency(spectrum),
+        entropy: this.calculateSpectralEntropy(spectrum),
+        harmonics
+      };
+    } catch (error) {
+      console.error('Error calculating metrics:', error);
+      return {
+        snr: 0,
+        stability: 0,
+        motion: 1,
+        brightness: 0,
+        contrast: 0,
+        frequency: 0,
+        entropy: 0,
+        harmonics: []
+      };
+    }
   }
 
   private calculateSNR(signal: Float32Array, spectrum: Float32Array): number {
@@ -191,22 +228,27 @@ export class SignalQualityAnalyzer {
     contrast: number;
     frequency: number;
   }): number {
-    // Normalizar métricas
-    const normalizedSNR = Math.min(1, metrics.snr / this.config.minSNR);
-    const normalizedMotion = 1 - Math.min(1, metrics.motion / this.config.maxMotion);
-    const normalizedBrightness = this.normalizeBrightness(metrics.brightness);
-    const normalizedContrast = Math.min(1, metrics.contrast / this.config.minContrast);
-    const normalizedFrequency = this.normalizeFrequency(metrics.frequency);
+    try {
+      // Normalizar métricas
+      const normalizedSNR = Math.min(1, metrics.snr / this.config.minSNR);
+      const normalizedMotion = 1 - Math.min(1, metrics.motion / this.config.maxMotion);
+      const normalizedBrightness = this.normalizeBrightness(metrics.brightness);
+      const normalizedContrast = Math.min(1, metrics.contrast / this.config.minContrast);
+      const normalizedFrequency = this.normalizeFrequency(metrics.frequency);
 
-    // Aplicar pesos
-    return (
-      this.config.weights.snr * normalizedSNR +
-      this.config.weights.stability * metrics.stability +
-      this.config.weights.motion * normalizedMotion +
-      this.config.weights.brightness * normalizedBrightness +
-      this.config.weights.contrast * normalizedContrast +
-      this.config.weights.frequency * normalizedFrequency
-    );
+      // Aplicar pesos
+      return (
+        this.config.weights.snr * normalizedSNR +
+        this.config.weights.stability * metrics.stability +
+        this.config.weights.motion * normalizedMotion +
+        this.config.weights.brightness * normalizedBrightness +
+        this.config.weights.contrast * normalizedContrast +
+        this.config.weights.frequency * normalizedFrequency
+      );
+    } catch (error) {
+      console.error('Error calculating quality score:', error);
+      return 0;
+    }
   }
 
   private determineQualityLevel(score: number): SignalQualityLevel {
@@ -264,7 +306,7 @@ export class SignalQualityAnalyzer {
     this.frequencyHistory.push(metrics.frequency);
 
     // Mantener longitud máxima
-    if (this.qualityHistory.length > this.maxHistoryLength) {
+    while (this.qualityHistory.length > this.maxHistoryLength) {
       this.qualityHistory.shift();
       this.motionHistory.shift();
       this.frequencyHistory.shift();
@@ -288,6 +330,54 @@ export class SignalQualityAnalyzer {
     const maxFreq = 4.0;
     const normalizedFreq = (frequency - minFreq) / (maxFreq - minFreq);
     return Math.max(0, Math.min(1, normalizedFreq));
+  }
+
+  private findPeakFrequencyBin(spectrum: Float32Array): number {
+    let maxBin = 0;
+    let maxValue = -Infinity;
+    
+    for (let i = 0; i < spectrum.length; i++) {
+      if (spectrum[i] > maxValue) {
+        maxValue = spectrum[i];
+        maxBin = i;
+      }
+    }
+    
+    return maxBin;
+  }
+
+  private calculateBandPower(
+    spectrum: Float32Array, 
+    startBin: number, 
+    endBin: number
+  ): number {
+    let power = 0;
+    for (let i = startBin; i <= endBin; i++) {
+      if (i >= 0 && i < spectrum.length) {
+        power += spectrum[i] * spectrum[i];
+      }
+    }
+    return power;
+  }
+
+  private extractSignalBand(spectrum: Float32Array): Float32Array {
+    const start = Math.floor(0.5 * this.fftSize / this.config.sampleRate);
+    const end = Math.floor(4.0 * this.fftSize / this.config.sampleRate);
+    return spectrum.slice(start, end);
+  }
+
+  private extractNoiseBand(spectrum: Float32Array): Float32Array {
+    const signalBand = this.extractSignalBand(spectrum);
+    const noiseBand = new Float32Array(spectrum.length - signalBand.length);
+    let j = 0;
+    
+    for (let i = 0; i < spectrum.length; i++) {
+      if (!signalBand.includes(spectrum[i])) {
+        noiseBand[j++] = spectrum[i];
+      }
+    }
+    
+    return noiseBand;
   }
 
   public updateSettings(newSettings: SensitivitySettings): void {
