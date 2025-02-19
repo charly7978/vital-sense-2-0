@@ -17,10 +17,13 @@ export interface CircularBuffer<T> {
   clear(): void;
 }
 
-export interface MediaTrackConstraintsExtended extends MediaTrackConstraints {
-  deviceId?: string;
+export interface MediaTrackConstraintsExtended {
+  width?: number | { ideal: number };
+  height?: number | { ideal: number };
   facingMode?: 'user' | 'environment';
-  advanced?: {
+  frameRate?: number;
+  aspectRatio?: number;
+  advanced?: Array<{
     exposureMode?: string;
     exposureTime?: number;
     exposureCompensation?: number;
@@ -31,7 +34,7 @@ export interface MediaTrackConstraintsExtended extends MediaTrackConstraints {
     saturation?: number;
     sharpness?: number;
     torch?: boolean;
-  }[];
+  }>;
 }
 
 export interface FingerDetection {

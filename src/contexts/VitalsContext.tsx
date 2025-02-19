@@ -16,14 +16,11 @@ interface VitalsContextType {
 }
 
 const initialSignalQuality: SignalQuality = {
-  overall: 0,
-  signal: 0,
-  noise: 0,
-  movement: 0,
-  confidence: 0,
+  level: SignalQualityLevel.Invalid,
   score: 0,
+  confidence: 0,
+  overall: 0,
   history: [],
-  level: SignalQualityLevel.Invalid
 };
 
 const VitalsContext = createContext<VitalsContextType | null>(null);
