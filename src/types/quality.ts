@@ -9,6 +9,26 @@ export const SignalQualityLevel = {
 
 export type SignalQualityLevelType = typeof SignalQualityLevel[keyof typeof SignalQualityLevel];
 
+export interface QualityConfig {
+  noise: number;
+  frequency: number;
+  amplitude: number;
+  wavelet?: {
+    type: string;
+    level: number;
+    threshold: number;
+  };
+  windowSize?: number;
+  validation?: {
+    minQuality: number;
+    maxError: number;
+  };
+  analysis?: {
+    minQuality: number;
+    maxArtifacts: number;
+  };
+}
+
 export interface SignalQuality {
   level: SignalQualityLevelType;
   score: number;
@@ -31,19 +51,7 @@ export interface QualityMetrics {
   amplitude: number;
   overall: number;
   confidence: number;
-}
-
-export interface QualityConfig {
-  thresholds: {
-    snr: number;
-    artifacts: number;
-    stability: number;
-  };
-  weights: {
-    noise: number;
-    frequency: number;
-    amplitude: number;
-  };
+  metrics?: any;
 }
 
 export interface SignalStability {

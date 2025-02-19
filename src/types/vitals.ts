@@ -1,7 +1,8 @@
 
-import { Float64Type, ProcessingMode } from './common';
+import { Float64Type, ProcessingMode, MeasurementType } from './common';
 import { SignalQuality } from './quality';
 import { CalibrationState } from './calibration';
+import { SensitivitySettings } from './config';
 
 export interface VitalReading {
   value: number;
@@ -69,5 +70,3 @@ export enum ArrhythmiaType {
   Tachycardia,
   Irregular
 }
-
-export type { SensitivitySettings } from './config';
