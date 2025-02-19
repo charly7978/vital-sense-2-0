@@ -1,6 +1,7 @@
 
 import { Float64Type } from './common';
 import { SignalQuality } from './quality';
+import { SpectralAnalysis, PhaseAnalysis } from './analysis';
 import { Disposable } from './common';
 
 export interface ArtifactConfig {
@@ -50,6 +51,7 @@ export interface NoiseAnalysis extends Disposable {
   entropy: number;
   kurtosis: number;
   variance: number;
+  spectralNoise?: number;
 }
 
 export interface MotionAnalysis extends Disposable {
@@ -58,6 +60,10 @@ export interface MotionAnalysis extends Disposable {
   acceleration: number;
   features: Float64Type;
   quality: number;
+  detection?: {
+    isMotion: boolean;
+    confidence: number;
+  };
 }
 
 export interface ArtifactFeatures {
@@ -72,4 +78,28 @@ export interface ArtifactDetection extends Disposable {
   confidence: number;
   features: ArtifactFeatures;
   quality: SignalQuality;
+}
+
+export interface SignalSegmentation {
+  segments: Float64Type[];
+  timestamps: number[];
+  quality: number[];
+}
+
+export interface ArtifactMetrics {
+  noise: NoiseAnalysis;
+  motion: MotionAnalysis;
+  spectral: SpectralAnalysis;
+  phase: PhaseAnalysis;
+}
+
+export interface TemplateMatching extends Disposable {
+  match(signal: Float64Type): number;
+  update(template: Float64Type): void;
+  getDistance(): number;
+}
+
+export interface ArtifactValidation extends Disposable {
+  validate(detection: ArtifactDetection): boolean;
+  getConfidence(): number;
 }

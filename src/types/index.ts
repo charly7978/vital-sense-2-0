@@ -42,7 +42,20 @@ export type {
   SignalConditions
 } from './vitals';
 
-// Frequency types
+// Artifact types
+export type {
+  ArtifactConfig,
+  ArtifactDetection,
+  ArtifactFeatures,
+  MotionAnalysis,
+  NoiseAnalysis,
+  SignalSegmentation,
+  ArtifactMetrics,
+  TemplateMatching,
+  ArtifactValidation
+} from './artifacts';
+
+// Analysis types
 export type {
   FrequencyBands,
   FrequencyConfig,
@@ -55,14 +68,5 @@ export type {
   PhaseAnalysis
 } from './analysis';
 
-// Motion types
-export type {
-  MotionAnalysis,
-  NoiseAnalysis
-} from './artifacts';
-
 // Constants
 export { SignalQualityLevel } from './quality';
-
-// Re-export all analysis types
-export * from './analysis';
