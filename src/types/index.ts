@@ -1,21 +1,25 @@
 
+// Re-export types from modules
 export * from './analysis';
 export * from './config';
 export * from './quality';
 export * from './vitals';
 export * from './camera';
+
+// Explicitly re-export types from common to avoid ambiguity
 export type {
-  SignalQualityLevel,
-  SignalQualityLevelType,
   ProcessingMode,
   ColorSpace,
   MeasurementType,
   BasicMetrics,
   ROI,
   MediaTrackConstraintsExtended,
-  Disposable
+  Disposable,
+  Float64Type,
+  Float32Type
 } from './common';
 
+// Global declarations for Float64Array
 declare global {
   interface Float64Array extends ArrayLike<number> {
     readonly BYTES_PER_ELEMENT: number;
@@ -47,3 +51,5 @@ declare global {
     valueOf(): Float64Array;
   }
 }
+
+export { SignalQualityLevel, type SignalQualityLevelType } from './quality';

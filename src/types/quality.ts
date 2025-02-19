@@ -15,4 +15,5 @@ export interface SignalQuality {
   confidence: number;
   overall: number;
   history: number[];
+  dispose?: () => void;
 }

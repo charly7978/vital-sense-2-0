@@ -1,15 +1,4 @@
 
-// Enums básicos
-export const SignalQualityLevel = {
-  Excellent: 'excellent',
-  Good: 'good',
-  Fair: 'fair',
-  Poor: 'poor',
-  Invalid: 'invalid'
-} as const;
-
-export type SignalQualityLevelType = typeof SignalQualityLevel[keyof typeof SignalQualityLevel];
-
 // Tipos numéricos básicos
 export type Float64Type = number[];
 export type Float32Type = number[];

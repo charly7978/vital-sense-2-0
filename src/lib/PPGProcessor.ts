@@ -1,13 +1,13 @@
-
 import { 
   PPGData, 
   PPGProcessingConfig,
   ProcessingState,
   SignalQuality,
   NoiseAnalysis,
-  MotionAnalysis
+  MotionAnalysis,
+  SignalQualityLevel,
+  SignalQualityLevelType
 } from '@/types';
-import { SignalQualityLevel } from '@/types/quality';
 import { config } from '../config';
 
 export class PPGProcessor {
@@ -369,9 +369,7 @@ export class PPGProcessor {
     return m4 / Math.pow(std, 4) - 3;
   }
 
-  private determineQualityLevel(snr: number, motion: number): SignalQualityLevel {
-    const score = snr * 0.6 + motion * 0.4;
-    
+  private determineQualityLevel(score: number): SignalQualityLevelType {
     if (score > 0.8) return SignalQualityLevel.Excellent;
     if (score > 0.6) return SignalQualityLevel.Good;
     if (score > 0.4) return SignalQualityLevel.Fair;
