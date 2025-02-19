@@ -1,4 +1,3 @@
-
 // Tipos básicos para mediciones
 export type Percent = number & { __brand: 'Percent' };
 export type BPM = number & { __brand: 'BPM' };
@@ -129,3 +128,19 @@ export type ProcessorEvent =
   | { type: 'finger_detected'; detection: FingerDetection }
   | { type: 'calibration_complete'; results: CalibrationState['results'] }
   | { type: 'error'; message: string };
+
+// Características espectrales
+export interface SpectralFeatures {
+  heartRate: number[];
+  variability: number[];
+  respiratory: number[];
+  artifacts: number[];
+}
+
+// Descomposición wavelet
+export interface WaveletDecomposition {
+  coefficients: Float32Array[];
+  energies: Float32Array[];
+  phases: Float32Array[];
+  scales: number[];
+}
