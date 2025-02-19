@@ -18,6 +18,7 @@ interface VitalsContextType {
   measurementQuality: number;
   sensitivitySettings: SensitivitySettings;
   toggleMeasurement: () => void;
+  resetMeasurement: () => void;
   processFrame: (imageData: ImageData) => void;
   updateSensitivitySettings: (settings: SensitivitySettings) => void;
 }
@@ -64,7 +65,19 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setArrhythmiaType('Normal');
     setReadings([]);
     setMeasurementProgress(0);
+    setMeasurementQuality(0);
   }, []);
+
+  const resetMeasurement = useCallback(() => {
+    resetMeasurements();
+    if (isStarted) {
+      toggleMeasurement();
+    }
+    toast({
+      title: "Medición reiniciada",
+      description: "Los valores han sido reiniciados."
+    });
+  }, [isStarted, resetMeasurements, toast]);
 
   const updateSensitivitySettings = useCallback((newSettings: SensitivitySettings) => {
     setSensitivitySettings(newSettings);
@@ -161,6 +174,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     measurementQuality,
     sensitivitySettings,
     toggleMeasurement,
+    resetMeasurement,
     processFrame,
     updateSensitivitySettings
   };

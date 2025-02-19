@@ -30,7 +30,8 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
     toggleMeasurement,
     processFrame,
     sensitivitySettings,
-    updateSensitivitySettings
+    updateSensitivitySettings,
+    resetMeasurement
   } = useVitals();
 
   const showFingerIndicator = isStarted && measurementQuality < 0.2;
@@ -123,11 +124,21 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
               </Button>
             </div>
 
-            <div className="w-40 mx-auto">
+            <div className="flex flex-col gap-2 items-center">
               <MeasurementControls
                 isStarted={isStarted}
                 onToggleMeasurement={toggleMeasurement}
               />
+              {isStarted && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={resetMeasurement}
+                  className="w-40 text-sm"
+                >
+                  Reiniciar Medición
+                </Button>
+              )}
             </div>
           </div>
         </div>
