@@ -27,14 +27,34 @@ export type {
   SubbandFeatures,
   NoiseAnalysis,
   MotionAnalysis,
-  CalibrationEntry,
-  CalibratedResult,
   WaveletTransform,
   WaveletBasis,
   WaveletPacket,
   ScaleSpace,
   OptimizedDWT
 } from './analysis';
+
+// Signal processing types
+export type {
+  SignalConditions,
+  SignalFeatures,
+  TemporalFeatures,
+  StatisticalFeatures,
+  ArtifactConfig,
+  ArtifactDetection,
+  ArtifactFeatures,
+  ArtifactMetrics,
+  ArtifactClassification,
+  SignalSegmentation,
+  TemplateMatching,
+  ArtifactValidation,
+  BPConfig,
+  BPEstimation,
+  WaveformAnalysis,
+  WaveformFeatures,
+  WaveformQuality,
+  QualityMetrics
+} from './signal-processing';
 
 // Configuration types
 export type {
