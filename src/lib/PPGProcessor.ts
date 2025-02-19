@@ -1,3 +1,4 @@
+
 import { 
   PPGData, ProcessingMode, SensitivitySettings, 
   FingerDetection, DeviceInfo, CalibrationState,
@@ -100,6 +101,40 @@ export class PPGProcessor {
     }
   }
 
+  /**
+   * Sistema de eventos
+   */
+  private setupEventSystem(): void {
+    this.eventListeners = new Map();
+    this.on('error', () => {
+      console.error('PPG Processor Error');
+    });
+  }
+
+  public on(event: keyof typeof ProcessorEvent, callback: Function): void {
+    if (!this.eventListeners.has(event)) {
+      this.eventListeners.set(event, []);
+    }
+    this.eventListeners.get(event)?.push(callback);
+  }
+
+  public off(event: keyof typeof ProcessorEvent, callback: Function): void {
+    const listeners = this.eventListeners.get(event);
+    if (listeners) {
+      const index = listeners.indexOf(callback);
+      if (index > -1) {
+        listeners.splice(index, 1);
+      }
+    }
+  }
+
+  protected emit(event: keyof typeof ProcessorEvent, data?: any): void {
+    const listeners = this.eventListeners.get(event);
+    if (listeners) {
+      listeners.forEach(callback => callback(data));
+    }
+  }
+
   private handleInitializationError(error: any): void {
     console.error('Error initializing PPG processor:', error);
     this.metrics = {
@@ -124,7 +159,6 @@ export class PPGProcessor {
       confidence: 0
     };
     
-    // Emit error event
     this.emit('error', { 
       type: 'initialization_error',
       message: error.message || 'Failed to initialize PPG processor'
