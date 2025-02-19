@@ -196,8 +196,9 @@ export class PPGProcessor {
     return filtered;
   }
 
-  private detectPeaks(signal: Float64Type): number[] {
-    const peaks: number[] = [];
+  private detectPeaks(signal: Float64Type): Float64Type {
+    const peaks = new Float64Array(signal.length);
+    let peakCount = 0;
     const minDistance = this.config.minPeakDistance * this.state.sampleRate;
     const threshold = this.calculateAdaptiveThreshold(signal);
 
@@ -206,14 +207,20 @@ export class PPGProcessor {
           signal[i] > signal[i + 1] && 
           signal[i] > threshold) {
         
-        if (peaks.length === 0 || (i - peaks[peaks.length - 1]) >= minDistance) {
-          peaks.push(i);
+        if (peakCount === 0 || (i - peaks[peakCount - 1]) >= minDistance) {
+          peaks[peakCount] = i;
+          peakCount++;
         }
       }
     }
 
-    this.peakBuffer = peaks;
-    return peaks;
+    // Create a new array with just the detected peaks
+    const finalPeaks = new Float64Array(peakCount);
+    for (let i = 0; i < peakCount; i++) {
+      finalPeaks[i] = peaks[i];
+    }
+
+    return finalPeaks;
   }
 
   private calculateAdaptiveThreshold(signal: Float64Type): number {
@@ -229,26 +236,28 @@ export class PPGProcessor {
     return mean + std * this.config.peakThreshold;
   }
 
-  private calculateBPM(peaks: number[], timestamp: number): number {
+  private calculateBPM(peaks: Float64Type, timestamp: number): number {
     if (peaks.length < 2) {
       return this.lastBPM;
     }
 
-    const intervals: number[] = [];
+    const intervals = new Float64Array(peaks.length - 1);
+    let intervalCount = 0;
+    
     for (let i = 1; i < peaks.length; i++) {
       const interval = this.timeBuffer[peaks[i]] - this.timeBuffer[peaks[i - 1]];
       if (interval > 0) {
-        intervals.push(interval);
+        intervals[intervalCount++] = interval;
       }
     }
 
-    if (intervals.length === 0) {
+    if (intervalCount === 0) {
       return this.lastBPM;
     }
 
-    // Calculate median interval
-    intervals.sort((a, b) => a - b);
-    const medianInterval = intervals[Math.floor(intervals.length / 2)];
+    // Sort intervals for median calculation
+    const sortedIntervals = new Float64Array(intervals.subarray(0, intervalCount).sort());
+    const medianInterval = sortedIntervals[Math.floor(intervalCount / 2)];
     
     // Convert to BPM
     const bpm = 60000 / medianInterval;
@@ -267,7 +276,7 @@ export class PPGProcessor {
     const motionScore = 1 - Math.min(motion.displacement[0], 1);
     
     const quality: SignalQuality = {
-      level: this.determineQualityLevel(snrScore, motionScore),
+      level: this.determineQualityLevel(snrScore + motionScore / 2),
       score: (snrScore + motionScore) / 2,
       confidence: snrScore * motionScore,
       overall: (snrScore * 0.6 + motionScore * 0.4),
@@ -396,10 +405,14 @@ export class PPGProcessor {
   private updateCalibration(rawSignal: number): void {
     if (!this.state.calibration.isCalibrating) return;
 
+    const newReferenceValues = new Float64Array(this.state.calibration.referenceValues.length + 1);
+    newReferenceValues.set(this.state.calibration.referenceValues);
+    newReferenceValues[this.state.calibration.referenceValues.length] = rawSignal;
+
     this.state.calibration = {
       ...this.state.calibration,
       calibrationQuality: this.state.quality.overall,
-      referenceValues: new Float64Array([...Array.from(this.state.calibration.referenceValues), rawSignal])
+      referenceValues: newReferenceValues
     };
 
     const progress = Math.min(
