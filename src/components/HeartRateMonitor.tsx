@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 
-const HeartRateMonitor: React.FC = () => {
+const HeartRateMonitor = () => {
   const {
     vitals,
     isProcessing,
@@ -62,11 +62,11 @@ const HeartRateMonitor: React.FC = () => {
               <CardContent className="p-6">
                 <h2 className="text-lg font-semibold text-white">Heart Rate</h2>
                 <p className="text-4xl font-bold text-primary">
-                  {vitals ? `${Math.round(vitals.bpm)} BPM` : '--'}
+                  {vitals?.bpm ? `${Math.round(vitals.bpm)} BPM` : '--'}
                 </p>
                 <div className="mt-4">
                   <p className="text-sm text-white/70">
-                    Confidence: {vitals ? `${Math.round(vitals.confidence * 100)}%` : '--'}
+                    Quality: {Math.round(signalQuality.overall * 100)}%
                   </p>
                 </div>
               </CardContent>
@@ -102,18 +102,18 @@ const HeartRateMonitor: React.FC = () => {
         <div className="absolute bottom-6 left-6 right-6 flex gap-4">
           <QualityIndicator
             label="Signal"
-            value={signalQuality.signal}
-            color="bg-emerald-500"
+            value={signalQuality.overall}
+            className="bg-emerald-500"
           />
           <QualityIndicator
-            label="Noise"
-            value={1 - signalQuality.noise}
-            color="bg-yellow-500"
+            label="Quality"
+            value={signalQuality.score}
+            className="bg-yellow-500"
           />
           <QualityIndicator
-            label="Movement"
-            value={1 - signalQuality.movement}
-            color="bg-red-500"
+            label="Stability"
+            value={signalQuality.confidence}
+            className="bg-red-500"
           />
         </div>
       </div>
@@ -138,19 +138,18 @@ const HeartRateMonitor: React.FC = () => {
 const QualityIndicator = ({ 
   label, 
   value, 
-  color 
+  className 
 }: { 
   label: string; 
   value: number; 
-  color: string; 
+  className: string; 
 }) => {
   return (
     <div className="flex-1 rounded bg-black/70 p-4">
       <p className="text-sm text-white">{label}</p>
       <Progress 
         value={value * 100} 
-        className="mt-2 h-1 bg-white/10"
-        indicatorClassName={color}
+        className={`mt-2 h-1 bg-white/10 ${className}`}
       />
     </div>
   );

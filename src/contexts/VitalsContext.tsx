@@ -1,10 +1,8 @@
-
 import React, { createContext, useContext, useRef, useEffect, useState } from 'react';
 import { PPGProcessor } from '@/lib/PPGProcessor';
 import { BeepPlayer } from '@/lib/BeepPlayer';
 import { PPGData, SignalQuality, SignalQualityLevel } from '@/types';
 
-// Definir el tipo para el contexto
 interface VitalsContextType {
   vitals: PPGData | null;
   isProcessing: boolean;
@@ -17,10 +15,19 @@ interface VitalsContextType {
   startCalibration: () => void;
 }
 
-// Crear el contexto
+const initialSignalQuality: SignalQuality = {
+  overall: 0,
+  signal: 0,
+  noise: 0,
+  movement: 0,
+  confidence: 0,
+  score: 0,
+  history: [],
+  level: SignalQualityLevel.Invalid
+};
+
 const VitalsContext = createContext<VitalsContextType | null>(null);
 
-// Hook personalizado para usar el contexto
 export const useVitals = () => {
   const context = useContext(VitalsContext);
   if (!context) {
@@ -29,33 +36,20 @@ export const useVitals = () => {
   return context;
 };
 
-// Proveedor del contexto
 export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Referencias a los procesadores
   const ppgProcessor = useRef<PPGProcessor | null>(null);
   const beepPlayer = useRef<BeepPlayer | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animationFrameRef = useRef<number>(0);
 
-  // Estado
   const [vitals, setVitals] = useState<PPGData | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [calibrationProgress, setCalibrationProgress] = useState(0);
   const [ppgData, setPpgData] = useState<Array<{ time: number; value: number }>>([]);
-  const [signalQuality, setSignalQuality] = useState<SignalQuality>({
-    overall: 0,
-    signal: 0,
-    noise: 0,
-    movement: 0,
-    confidence: 0,
-    score: 0,
-    history: [],
-    level: SignalQualityLevel.Invalid
-  });
+  const [signalQuality, setSignalQuality] = useState<SignalQuality>(initialSignalQuality);
 
-  // Procesar frame de video con verificaciones
   const processFrame = () => {
     if (!videoRef.current || !canvasRef.current || !ppgProcessor.current) {
       console.warn('Procesamiento detenido: componentes no inicializados');
@@ -69,7 +63,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     try {
-      // Dibujar frame en canvas
       context.drawImage(
         videoRef.current,
         0,
@@ -78,7 +71,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         canvasRef.current.height
       );
 
-      // Obtener datos de imagen
       const imageData = context.getImageData(
         0,
         0,
@@ -86,13 +78,11 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         canvasRef.current.height
       );
 
-      // Procesar frame
       const results = ppgProcessor.current.processFrame(imageData);
       
       if (results) {
         setVitals(results);
         
-        // Actualizar datos PPG - con verificación de valores
         setPpgData(prevData => {
           const value = results.values && results.values.length > 0 
             ? results.values[results.values.length - 1] 
@@ -106,13 +96,11 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           return newData.length > 100 ? newData.slice(-100) : newData;
         });
 
-        // Reproducir beep si hay pulso detectado
         if (results.bpm && results.bpm > 0 && beepPlayer.current) {
           beepPlayer.current.play(440, 50);
         }
       }
 
-      // Continuar procesamiento
       animationFrameRef.current = requestAnimationFrame(processFrame);
     } catch (error) {
       console.error('Error en processFrame:', error);
@@ -120,7 +108,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  // Iniciar procesamiento con verificaciones
   const startProcessing = async () => {
     if (!videoRef.current) {
       console.error('Video ref no inicializada');
@@ -139,7 +126,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       videoRef.current.srcObject = stream;
       await videoRef.current.play();
 
-      // Configurar canvas
       if (canvasRef.current) {
         canvasRef.current.width = videoRef.current.videoWidth;
         canvasRef.current.height = videoRef.current.videoHeight;
@@ -160,7 +146,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  // Detener procesamiento con verificaciones
   const stopProcessing = () => {
     setIsProcessing(false);
     
@@ -186,7 +171,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  // Inicializar procesadores
   useEffect(() => {
     try {
       ppgProcessor.current = new PPGProcessor();
