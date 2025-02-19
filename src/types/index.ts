@@ -138,9 +138,63 @@ export interface SpectralFeatures {
 }
 
 // Descomposición wavelet
-export interface WaveletDecomposition {
-  coefficients: Float32Array[];
-  energies: Float32Array[];
-  phases: Float32Array[];
-  scales: number[];
+export interface WaveletCoefficients {
+  approximation: Float64Array;
+  details: Float64Array[];
+}
+
+export interface SubbandFeatures {
+  energy: number;
+  entropy: number;
+  variance: number;
+  mean: number;
+  level: number;
+  type: string;
+}
+
+export interface WaveletBasis {
+  filters: {
+    decomposition: {
+      lowPass: Float64Array;
+      highPass: Float64Array;
+    };
+    reconstruction: {
+      lowPass: Float64Array;
+      highPass: Float64Array;
+    };
+  };
+  support: number;
+  vanishingMoments: number;
+}
+
+export interface WaveletPacket {
+  tree: any;
+  bestBasis: any;
+  features: any;
+  initialize(signal: Float64Array): void;
+  decomposeAll(): void;
+  selectBestBasis(costFunction: string): any;
+  dispose(): void;
+}
+
+export interface ScaleSpace {
+  energies: Float64Array;
+  singularities: number[];
+  maximalLines: number[][];
+}
+
+export interface OptimizedDWT {
+  transform(signal: Float64Array): WaveletCoefficients;
+  inverse(coefficients: WaveletCoefficients): Float64Array;
+  dispose(): void;
+}
+
+export interface WaveletTransform {
+  coefficients: WaveletCoefficients;
+  subbands: SubbandFeatures[];
+  packets: WaveletPacket;
+  features: any;
+  denoised: WaveletCoefficients;
+  scaleSpace: ScaleSpace;
+  reconstructed: Float64Array;
 }

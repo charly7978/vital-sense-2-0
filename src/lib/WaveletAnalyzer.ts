@@ -34,9 +34,9 @@ export class WaveletAnalyzer {
   private featureCache: WeakMap<WaveletCoefficients, SubbandFeatures>;
 
   constructor() {
-    this.dwt = {} as OptimizedDWT; // Inicialización temporal
+    this.dwt = this.createDWT();
     this.waveletBases = new Map();
-    this.packetTree = {} as WaveletPacket; // Inicialización temporal
+    this.packetTree = this.createWaveletPacket();
     this.coefficientCache = new WeakMap();
     this.featureCache = new WeakMap();
     this.initializeAnalyzer();
@@ -355,16 +355,91 @@ export class WaveletAnalyzer {
     }
   }
 
+  private createDWT(): OptimizedDWT {
+    return {
+      transform: (signal: Float64Array): WaveletCoefficients => ({
+        approximation: new Float64Array(signal.length / 2),
+        details: [new Float64Array(signal.length / 2)]
+      }),
+      inverse: (coeffs: WaveletCoefficients): Float64Array => 
+        new Float64Array(coeffs.approximation.length * 2),
+      dispose: () => {}
+    };
+  }
+
+  private createWaveletPacket(): WaveletPacket {
+    return {
+      tree: {},
+      bestBasis: {},
+      features: {},
+      initialize: (signal: Float64Array) => {},
+      decomposeAll: () => {},
+      selectBestBasis: (costFunction: string) => ({}),
+      dispose: () => {}
+    };
+  }
+
+  private initializeAnalyzer(): void {
+    this.precomputeFilters();
+    this.optimizeCacheStrategy();
+  }
+
+  private precomputeBases(): void {
+    const basicBasis: WaveletBasis = {
+      filters: {
+        decomposition: {
+          lowPass: new Float64Array(4),
+          highPass: new Float64Array(4)
+        },
+        reconstruction: {
+          lowPass: new Float64Array(4),
+          highPass: new Float64Array(4)
+        }
+      },
+      support: 4,
+      vanishingMoments: 2
+    };
+    
+    this.waveletBases.set(this.config.waveletType, basicBasis);
+  }
+
+  private precomputeFilters(): void {
+    Object.values(this.buffers).forEach(buffer => {
+      buffer.fill(0);
+    });
+  }
+
+  private optimizeCacheStrategy(): void {
+    this.coefficientCache = new WeakMap();
+    this.featureCache = new WeakMap();
+  }
+
   private validateSignal(signal: Float64Array): boolean {
-    return signal && signal.length > 0;
+    return signal && signal.length > 0 && !signal.some(isNaN);
   }
 
   private checkCache(signal: Float64Array): WaveletTransform | null {
-    return null; // Implementación básica
+    const cached = this.coefficientCache.get(signal);
+    if (!cached) return null;
+    
+    return {
+      coefficients: cached,
+      subbands: [],
+      packets: this.packetTree,
+      features: {},
+      denoised: cached,
+      scaleSpace: {
+        energies: new Float64Array(8),
+        singularities: [],
+        maximalLines: []
+      },
+      reconstructed: new Float64Array(signal.length)
+    };
   }
 
   private updateCache(signal: Float64Array, result: WaveletTransform): void {
-    // Implementación básica de cache
+    if (!signal || !result) return;
+    this.coefficientCache.set(signal, result.coefficients);
   }
 
   private handleAnalysisError(error: Error): WaveletTransform {
@@ -374,22 +449,6 @@ export class WaveletAnalyzer {
 
   private extendSignal(signal: Float64Array): Float64Array {
     return signal; // Implementación básica
-  }
-
-  private precomputeBases(): void {
-    // Implementación básica
-  }
-
-  private initializeAnalyzer(): void {
-    // Implementación básica
-  }
-
-  private precomputeFilters(): void {
-    // Implementación básica
-  }
-
-  private optimizeCacheStrategy(): void {
-    // Implementación básica
   }
 
   private getWaveletFilters(type: string): { lowPass: Float64Array; highPass: Float64Array } {
