@@ -35,10 +35,12 @@ export type {
   VitalReading,
   PPGData,
   PPGProcessingConfig,
+  ProcessingState,
   VitalSigns,
   BloodPressure,
   ArrhythmiaType,
-  SignalConditions
+  SignalConditions,
+  SensitivitySettings
 } from './vitals';
 
 // Artifact types
@@ -51,7 +53,8 @@ export type {
   SignalSegmentation,
   ArtifactMetrics,
   TemplateMatching,
-  ArtifactValidation
+  ArtifactValidation,
+  ArtifactClassification
 } from './artifacts';
 
 // Analysis types

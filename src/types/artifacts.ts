@@ -9,6 +9,7 @@ export interface ArtifactConfig {
     enabled: boolean;
     threshold: number;
     window: number;
+    features: string[];
   };
   spectral: {
     enabled: boolean;
@@ -23,15 +24,6 @@ export interface ArtifactConfig {
     metrics: string[];
     threshold: number;
   };
-  minQuality: number;
-  windowSize: number;
-  overlapSize: number;
-  validation: {
-    minQuality: number;
-    maxArtifacts: number;
-    consistency: number;
-    physiological: boolean;
-  };
   noise: {
     enabled: boolean;
     methods: string[];
@@ -41,6 +33,15 @@ export interface ArtifactConfig {
     enabled: boolean;
     threshold: number;
     window: number;
+  };
+  minQuality: number;
+  windowSize: number;
+  overlapSize: number;
+  validation: {
+    minQuality: number;
+    maxArtifacts: number;
+    consistency: number;
+    physiological: boolean;
   };
 }
 
@@ -74,10 +75,10 @@ export interface ArtifactFeatures {
 
 export interface ArtifactDetection extends Disposable {
   isArtifact: boolean;
-  type: string;
   confidence: number;
   features: ArtifactFeatures;
   quality: SignalQuality;
+  type: string;
 }
 
 export interface SignalSegmentation {
@@ -102,4 +103,10 @@ export interface TemplateMatching extends Disposable {
 export interface ArtifactValidation extends Disposable {
   validate(detection: ArtifactDetection): boolean;
   getConfidence(): number;
+}
+
+export interface ArtifactClassification {
+  type: string;
+  confidence: number;
+  features: ArtifactFeatures;
 }
