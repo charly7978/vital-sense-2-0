@@ -33,7 +33,7 @@ export interface ROI {
   height: number;
 }
 
-// Interfaces de medios
+// Media interfaces
 export interface MediaTrackConstraintsExtended extends MediaTrackConstraints {
   width?: { ideal: number };
   height?: { ideal: number };

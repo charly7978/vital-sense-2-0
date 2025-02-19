@@ -65,4 +65,4 @@ export interface ProcessorMetrics {
   latency: number;
 }
 
-export type { MediaTrackConstraintsExtended };
+export { MediaTrackConstraintsExtended };

@@ -1,10 +1,20 @@
 
-export * from './common';
 export * from './analysis';
 export * from './config';
 export * from './quality';
 export * from './vitals';
 export * from './camera';
+export type {
+  SignalQualityLevel,
+  SignalQualityLevelType,
+  ProcessingMode,
+  ColorSpace,
+  MeasurementType,
+  BasicMetrics,
+  ROI,
+  MediaTrackConstraintsExtended,
+  Disposable
+} from './common';
 
 declare global {
   interface Float64Array extends ArrayLike<number> {
@@ -37,5 +47,3 @@ declare global {
     valueOf(): Float64Array;
   }
 }
-
-export type { Float64Array };
