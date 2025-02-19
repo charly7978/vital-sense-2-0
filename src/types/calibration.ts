@@ -75,3 +75,24 @@ export interface SensitivitySettings {
   snr?: number;
 }
 
+export interface CalibrationConfig {
+  referenceValues: Float64Type;
+  duration: number;
+  threshold: number;
+  adaptation: number;
+  window: number;
+  validationCriteria: {
+    minQuality: number;
+    maxVariability: number;
+    minSamples: number;
+  };
+}
+
+export interface CalibrationInterface {
+  state: CalibrationState;
+  config: CalibrationConfig;
+  calibrate(value: number, conditions: SignalConditions): CalibratedResult;
+  validate(result: CalibratedResult): boolean;
+  reset(): void;
+  dispose(): void;
+}
