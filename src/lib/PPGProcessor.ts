@@ -7,7 +7,7 @@ import {
   NoiseAnalysis,
   MotionAnalysis
 } from '@/types';
-import { config } from '@/config';
+import { config } from '../config';
 
 export class PPGProcessor {
   private config: PPGProcessingConfig;
