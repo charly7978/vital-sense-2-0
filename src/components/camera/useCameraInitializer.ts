@@ -18,25 +18,17 @@ export const useCameraInitializer = ({
 
   const initializeCamera = useCallback(async () => {
     try {
-      console.log('Intentando iniciar cámara con config básica');
-      
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          frameRate: { ideal: 30 },
-          facingMode: "environment"
-        },
+        video: videoConstraints as MediaTrackConstraints,
         audio: false
       });
 
       if (!stream) {
-        console.error('No se pudo obtener el stream de la cámara');
         throw new Error('No stream available');
       }
 
       const track = stream.getVideoTracks()[0];
-      console.log('Cámara iniciada exitosamente:', {
+      console.log('Camera initialized:', {
         label: track.label,
         settings: track.getSettings()
       });
@@ -44,14 +36,13 @@ export const useCameraInitializer = ({
       return true;
 
     } catch (error) {
-      console.error('Error al iniciar la cámara:', error);
+      console.error('Camera initialization error:', error);
       setHasError(true);
       
       toast({
-        title: "Error de cámara",
-        description: "No se pudo acceder a la cámara. Por favor, verifique los permisos.",
+        title: "Camera Error",
+        description: "Could not access camera. Please check permissions.",
         variant: "destructive",
-        className: "bg-black/40 backdrop-blur-sm text-sm text-white/80"
       });
 
       return false;

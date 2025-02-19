@@ -18,11 +18,9 @@ const CameraPreview: React.FC<CameraPreviewProps> = ({
       audio={false}
       screenshotFormat="image/jpeg"
       videoConstraints={{
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-        frameRate: { ideal: 30 },
-        facingMode: "environment"
-      }}
+        ...videoConstraints,
+        facingMode: "user"
+      } as MediaTrackConstraints}
       className="absolute w-full h-full object-cover z-0"
       screenshotQuality={1}
     />
