@@ -37,17 +37,6 @@ export interface QualityConfig {
   };
 }
 
-export interface CalibrationState {
-  isCalibrating: boolean;
-  progress: number;
-  message: string;
-  isCalibrated?: boolean;
-  calibrationTime?: number;
-  lastCalibration?: number;
-  referenceValues?: Float64Array;
-  calibrationQuality?: number;
-}
-
 export interface SignalConditions {
   brightness: number;
   contrast: number;
@@ -61,33 +50,12 @@ export interface SignalConditions {
   measurementType?: string;
 }
 
-export interface CalibrationEntry {
-  timestamp: number;
-  values: Float64Array;
-  conditions: SignalConditions;
-  quality: number;
-  factor: number;
-  raw?: number;
-}
-
-export interface CalibratedResult {
-  value?: number;
-  confidence: number;
-  factor: number;
-}
-
-export interface ArtifactConfig {
-  threshold: number;
-  windowSize: number;
-  mode: 'default' | 'strict' | 'lenient';
-  validation?: {
-    minConfidence: number;
-    maxArtifacts: number;
-    minAmplitude?: number;
-  };
-  wavelet?: {
-    decompositionLevel: number;
-    waveletType: string;
-    type?: string;
-  };
+export interface QualityMetrics {
+  snr: number;
+  stability: number;
+  noise: number;
+  overall: number;
+  frequency?: number;
+  amplitude?: number;
+  artifacts?: number;
 }
