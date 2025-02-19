@@ -8,7 +8,7 @@ import { PPGData } from '@/types';
 interface VitalsContextType {
   vitals: PPGData | null;
   isProcessing: boolean;
-  startProcessing: () => void;
+  startProcessing: () => Promise<void>;
   stopProcessing: () => void;
   calibrate: () => void;
   isCalibrating: boolean;
@@ -40,79 +40,105 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCalibrating, setIsCalibrating] = useState(false);
 
-  // Inicializar procesadores
-  useEffect(() => {
-    // Crear instancias
-    const processor = new PPGProcessor();
-    const beep = new BeepPlayer();
-    
-    // Asignar a las referencias
-    ppgProcessor.current = processor;
-    beepPlayer.current = beep;
-
-    // Cleanup
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-      
-      if (videoRef.current?.srcObject) {
-        const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
-        tracks.forEach(track => track.stop());
-      }
-
-      // Detener procesadores
-      processor.stop();
-      beep.stop();
-      
-      // Limpiar referencias
-      ppgProcessor.current = null;
-      beepPlayer.current = null;
-    };
-  }, []);
-
-  // Procesar frame de video
+  // Procesar frame de video con verificaciones
   const processFrame = () => {
     if (!isProcessing || !videoRef.current || !canvasRef.current || !ppgProcessor.current) {
+      console.warn('Procesamiento detenido: componentes no inicializados');
       return;
     }
 
     const context = canvasRef.current.getContext('2d');
-    if (!context) return;
-
-    // Dibujar frame en canvas
-    context.drawImage(
-      videoRef.current,
-      0,
-      0,
-      canvasRef.current.width,
-      canvasRef.current.height
-    );
-
-    // Obtener datos de imagen
-    const imageData = context.getImageData(
-      0,
-      0,
-      canvasRef.current.width,
-      canvasRef.current.height
-    );
-
-    // Procesar frame
-    const results = ppgProcessor.current.processFrame(imageData);
-    setVitals(results);
-
-    // Reproducir beep si hay pulso detectado
-    if (results.bpm > 0 && beepPlayer.current) {
-      beepPlayer.current.play(440, 50);
+    if (!context) {
+      console.error('No se pudo obtener el contexto 2D');
+      return;
     }
 
-    // Continuar procesamiento
-    animationFrameRef.current = requestAnimationFrame(processFrame);
+    try {
+      // Dibujar frame en canvas
+      context.drawImage(
+        videoRef.current,
+        0,
+        0,
+        canvasRef.current.width,
+        canvasRef.current.height
+      );
+
+      // Obtener datos de imagen
+      const imageData = context.getImageData(
+        0,
+        0,
+        canvasRef.current.width,
+        canvasRef.current.height
+      );
+
+      // Procesar frame
+      const results = ppgProcessor.current.processFrame(imageData);
+      setVitals(results);
+
+      // Reproducir beep si hay pulso detectado
+      if (results.bpm > 0 && beepPlayer.current) {
+        beepPlayer.current.play(440, 50);
+      }
+
+      // Continuar procesamiento
+      animationFrameRef.current = requestAnimationFrame(processFrame);
+    } catch (error) {
+      console.error('Error en processFrame:', error);
+      setIsProcessing(false);
+    }
   };
 
-  // Iniciar procesamiento
+  // Inicializar procesadores con manejo de errores
+  useEffect(() => {
+    let mounted = true;
+    
+    try {
+      // Crear instancias
+      const processor = new PPGProcessor();
+      const beep = new BeepPlayer();
+      
+      if (mounted) {
+        ppgProcessor.current = processor;
+        beepPlayer.current = beep;
+      }
+
+      // Cleanup
+      return () => {
+        mounted = false;
+        
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+        }
+        
+        try {
+          if (videoRef.current?.srcObject) {
+            const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+            tracks.forEach(track => track.stop());
+          }
+
+          processor.stop();
+          beep.stop();
+          
+          ppgProcessor.current = null;
+          beepPlayer.current = null;
+        } catch (error) {
+          console.error('Error en cleanup:', error);
+        }
+      };
+    } catch (error) {
+      console.error('Error al inicializar procesadores:', error);
+      return () => {
+        mounted = false;
+      };
+    }
+  }, []);
+
+  // Iniciar procesamiento con verificaciones
   const startProcessing = async () => {
-    if (!videoRef.current) return;
+    if (!videoRef.current) {
+      console.error('Video ref no inicializada');
+      return;
+    }
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -124,7 +150,10 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
 
       videoRef.current.srcObject = stream;
-      await videoRef.current.play();
+      await videoRef.current.play().catch(error => {
+        console.error('Error al reproducir video:', error);
+        throw error;
+      });
 
       // Configurar canvas
       if (canvasRef.current) {
@@ -136,39 +165,51 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       processFrame();
     } catch (error) {
       console.error('Error al acceder a la cámara:', error);
+      setIsProcessing(false);
     }
   };
 
-  // Detener procesamiento
+  // Detener procesamiento con verificaciones
   const stopProcessing = () => {
     setIsProcessing(false);
+    
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
     }
 
-    // Detener video
-    if (videoRef.current?.srcObject) {
-      const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
-      tracks.forEach(track => track.stop());
-      videoRef.current.srcObject = null;
-    }
+    try {
+      if (videoRef.current?.srcObject) {
+        const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+        tracks.forEach(track => track.stop());
+        videoRef.current.srcObject = null;
+      }
 
-    // Detener procesadores
-    if (ppgProcessor.current) {
-      ppgProcessor.current.stop();
-    }
-    if (beepPlayer.current) {
-      beepPlayer.current.stop();
+      if (ppgProcessor.current) {
+        ppgProcessor.current.stop();
+      }
+      if (beepPlayer.current) {
+        beepPlayer.current.stop();
+      }
+    } catch (error) {
+      console.error('Error al detener procesamiento:', error);
     }
   };
 
-  // Iniciar calibración
+  // Calibración con verificaciones
   const calibrate = () => {
-    if (!ppgProcessor.current) return;
+    if (!ppgProcessor.current) {
+      console.error('Procesador no inicializado');
+      return;
+    }
     
-    setIsCalibrating(true);
-    ppgProcessor.current.startCalibration();
-    setTimeout(() => setIsCalibrating(false), 5000);
+    try {
+      setIsCalibrating(true);
+      ppgProcessor.current.startCalibration();
+      setTimeout(() => setIsCalibrating(false), 5000);
+    } catch (error) {
+      console.error('Error en calibración:', error);
+      setIsCalibrating(false);
+    }
   };
 
   return (
@@ -197,3 +238,4 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 };
 
 export default VitalsProvider;
+
