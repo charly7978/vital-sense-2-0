@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect } from 'react';
 import { MediaTrackConstraintsExtended } from '@/types/vitals';
 
@@ -16,7 +17,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, enabled }) => {
       height: { ideal: 720 },
       facingMode: "user",
       frameRate: 30
-    } as MediaTrackConstraintsExtended
+    } as unknown as MediaTrackConstraints
   };
 
   useEffect(() => {

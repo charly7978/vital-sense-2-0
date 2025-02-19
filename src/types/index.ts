@@ -23,6 +23,13 @@ export interface PPGData {
   confidence: number;
 }
 
+export interface VitalReading {
+  timestamp: number;
+  value: number;
+  quality: number;
+  type: MeasurementType;
+}
+
 export interface SignalQuality {
   level: SignalQualityLevel;
   score: number;
@@ -30,29 +37,6 @@ export interface SignalQuality {
   overall: number;
   history: number[];
   dispose?: () => void;
-}
-
-export interface ProcessorMetrics {
-  snr: number;
-  bpm: number;
-  quality: SignalQuality;
-  timestamp: number;
-}
-
-export interface ProcessingState {
-  isProcessing: boolean;
-  frameCount: number;
-  buffer: Float64Array;
-  timeBuffer: Float64Array;
-  lastTimestamp: number;
-  sampleRate: number;
-  calibration: CalibrationState;
-  quality: SignalQuality;
-  optimization: {
-    cache: Map<string, any>;
-    performance: Map<string, number>;
-    resources: Map<string, number>;
-  };
 }
 
 export interface CalibrationState {
@@ -73,9 +57,9 @@ export interface NoiseAnalysis {
   entropy: number;
   kurtosis: number;
   variance: number;
-  dispose?: () => void;
   spectralNoise?: number;
   threshold?: number;
+  dispose?: () => void;
 }
 
 export interface MotionAnalysis {
@@ -101,6 +85,22 @@ export interface ProcessingConfig {
   adaptiveThreshold: boolean;
 }
 
+export interface ProcessingState {
+  isProcessing: boolean;
+  frameCount: number;
+  buffer: Float64Array;
+  timeBuffer: Float64Array;
+  lastTimestamp: number;
+  sampleRate: number;
+  calibration: CalibrationState;
+  quality: SignalQuality;
+  optimization: {
+    cache: Map<string, any>;
+    performance: Map<string, number>;
+    resources: Map<string, number>;
+  };
+}
+
 export interface SensitivitySettings {
   brightness: number;
   redIntensity: number;
@@ -112,29 +112,25 @@ export interface SensitivitySettings {
   signalStability: number;
 }
 
+// Processing types
+export interface ProcessorMetrics {
+  snr: number;
+  bpm: number;
+  quality: SignalQuality;
+  timestamp: number;
+}
+
+export interface RegionAnalysis {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  quality: number;
+  coverage: number;
+  stability: number;
+}
+
 // Helper functions
 export const createPercent = (n: number): Percent => Math.max(0, Math.min(100, n)) as Percent;
 export const createBPM = (n: number): BPM => Math.max(0, Math.min(300, n)) as BPM;
 export const createMilliseconds = (n: number): Milliseconds => Math.max(0, n) as Milliseconds;
-
-export interface WaveletAnalysis {
-  subbands: {
-    approximation: Float64Array;
-    details: Float64Array[];
-  };
-  features: {
-    energy: number[];
-    entropy: number[];
-    variance: number[];
-  };
-  dispose?: () => void;
-}
-
-export interface SpectralAnalysis {
-  spectrum: Float64Array;
-  frequencies: Float64Array;
-  magnitude: Float64Array;
-  phase: Float64Array;
-  dispose?: () => void;
-}
-

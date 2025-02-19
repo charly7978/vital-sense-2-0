@@ -18,23 +18,12 @@ export interface CircularBuffer<T> {
 }
 
 export interface MediaTrackConstraintsExtended {
-  width?: number | { ideal: number };
-  height?: number | { ideal: number };
+  width?: { ideal: number };
+  height?: { ideal: number };
   facingMode?: 'user' | 'environment';
   frameRate?: number;
   aspectRatio?: number;
-  advanced?: Array<{
-    exposureMode?: string;
-    exposureTime?: number;
-    exposureCompensation?: number;
-    brightness?: number;
-    contrast?: number;
-    whiteBalanceMode?: string;
-    colorTemperature?: number;
-    saturation?: number;
-    sharpness?: number;
-    torch?: boolean;
-  }>;
+  advanced?: MediaTrackConstraintSet[];
 }
 
 export interface FingerDetection {
