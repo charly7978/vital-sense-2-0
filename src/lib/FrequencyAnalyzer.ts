@@ -1,123 +1,156 @@
 import {
   FrequencyConfig, SpectralAnalysis, FrequencyBands,
-  HarmonicStructure, PhaseAnalysis, CoherenceMetrics,
-  TimeFrequencyMap, SpectralFeatures, ComplexArray,
-  OptimizedFFT, WindowFunction, SpectralPeaks
+  SpectralFeatures, FrequencyResponse, PowerSpectrum,
+  SpectralDensity, HarmonicAnalysis, PhaseAnalysis,
+  FrequencyMetrics, SpectralQuality, BandPower
 } from '@/types';
 
 /**
- * Analizador avanzado de frecuencia para PPG
- * Implementa técnicas espectrales de última generación
+ * Analizador avanzado de frecuencias para PPG
+ * Implementa técnicas de última generación en análisis espectral
  * @version 2.0.0
  */
 export class FrequencyAnalyzer {
   // Configuración optimizada
   private readonly config: FrequencyConfig = {
-    sampleRate: 30,          // Hz
-    fftSize: 1024,           // Potencia de 2 para FFT óptima
-    hopSize: 256,            // Avance entre ventanas
-    minFreq: 0.5,           // Hz (30 BPM)
-    maxFreq: 4.0,           // Hz (240 BPM)
-    harmonicCount: 4,        // Número de armónicos
-    windowType: 'blackman',  // Ventana óptima
-    zeroPadding: 2,         // Factor de zero-padding
+    sampleRate: 30,           // Hz
+    windowSize: 512,          // Muestras
+    overlapSize: 256,         // Solapamiento
     
-    // Configuración espectral avanzada
+    // Configuración espectral
     spectral: {
-      minPeakHeight: 0.1,    // Altura mínima de picos
-      minPeakDistance: 0.25, // Hz entre picos
-      maxPeakCount: 8,       // Máximo número de picos
-      noiseFloor: -60,       // dB
-      dynamicRange: 90       // dB
+      method: 'welch',        // Método de estimación
+      window: 'hanning',      // Ventana
+      nfft: 1024,            // Puntos FFT
+      detrend: 'linear',     // Detrending
+      averaging: 'median'     // Promediado
     },
 
-    // Bandas de frecuencia optimizadas
+    // Bandas de frecuencia (Hz)
     bands: {
-      sub: [0.0, 0.5],      // Sub-cardíaca
-      fundamental: [0.5, 2.0], // Fundamental
-      harmonic1: [2.0, 3.5], // Primer armónico
-      harmonic2: [3.5, 5.0], // Segundo armónico
-      noise: [5.0, 15.0]     // Banda de ruido
+      vlf: [0.0, 0.04],      // Muy baja frecuencia
+      lf: [0.04, 0.15],      // Baja frecuencia
+      hf: [0.15, 0.4],       // Alta frecuencia
+      cardiac: [0.5, 4.0],   // Banda cardíaca
+      noise: [4.0, 15.0]     // Ruido
+    },
+
+    // Análisis armónico
+    harmonics: {
+      maxOrder: 5,           // Máximo orden
+      minAmplitude: 0.1,     // Amplitud mínima
+      tolerance: 0.05,       // Tolerancia
+      tracking: true         // Seguimiento
+    },
+
+    // Análisis de fase
+    phase: {
+      unwrapping: 'simple',  // Desenvoltura
+      smoothing: 0.1,        // Suavizado
+      coherence: true,       // Coherencia
+      groupDelay: true       // Retardo de grupo
+    },
+
+    // Optimizaciones
+    optimization: {
+      vectorization: true,   // SIMD
+      parallelization: true, // Multi-hilo
+      precision: 'double',   // Precisión
+      cacheSize: 10,        // Tamaño de cache
+      adaptiveWindow: true   // Ventana adaptativa
     }
   };
 
-  // Procesadores optimizados
-  private readonly fft: OptimizedFFT;
-  private readonly windows: Map<string, Float64Array>;
-  private readonly complexBuffers: {
-    time: ComplexArray;
-    freq: ComplexArray;
-    correlation: ComplexArray;
-    convolution: ComplexArray;
-  };
+  // Procesadores especializados
+  private readonly fftProcessor: FFTProcessor;
+  private readonly windowProcessor: WindowProcessor;
+  private readonly harmonicAnalyzer: HarmonicAnalyzer;
+  private readonly phaseAnalyzer: PhaseAnalyzer;
 
-  // Buffers de análisis pre-allocados
+  // Buffers optimizados
   private readonly buffers = {
-    magnitude: new Float64Array(this.config.fftSize),
-    phase: new Float64Array(this.config.fftSize),
-    power: new Float64Array(this.config.fftSize),
-    coherence: new Float64Array(this.config.fftSize),
-    timeFreq: new Float64Array(this.config.fftSize * this.config.hopSize),
-    features: new Float64Array(64)
+    time: new Float64Array(1024),
+    freq: new Float64Array(513),
+    power: new Float64Array(513),
+    phase: new Float64Array(513),
+    harmonics: new Float64Array(10),
+    workspace: new Float64Array(2048)
   };
 
-  // Cache de resultados
-  private readonly resultCache = new WeakMap<Float64Array, SpectralAnalysis>();
+  // Estado del analizador
+  private readonly state = {
+    lastSpectrum: null as PowerSpectrum | null,
+    harmonicHistory: [] as HarmonicAnalysis[],
+    phaseHistory: [] as PhaseAnalysis[],
+    qualityHistory: [] as number[],
+    adaptiveWindow: {
+      size: 512,
+      overlap: 256,
+      adaptation: 0.1
+    }
+  };
 
   constructor() {
     this.initializeAnalyzer();
   }
 
   /**
-   * Análisis espectral principal
-   * Implementa pipeline avanzado de procesamiento frecuencial
+   * Análisis principal de frecuencia
+   * Implementa pipeline completo de análisis espectral
    */
   public analyze(signal: Float64Array): SpectralAnalysis {
     try {
-      // 1. Validación y preparación
+      // 1. Validación de señal
       if (!this.validateSignal(signal)) {
         throw new Error('Invalid signal for frequency analysis');
       }
 
-      // 2. Cache check
-      const cached = this.resultCache.get(signal);
-      if (cached) return cached;
-
-      // 3. Pre-procesamiento
+      // 2. Pre-procesamiento
       const prepared = this.prepareSignal(signal);
 
-      // 4. Análisis espectral completo
-      const spectral = this.computeSpectralAnalysis(prepared);
+      // 3. Estimación espectral
+      const spectrum = this.estimateSpectrum(prepared);
 
-      // 5. Análisis de armónicos
-      const harmonics = this.analyzeHarmonics(spectral);
+      // 4. Análisis de bandas
+      const bands = this.analyzeBands(spectrum);
+
+      // 5. Análisis armónico
+      const harmonics = this.analyzeHarmonics(spectrum);
 
       // 6. Análisis de fase
-      const phase = this.analyzePhase(spectral);
+      const phase = this.analyzePhase(spectrum);
 
-      // 7. Análisis de coherencia
-      const coherence = this.analyzeCoherence(spectral);
+      // 7. Extracción de características
+      const features = this.extractFeatures({
+        spectrum,
+        bands,
+        harmonics,
+        phase
+      });
 
-      // 8. Extracción de características
-      const features = this.extractSpectralFeatures(spectral);
+      // 8. Análisis de calidad
+      const quality = this.analyzeQuality({
+        spectrum,
+        bands,
+        harmonics
+      });
 
-      // 9. Análisis tiempo-frecuencia
-      const timeFreq = this.computeTimeFrequencyMap(prepared);
-
-      // 10. Resultados finales
-      const result = {
-        spectral,
+      // 9. Actualización de estado
+      this.updateState({
+        spectrum,
         harmonics,
         phase,
-        coherence,
+        quality
+      });
+
+      return {
+        spectrum,
+        bands,
+        harmonics,
+        phase,
         features,
-        timeFreq
+        quality
       };
-
-      // 11. Cache update
-      this.resultCache.set(signal, result);
-
-      return result;
 
     } catch (error) {
       console.error('Error in frequency analysis:', error);
@@ -126,188 +159,182 @@ export class FrequencyAnalyzer {
   }
 
   /**
-   * Análisis espectral avanzado
+   * Estimación espectral avanzada
    */
-  private computeSpectralAnalysis(signal: Float64Array): SpectralAnalysis {
-    // 1. Aplicar ventana
-    const windowed = this.applyWindow(signal, this.config.windowType);
+  private estimateSpectrum(signal: Float64Array): PowerSpectrum {
+    // 1. Segmentación
+    const segments = this.segmentSignal(
+      signal,
+      this.state.adaptiveWindow.size,
+      this.state.adaptiveWindow.overlap
+    );
 
-    // 2. Zero padding
-    const padded = this.zeroPad(windowed, this.config.zeroPadding);
+    // 2. Ventaneo
+    const windowed = segments.map(segment =>
+      this.applyWindow(segment, this.config.spectral.window)
+    );
 
-    // 3. FFT optimizada
-    const spectrum = this.computeOptimizedFFT(padded);
+    // 3. FFT
+    const ffts = windowed.map(segment =>
+      this.computeFFT(segment, this.config.spectral.nfft)
+    );
 
-    // 4. Análisis de magnitud
-    const magnitude = this.computeMagnitudeSpectrum(spectrum);
+    // 4. Promediado
+    const averaged = this.averageSpectra(
+      ffts,
+      this.config.spectral.averaging
+    );
 
-    // 5. Análisis de potencia
-    const power = this.computePowerSpectrum(magnitude);
+    // 5. Normalización
+    return this.normalizeSpectrum(averaged);
+  }
 
-    // 6. Detección de picos
-    const peaks = this.detectSpectralPeaks(power);
+  /**
+   * Análisis de bandas de frecuencia
+   */
+  private analyzeBands(spectrum: PowerSpectrum): FrequencyBands {
+    const bands: FrequencyBands = {};
+    
+    // Cálculo para cada banda
+    for (const [name, [low, high]] of Object.entries(this.config.bands)) {
+      bands[name] = this.calculateBandPower(
+        spectrum,
+        low,
+        high
+      );
+    }
 
-    // 7. Análisis de bandas
-    const bands = this.analyzeFrequencyBands(power);
+    // Métricas adicionales
+    bands.ratios = this.calculateBandRatios(bands);
+    bands.normalized = this.normalizeBandPowers(bands);
+    bands.relative = this.calculateRelativePowers(bands);
 
-    return {
-      magnitude,
-      power,
-      peaks,
-      bands,
-      fundamentalFreq: this.estimateFundamentalFrequency(peaks)
-    };
+    return bands;
   }
 
   /**
    * Análisis armónico avanzado
    */
-  private analyzeHarmonics(spectral: SpectralAnalysis): HarmonicStructure {
-    const fundamental = spectral.fundamentalFreq;
-    const harmonics: number[] = [];
-    const ratios: number[] = [];
-    const powers: number[] = [];
+  private analyzeHarmonics(spectrum: PowerSpectrum): HarmonicAnalysis {
+    // 1. Detección de fundamental
+    const fundamental = this.detectFundamental(spectrum);
 
-    for (let i = 1; i <= this.config.harmonicCount; i++) {
-      const harmonicFreq = fundamental * i;
-      const harmonicPower = this.findHarmonicPower(
-        spectral.power,
-        harmonicFreq
-      );
+    // 2. Búsqueda de armónicos
+    const harmonics = this.findHarmonics(
+      spectrum,
+      fundamental,
+      this.config.harmonics.maxOrder
+    );
 
-      harmonics.push(harmonicFreq);
-      powers.push(harmonicPower);
-      if (i > 1) {
-        ratios.push(harmonicPower / powers[0]);
-      }
+    // 3. Validación de armónicos
+    const validated = this.validateHarmonics(
+      harmonics,
+      this.config.harmonics.minAmplitude
+    );
+
+    // 4. Seguimiento temporal
+    if (this.config.harmonics.tracking) {
+      this.trackHarmonics(validated);
     }
 
-    return {
-      frequencies: harmonics,
-      powers,
-      ratios,
-      harmonicity: this.calculateHarmonicity(powers)
-    };
+    // 5. Métricas armónicas
+    return this.calculateHarmonicMetrics(validated);
   }
 
   /**
    * Análisis de fase avanzado
    */
-  private analyzePhase(spectral: SpectralAnalysis): PhaseAnalysis {
-    // 1. Fase instantánea
-    const instantPhase = this.computeInstantaneousPhase();
+  private analyzePhase(spectrum: PowerSpectrum): PhaseAnalysis {
+    // 1. Extracción de fase
+    const phase = this.extractPhase(spectrum);
 
-    // 2. Fase envolvente
-    const phaseEnvelope = this.computePhaseEnvelope();
+    // 2. Desenvoltura de fase
+    const unwrapped = this.unwrapPhase(
+      phase,
+      this.config.phase.unwrapping
+    );
 
-    // 3. Coherencia de fase
-    const phaseCoherence = this.computePhaseCoherence();
+    // 3. Suavizado de fase
+    const smoothed = this.smoothPhase(
+      unwrapped,
+      this.config.phase.smoothing
+    );
 
-    // 4. Sincronización de fase
-    const phaseSynch = this.computePhaseSynchronization();
+    // 4. Análisis de coherencia
+    const coherence = this.config.phase.coherence ?
+      this.analyzeCoherence(smoothed) :
+      null;
 
-    return {
-      instantPhase,
-      phaseEnvelope,
-      phaseCoherence,
-      phaseSynch
-    };
-  }
-
-  /**
-   * Análisis de coherencia avanzado
-   */
-  private analyzeCoherence(spectral: SpectralAnalysis): CoherenceMetrics {
-    // 1. Coherencia espectral
-    const spectralCoherence = this.computeSpectralCoherence();
-
-    // 2. Coherencia de magnitud
-    const magnitudeCoherence = this.computeMagnitudeCoherence();
-
-    // 3. Coherencia wavelet
-    const waveletCoherence = this.computeWaveletCoherence();
+    // 5. Retardo de grupo
+    const groupDelay = this.config.phase.groupDelay ?
+      this.calculateGroupDelay(smoothed) :
+      null;
 
     return {
-      spectral: spectralCoherence,
-      magnitude: magnitudeCoherence,
-      wavelet: waveletCoherence,
-      overall: this.computeOverallCoherence([
-        spectralCoherence,
-        magnitudeCoherence,
-        waveletCoherence
-      ])
-    };
-  }
-
-  /**
-   * Extracción de características espectrales
-   */
-  private extractSpectralFeatures(spectral: SpectralAnalysis): SpectralFeatures {
-    return {
-      centroid: this.computeSpectralCentroid(spectral.power),
-      bandwidth: this.computeSpectralBandwidth(spectral.power),
-      flatness: this.computeSpectralFlatness(spectral.power),
-      rolloff: this.computeSpectralRolloff(spectral.power),
-      flux: this.computeSpectralFlux(spectral.power),
-      spread: this.computeSpectralSpread(spectral.power),
-      kurtosis: this.computeSpectralKurtosis(spectral.power),
-      skewness: this.computeSpectralSkewness(spectral.power)
-    };
-  }
-
-  /**
-   * Análisis tiempo-frecuencia avanzado
-   */
-  private computeTimeFrequencyMap(signal: Float64Array): TimeFrequencyMap {
-    // 1. STFT optimizada
-    const stft = this.computeOptimizedSTFT(signal);
-
-    // 2. Espectrograma
-    const spectrogram = this.computeSpectrogram(stft);
-
-    // 3. Escalograma
-    const scalogram = this.computeScalogram(signal);
-
-    // 4. Representación de Wigner-Ville
-    const wvd = this.computeWignerVille(signal);
-
-    return {
-      stft,
-      spectrogram,
-      scalogram,
-      wvd,
-      timeAxis: this.generateTimeAxis(),
-      freqAxis: this.generateFrequencyAxis()
+      phase: smoothed,
+      coherence,
+      groupDelay,
+      metrics: this.calculatePhaseMetrics({
+        phase: smoothed,
+        coherence,
+        groupDelay
+      })
     };
   }
 
   /**
    * Optimizaciones de bajo nivel
    */
-  private computeOptimizedFFT(signal: Float64Array): ComplexArray {
-    return this.fft.forward(signal);
-  }
+  private computeFFT(
+    signal: Float64Array,
+    nfft: number
+  ): ComplexArray {
+    // 1. Preparación de datos
+    const padded = new Float64Array(nfft);
+    padded.set(signal);
 
-  private computeOptimizedSTFT(signal: Float64Array): ComplexArray {
-    const frameCount = Math.floor(
-      (signal.length - this.config.fftSize) / this.config.hopSize
-    ) + 1;
-
-    const stft = new ComplexArray(
-      frameCount * this.config.fftSize
+    // 2. FFT in-place
+    this.fftProcessor.transform(
+      padded,
+      this.buffers.workspace
     );
 
-    for (let i = 0; i < frameCount; i++) {
-      const frame = signal.subarray(
-        i * this.config.hopSize,
-        i * this.config.hopSize + this.config.fftSize
-      );
-      const windowed = this.applyWindow(frame, this.config.windowType);
-      const spectrum = this.computeOptimizedFFT(windowed);
-      stft.set(spectrum, i * this.config.fftSize);
+    // 3. Organización de resultados
+    const complex = new ComplexArray(nfft / 2 + 1);
+    for (let i = 0; i <= nfft / 2; i++) {
+      complex.real[i] = padded[2 * i];
+      complex.imag[i] = padded[2 * i + 1];
     }
 
-    return stft;
+    return complex;
+  }
+
+  /**
+   * Gestión de estado
+   */
+  private updateState(data: {
+    spectrum: PowerSpectrum;
+    harmonics: HarmonicAnalysis;
+    phase: PhaseAnalysis;
+    quality: SpectralQuality;
+  }): void {
+    // 1. Actualización de espectro
+    this.state.lastSpectrum = data.spectrum;
+
+    // 2. Actualización de historiales
+    this.state.harmonicHistory.push(data.harmonics);
+    this.state.phaseHistory.push(data.phase);
+    this.state.qualityHistory.push(data.quality.overall);
+
+    // 3. Mantenimiento de historiales
+    if (this.state.harmonicHistory.length > 30) {
+      this.state.harmonicHistory.shift();
+      this.state.phaseHistory.shift();
+      this.state.qualityHistory.shift();
+    }
+
+    // 4. Adaptación de ventana
+    this.updateAdaptiveWindow(data.quality);
   }
 
   /**
@@ -315,24 +342,27 @@ export class FrequencyAnalyzer {
    */
   public dispose(): void {
     try {
-      // 1. Limpieza de FFT
-      this.fft.dispose();
+      // 1. Limpieza de procesadores
+      this.fftProcessor.dispose();
+      this.windowProcessor.dispose();
+      this.harmonicAnalyzer.dispose();
+      this.phaseAnalyzer.dispose();
 
       // 2. Limpieza de buffers
       Object.values(this.buffers).forEach(buffer => {
         buffer.fill(0);
       });
 
-      // 3. Limpieza de buffers complejos
-      Object.values(this.complexBuffers).forEach(buffer => {
-        buffer.dispose();
-      });
-
-      // 4. Limpieza de ventanas
-      this.windows.clear();
-
-      // 5. Limpieza de cache
-      this.resultCache = new WeakMap();
+      // 3. Limpieza de estado
+      this.state.lastSpectrum = null;
+      this.state.harmonicHistory = [];
+      this.state.phaseHistory = [];
+      this.state.qualityHistory = [];
+      this.state.adaptiveWindow = {
+        size: 512,
+        overlap: 256,
+        adaptation: 0.1
+      };
 
     } catch (error) {
       console.error('Error in dispose:', error);
