@@ -1,89 +1,110 @@
 import {
-  FilterConfig, FilterResponse, FilterBank,
-  AdaptiveFilter, FilterCoefficients, FilterState,
+  FilterConfig, FilterResponse, FilterState,
+  FilterDesign, FilterBank, FilterMetrics,
+  FilterQuality, AdaptiveFilter, FilterValidation,
   FrequencyResponse, PhaseResponse, ImpulseResponse,
-  FilterDesign, FilterOptimization, FilterMetrics,
-  FilterStability, FilterOrder
+  FilterOptimization
 } from '@/types';
 
 /**
- * Filtro avanzado de señales PPG
+ * Filtro avanzado para señales PPG
  * Implementa técnicas de última generación en filtrado digital
  * @version 2.0.0
  */
 export class SignalFilter {
   // Configuración optimizada
   private readonly config: FilterConfig = {
-    sampleRate: 30,         // Hz
-    filterOrder: 64,        // Orden del filtro
-    adaptiveRate: 0.15,     // Tasa de adaptación
-    convergence: 1e-6,      // Criterio de convergencia
+    sampleRate: 30,           // Hz
     
-    // Configuración de bandas
-    bands: {
-      stopband1: [0.0, 0.5],  // Hz
-      passband1: [0.5, 3.5],  // Banda cardíaca
-      stopband2: [3.5, 15.0], // Hz
-      ripple: 0.1,            // dB
-      attenuation: 60         // dB
-    },
-
-    // Configuración adaptativa
-    adaptive: {
-      algorithm: 'rls',      // RLS adaptativo
-      forgetting: 0.995,     // Factor de olvido
-      regularization: 1e-6,  // Regularización
-      stepSize: 0.1,         // Tamaño de paso
-      blockSize: 32          // Tamaño de bloque
-    },
-
-    // Configuración de diseño
+    // Diseño de filtros
     design: {
-      method: 'equiripple',  // Diseño óptimo
-      window: 'kaiser',      // Ventana Kaiser
-      beta: 6.0,            // Parámetro beta
-      transition: 0.5        // Banda de transición
+      types: [
+        'lowpass',           // Paso bajo
+        'bandpass',          // Paso banda
+        'highpass',          // Paso alto
+        'notch'              // Rechazo de banda
+      ],
+      orders: {
+        iir: 4,              // Orden IIR
+        fir: 64              // Orden FIR
+      },
+      windows: {
+        type: 'kaiser',      // Ventana Kaiser
+        beta: 4.0            // Parámetro beta
+      }
+    },
+
+    // Bandas de frecuencia
+    bands: {
+      cardiac: [0.5, 4.0],   // Banda cardíaca
+      respiratory: [0.1, 0.5],// Banda respiratoria
+      noise: [4.0, 15.0],    // Banda de ruido
+      mains: [49.0, 51.0]    // Ruido de red
+    },
+
+    // Filtrado adaptativo
+    adaptive: {
+      enabled: true,         // Habilitado
+      algorithm: 'rls',      // RLS
+      stepSize: 0.1,         // Tamaño de paso
+      forgetting: 0.99,      // Factor de olvido
+      order: 32             // Orden del filtro
+    },
+
+    // Banco de filtros
+    bank: {
+      enabled: true,         // Habilitado
+      levels: 4,             // Niveles
+      wavelet: 'db4',        // Wavelet
+      threshold: 'universal', // Umbral
+      reconstruction: 'soft'  // Reconstrucción
     },
 
     // Optimizaciones
     optimization: {
       vectorization: true,   // SIMD
       parallelization: true, // Multi-hilo
-      precision: 'double',   // Precisión doble
-      blockProcessing: true, // Procesamiento por bloques
-      cacheSize: 8192       // Tamaño de cache
+      precision: 'double',   // Precisión
+      blockSize: 256,        // Tamaño de bloque
+      overlap: 128          // Solapamiento
     }
   };
 
   // Procesadores especializados
   private readonly filterBank: FilterBank;
   private readonly adaptiveFilter: AdaptiveFilter;
+  private readonly filterValidator: FilterValidation;
   private readonly responseAnalyzer: FrequencyResponse;
-  private readonly stabilityAnalyzer: FilterStability;
 
   // Buffers optimizados
   private readonly buffers = {
-    input: new Float64Array(8192),
-    output: new Float64Array(8192),
-    coefficients: new Float64Array(256),
-    state: new Float64Array(256),
-    response: new Float64Array(4096),
-    workspace: new Float64Array(8192)
+    input: new Float64Array(1024),
+    output: new Float64Array(1024),
+    coefficients: new Float64Array(128),
+    state: new Float64Array(64),
+    response: new Float64Array(512)
   };
 
   // Estado del filtro
-  private readonly filterState: FilterState = {
-    coefficients: new Float64Array(this.config.filterOrder + 1),
-    delay: new Float64Array(this.config.filterOrder),
-    adaptation: {
-      weights: new Float64Array(this.config.filterOrder),
-      covariance: new Float64Array(this.config.filterOrder ** 2),
-      error: new Float64Array(this.config.adaptive.blockSize)
+  private readonly state: FilterState = {
+    lastResponse: null,
+    filterStates: new Map(),
+    adaptiveState: {
+      weights: new Float64Array(32),
+      error: new Float64Array(256),
+      adaptation: 0.1
+    },
+    bankState: {
+      coefficients: [] as Float64Array[],
+      details: [] as Float64Array[],
+      level: 0
+    },
+    quality: {
+      snr: 0,
+      distortion: 0,
+      stability: 1.0
     }
   };
-
-  // Cache de respuestas
-  private readonly responseCache = new Map<string, FilterResponse>();
 
   constructor() {
     this.initializeFilter();
@@ -91,37 +112,52 @@ export class SignalFilter {
 
   /**
    * Filtrado principal de señal
-   * Implementa pipeline completo de filtrado adaptativo
+   * Implementa pipeline completo de filtrado
    */
   public filter(signal: Float64Array): Float64Array {
     try {
-      // 1. Validación de señal
-      if (!this.validateSignal(signal)) {
-        throw new Error('Invalid signal for filtering');
+      // 1. Validación de entrada
+      if (!this.validateInput(signal)) {
+        throw new Error('Invalid input signal for filtering');
       }
 
       // 2. Pre-procesamiento
-      const prepared = this.prepareSignal(signal);
+      const preprocessed = this.preprocess(signal);
 
       // 3. Filtrado adaptativo
-      const filtered = this.adaptiveFiltering(prepared);
+      const adaptive = this.config.adaptive.enabled ?
+        this.applyAdaptiveFilter(preprocessed) :
+        preprocessed;
 
-      // 4. Filtrado por bandas
-      const bandFiltered = this.bandFiltering(filtered);
+      // 4. Banco de filtros
+      const decomposed = this.config.bank.enabled ?
+        this.applyFilterBank(adaptive) :
+        adaptive;
 
-      // 5. Post-procesamiento
-      const processed = this.postProcess(bandFiltered);
+      // 5. Filtrado final
+      const filtered = this.applyMainFilters(decomposed);
 
       // 6. Análisis de respuesta
-      const response = this.analyzeResponse(processed);
+      const response = this.analyzeResponse(filtered);
 
-      // 7. Validación de estabilidad
-      const stability = this.checkStability(response);
+      // 7. Validación de salida
+      const validated = this.validateOutput(filtered);
 
-      // 8. Actualización de estado
-      this.updateFilterState(processed, response, stability);
+      // 8. Cálculo de métricas
+      const metrics = this.calculateMetrics({
+        input: signal,
+        output: validated,
+        response
+      });
 
-      return processed;
+      // 9. Actualización de estado
+      this.updateState({
+        response,
+        metrics,
+        quality: this.calculateQuality(metrics)
+      });
+
+      return validated;
 
     } catch (error) {
       console.error('Error in signal filtering:', error);
@@ -130,267 +166,162 @@ export class SignalFilter {
   }
 
   /**
-   * Filtrado adaptativo avanzado
+   * Diseño de filtros
    */
-  private adaptiveFiltering(signal: Float64Array): Float64Array {
-    // 1. Inicialización de buffers
-    const output = new Float64Array(signal.length);
-    const { weights, covariance, error } = this.filterState.adaptation;
+  private designFilters(): FilterDesign {
+    const designs = new Map();
 
-    // 2. Procesamiento por bloques
-    for (let i = 0; i < signal.length; i += this.config.adaptive.blockSize) {
-      const blockEnd = Math.min(
-        i + this.config.adaptive.blockSize,
-        signal.length
-      );
-
-      // 2.1 Extracción de bloque
-      const block = signal.subarray(i, blockEnd);
-
-      // 2.2 Filtrado RLS
-      const filtered = this.rlsFilter(
-        block,
-        weights,
-        covariance,
-        this.config.adaptive.forgetting
-      );
-
-      // 2.3 Actualización de error
-      this.updateError(
-        block,
-        filtered,
-        error
-      );
-
-      // 2.4 Actualización de pesos
-      this.updateWeights(
-        weights,
-        covariance,
-        error,
-        this.config.adaptive.stepSize
-      );
-
-      // 2.5 Almacenamiento de resultados
-      output.set(filtered, i);
-    }
-
-    return output;
-  }
-
-  /**
-   * Filtrado por bandas optimizado
-   */
-  private bandFiltering(signal: Float64Array): Float64Array {
-    // 1. Diseño de filtros
-    const filters = this.designFilters();
-
-    // 2. Inicialización de salida
-    const output = new Float64Array(signal.length);
-
-    // 3. Aplicación de filtros en cascada
-    let current = signal;
-    for (const filter of filters) {
-      current = this.applyFilter(
-        current,
-        filter.coefficients,
-        filter.state
-      );
-    }
-
-    // 4. Compensación de fase
-    const compensated = this.compensatePhase(current);
-
-    output.set(compensated);
-    return output;
-  }
-
-  /**
-   * Diseño optimizado de filtros
-   */
-  private designFilters(): FilterDesign[] {
-    const designs: FilterDesign[] = [];
-
-    // 1. Filtro paso banda cardíaco
-    designs.push(this.designBandpassFilter(
-      this.config.bands.passband1[0],
-      this.config.bands.passband1[1]
+    // 1. Filtro paso bajo
+    designs.set('lowpass', this.designLowPass(
+      this.config.bands.cardiac[1]
     ));
 
-    // 2. Filtro notch para interferencia
-    designs.push(this.designNotchFilter(50)); // Hz
-
-    // 3. Filtro paso bajo anti-aliasing
-    designs.push(this.designLowpassFilter(
-      this.config.bands.stopband2[0]
+    // 2. Filtro paso banda
+    designs.set('bandpass', this.designBandPass(
+      this.config.bands.cardiac[0],
+      this.config.bands.cardiac[1]
     ));
 
-    return designs;
-  }
+    // 3. Filtro paso alto
+    designs.set('highpass', this.designHighPass(
+      this.config.bands.respiratory[0]
+    ));
 
-  /**
-   * Filtro RLS optimizado
-   */
-  private rlsFilter(
-    block: Float64Array,
-    weights: Float64Array,
-    covariance: Float64Array,
-    forgetting: number
-  ): Float64Array {
-    const output = new Float64Array(block.length);
-    const order = weights.length;
-
-    // 1. Pre-cálculo de factores
-    const lambda_inv = 1.0 / forgetting;
-    const reg = this.config.adaptive.regularization;
-
-    // 2. Procesamiento por muestra
-    for (let n = 0; n < block.length; n++) {
-      // 2.1 Vector de entrada
-      const x = this.getInputVector(block, n, order);
-
-      // 2.2 Predicción
-      output[n] = this.computeOutput(x, weights);
-
-      // 2.3 Actualización de ganancia
-      const gain = this.updateGain(
-        x,
-        covariance,
-        lambda_inv,
-        reg
-      );
-
-      // 2.4 Actualización de covarianza
-      this.updateCovariance(
-        covariance,
-        gain,
-        x,
-        lambda_inv
-      );
-
-      // 2.5 Actualización de pesos
-      const error = block[n] - output[n];
-      this.updateFilterWeights(
-        weights,
-        gain,
-        error
-      );
-    }
-
-    return output;
-  }
-
-  /**
-   * Análisis de respuesta del filtro
-   */
-  private analyzeResponse(signal: Float64Array): FilterResponse {
-    // 1. Respuesta en frecuencia
-    const frequency = this.computeFrequencyResponse();
-
-    // 2. Respuesta de fase
-    const phase = this.computePhaseResponse();
-
-    // 3. Respuesta al impulso
-    const impulse = this.computeImpulseResponse();
-
-    // 4. Métricas de respuesta
-    const metrics = this.computeResponseMetrics(
-      frequency,
-      phase,
-      impulse
-    );
+    // 4. Filtro notch
+    designs.set('notch', this.designNotch(
+      this.config.bands.mains[0],
+      this.config.bands.mains[1]
+    ));
 
     return {
-      frequency,
-      phase,
-      impulse,
-      metrics
+      filters: designs,
+      response: this.calculateFilterResponse(designs),
+      stability: this.checkFilterStability(designs)
     };
+  }
+
+  /**
+   * Filtrado adaptativo
+   */
+  private applyAdaptiveFilter(
+    signal: Float64Array
+  ): Float64Array {
+    const config = this.config.adaptive;
+    const state = this.state.adaptiveState;
+
+    // 1. Inicialización de buffer
+    const output = new Float64Array(signal.length);
+
+    // 2. Filtrado RLS
+    for (let i = 0; i < signal.length; i++) {
+      // Actualización de salida
+      output[i] = this.adaptiveStep(
+        signal[i],
+        state.weights,
+        config.stepSize,
+        config.forgetting
+      );
+
+      // Actualización de pesos
+      this.updateAdaptiveWeights(
+        signal[i],
+        output[i],
+        state
+      );
+    }
+
+    return output;
+  }
+
+  /**
+   * Banco de filtros
+   */
+  private applyFilterBank(
+    signal: Float64Array
+  ): Float64Array {
+    const config = this.config.bank;
+    const state = this.state.bankState;
+
+    // 1. Descomposición wavelet
+    const decomposition = this.decomposeSignal(
+      signal,
+      config.levels,
+      config.wavelet
+    );
+
+    // 2. Umbralización
+    const thresholded = this.thresholdCoefficients(
+      decomposition,
+      config.threshold
+    );
+
+    // 3. Reconstrucción
+    return this.reconstructSignal(
+      thresholded,
+      config.reconstruction
+    );
   }
 
   /**
    * Optimizaciones de bajo nivel
    */
-  private computeOutput(
-    x: Float64Array,
-    weights: Float64Array
+  private adaptiveStep(
+    input: number,
+    weights: Float64Array,
+    stepSize: number,
+    forgetting: number
   ): number {
-    let sum = 0;
-    // Multiplicación vectorizada
-    for (let i = 0; i < x.length; i += 4) {
-      sum += x[i] * weights[i] +
-             x[i + 1] * weights[i + 1] +
-             x[i + 2] * weights[i + 2] +
-             x[i + 3] * weights[i + 3];
-    }
-    return sum;
-  }
-
-  private updateGain(
-    x: Float64Array,
-    covariance: Float64Array,
-    lambda_inv: number,
-    reg: number
-  ): Float64Array {
-    const order = x.length;
-    const gain = new Float64Array(order);
-    const temp = new Float64Array(order);
-
-    // Multiplicación matriz-vector optimizada
-    for (let i = 0; i < order; i++) {
-      let sum = 0;
-      for (let j = 0; j < order; j++) {
-        sum += covariance[i * order + j] * x[j];
-      }
-      temp[i] = sum;
+    let output = 0;
+    
+    // 1. Cálculo de salida
+    for (let i = 0; i < weights.length; i++) {
+      output += weights[i] * input;
     }
 
-    const denominator = reg + this.vectorDot(x, temp);
-    const scale = lambda_inv / denominator;
+    // 2. Actualización de pesos
+    const error = input - output;
+    const norm = input * input + 1e-10;
 
-    // Escalado vectorizado
-    for (let i = 0; i < order; i++) {
-      gain[i] = temp[i] * scale;
+    for (let i = 0; i < weights.length; i++) {
+      weights[i] += stepSize * error * input / norm;
     }
 
-    return gain;
+    return output;
   }
 
   /**
-   * Gestión de estado y recursos
+   * Gestión de estado
    */
-  private updateFilterState(
-    signal: Float64Array,
-    response: FilterResponse,
-    stability: FilterStability
-  ): void {
-    // 1. Actualización de coeficientes
-    if (stability.isStable) {
-      this.filterState.coefficients = this.optimizeCoefficients(
-        this.filterState.coefficients,
-        response
-      );
-    }
+  private updateState(data: {
+    response: FilterResponse;
+    metrics: FilterMetrics;
+    quality: FilterQuality;
+  }): void {
+    // 1. Actualización de respuesta
+    this.state.lastResponse = data.response;
 
-    // 2. Actualización de estado de delay
-    this.updateDelayLine(signal);
+    // 2. Actualización de calidad
+    this.state.quality = data.quality;
 
-    // 3. Actualización de estado adaptativo
-    this.updateAdaptiveState(response);
+    // 3. Actualización de estados de filtro
+    this.updateFilterStates(data.metrics);
 
-    // 4. Limpieza de cache si necesario
-    if (this.responseCache.size > this.config.optimization.cacheSize) {
-      const oldestKey = this.responseCache.keys().next().value;
-      this.responseCache.delete(oldestKey);
+    // 4. Adaptación de parámetros
+    if (data.quality.stability > 0.8) {
+      this.adaptFilterParameters(data.metrics);
     }
   }
 
+  /**
+   * Gestión de recursos
+   */
   public dispose(): void {
     try {
       // 1. Limpieza de procesadores
       this.filterBank.dispose();
       this.adaptiveFilter.dispose();
+      this.filterValidator.dispose();
       this.responseAnalyzer.dispose();
-      this.stabilityAnalyzer.dispose();
 
       // 2. Limpieza de buffers
       Object.values(this.buffers).forEach(buffer => {
@@ -398,14 +329,23 @@ export class SignalFilter {
       });
 
       // 3. Limpieza de estado
-      this.filterState.coefficients.fill(0);
-      this.filterState.delay.fill(0);
-      this.filterState.adaptation.weights.fill(0);
-      this.filterState.adaptation.covariance.fill(0);
-      this.filterState.adaptation.error.fill(0);
-
-      // 4. Limpieza de cache
-      this.responseCache.clear();
+      this.state.lastResponse = null;
+      this.state.filterStates.clear();
+      this.state.adaptiveState = {
+        weights: new Float64Array(32),
+        error: new Float64Array(256),
+        adaptation: 0.1
+      };
+      this.state.bankState = {
+        coefficients: [],
+        details: [],
+        level: 0
+      };
+      this.state.quality = {
+        snr: 0,
+        distortion: 0,
+        stability: 1.0
+      };
 
     } catch (error) {
       console.error('Error in dispose:', error);
