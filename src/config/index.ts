@@ -1,10 +1,10 @@
 
-import { SignalQualityLevel } from '@/types/quality';
+import { SignalQualityLevel } from '../types/quality';
 import { 
   ProcessingConfig, 
   SensitivitySettings,
   CalibrationState
-} from '@/types/config';
+} from '../types/config';
 
 const defaultSensitivity: SensitivitySettings = {
   brightness: 1.0,

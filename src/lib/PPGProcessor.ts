@@ -1,12 +1,13 @@
+
 import { 
   PPGData, 
   PPGProcessingConfig,
   ProcessingState,
   SignalQuality,
-  SignalQualityLevel,
   NoiseAnalysis,
   MotionAnalysis
 } from '@/types';
+import { SignalQualityLevel } from '@/types/quality';
 import { config } from '../config';
 
 export class PPGProcessor {
