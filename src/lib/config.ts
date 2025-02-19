@@ -1,17 +1,20 @@
-import { SensitivitySettings, CalibrationState } from '@/types';
 
-const defaultSensitivity: SensitivitySettings = {
+import { SensitivitySettings, CalibrationState } from '../types/calibration';
+import { ProcessingMode } from '../types/common';
+import { Float64Array } from '@tensorflow/tfjs';
+
+export const defaultSensitivitySettings: SensitivitySettings = {
   brightness: 1.0,
   redIntensity: 1.0,
   signalAmplification: 1.0,
-  noiseReduction: 1.0,
-  peakDetection: 1.0,
-  heartbeatThreshold: 1.0,
-  responseTime: 1.0,
-  signalStability: 1.0
+  noiseReduction: 0.5,
+  peakDetection: 0.7,
+  heartbeatThreshold: 0.3,
+  responseTime: 0.2,
+  signalStability: 0.8,
+  snr: 10
 };
 
-// Default calibration state
 export const defaultCalibrationState: CalibrationState = {
   isCalibrating: false,
   progress: 0,
@@ -19,31 +22,17 @@ export const defaultCalibrationState: CalibrationState = {
   isCalibrated: false,
   calibrationTime: 0,
   referenceValues: new Float64Array(),
-  calibrationQuality: 0
+  calibrationQuality: 0,
+  enabled: true,
+  duration: 5000,
+  reference: new Float64Array(),
+  lastCalibration: Date.now()
 };
 
-export const config = {
-  processing: {
-    mode: 'normal' as const,
-    sampleRate: 30,
-    sensitivity: defaultSensitivity,
-    calibration: defaultCalibrationState,
-  },
-  camera: {
-    constraints: {
-      video: {
-        facingMode: 'user',
-        width: { ideal: 640 },
-        height: { ideal: 480 }
-      }
-    },
-    settings: {
-      width: 640,
-      height: 480,
-      frameRate: 30,
-      facingMode: 'user' as const
-    }
-  },
-  sensitivity: defaultSensitivity,
+export const defaultConfig = {
+  mode: 'normal' as ProcessingMode,
+  sampleRate: 30,
+  bufferSize: 256,
+  sensitivity: defaultSensitivitySettings,
   calibration: defaultCalibrationState
 };

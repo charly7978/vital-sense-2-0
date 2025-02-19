@@ -31,6 +31,13 @@ export interface PPGProcessingConfig {
     highCut: number;
     order: number;
   };
+  filterOrder?: number;
+  lowCutoff?: number;
+  highCutoff?: number;
+  peakThreshold?: number;
+  minPeakDistance?: number;
+  calibrationDuration?: number;
+  adaptiveThreshold?: boolean;
   calibration: CalibrationState;
 }
 

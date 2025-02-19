@@ -1,6 +1,7 @@
 
 import { Float64Type } from './common';
 import { Metadata, ValidationResult } from './core';
+import { SignalQuality } from './quality';
 
 export interface SignalSegment {
   data: Float64Type;
@@ -26,11 +27,14 @@ export interface SignalValidation extends ValidationResult {
   stability: number;
   artifacts: number;
   coverage: number;
+  quality?: SignalQuality;
 }
 
 export interface SignalFeatures {
   temporal: Float64Type;
   spectral: Float64Type;
   statistical: Float64Type;
+  morphological?: Float64Type;
+  wavelet?: Float64Type;
   quality: number;
 }

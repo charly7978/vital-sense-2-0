@@ -1,4 +1,3 @@
-
 import { Float64Type } from './common';
 import { SignalQuality } from './quality';
 import { ValidationResult } from './core';
@@ -234,4 +233,40 @@ export interface OptimizedDWT {
     high: Float64Type;
   };
   mode: 'periodic' | 'symmetric';
+}
+
+export interface BeatState {
+  lastBeat: BeatDetection | null;
+  beatHistory: BeatDetection[];
+  templateHistory: Float64Array[];
+  qualityHistory: number[];
+  threshold: {
+    value: number;
+    history: number[];
+    adaptation: number;
+  };
+}
+
+export interface ProcessorState {
+  isProcessing: boolean;
+  frameCount: number;
+  buffer: Float64Array;
+  timeBuffer: Float64Array;
+  lastTimestamp: number;
+  sampleRate: number;
+  calibration: CalibrationState;
+  quality: SignalQuality;
+  optimization: {
+    cache: Map<string, any>;
+    performance: Map<string, number>;
+    resources: Map<string, any>;
+  };
+}
+
+export interface AnalyzerBase {
+  initialize(): void;
+  dispose(): void;
+  validateInput(input: Float64Array): boolean;
+  handleError(error: Error): void;
+  updateState(state: any): void;
 }

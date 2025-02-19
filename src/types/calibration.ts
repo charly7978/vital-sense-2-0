@@ -67,5 +67,14 @@ export interface SensitivitySettings {
   brightness: number;
   redIntensity: number;
   signalAmplification: number;
+  noiseReduction: number;
+  peakDetection: number;
+  heartbeatThreshold: number;
+  responseTime: number;
+  signalStability: number;
   snr?: number;
+}
+
+export interface CalibrationInterface extends CalibrationState {
+  dispose(): void;
 }
