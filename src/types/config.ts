@@ -1,24 +1,20 @@
 
-export interface SystemConfig {
-  processing: ProcessingConfig;
-  camera: CameraConfig;
-  sensitivity: SensitivitySettings;
-  calibration: CalibrationState;
-  sampling?: {
-    rate: number;
-    interval: number;
+import { SystemConfig } from './vitals';
+import { websocketConfig } from '@/config/websocket';
+
+export interface WebSocketConfig {
+  websocket: {
+    url: string;
+    options: {
+      reconnectAttempts: number;
+      reconnectInterval: number;
+      timeout: number;
+    };
   };
 }
 
-export interface SensitivitySettings {
-  brightness: number;
-  redIntensity: number;
-  signalAmplification: number;
-  noiseReduction: number;
-  peakDetection: number;
-  heartbeatThreshold: number;
-  responseTime: number;
-  signalStability: number;
-  filterStrength?: number;
-  adaptiveThreshold?: number;
-}
+export type AppConfig = SystemConfig & {
+  websocket: WebSocketConfig;
+};
+
+export { websocketConfig };
