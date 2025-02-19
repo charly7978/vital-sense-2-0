@@ -30,3 +30,14 @@ export interface SpectralContent {
   harmonics: number[];
   snr: number;
 }
+
+export interface FrequencyConfig {
+  samplingRate: number;
+  method: string;
+  window: string;
+  segments: number;
+  overlap: number;
+  averaging: string;
+  nfft?: number;
+}
+

@@ -10,7 +10,7 @@ export interface SensitivitySettings {
   noiseReduction: number;
   peakDetection: number;
   heartbeatThreshold: number;
-  responseTime: number;
+  responseTime: number;  
   signalStability: number;
   snr?: number;
 }

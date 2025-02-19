@@ -1,11 +1,12 @@
+
 import { Float64Type } from './common';
 import { SignalQuality } from './quality';
 import { ValidationResult } from './core';
 
 export interface ArtifactConfig {
-  enabled: boolean;
-  threshold: number;
-  window: number;
+  sampleRate: number;
+  windowSize: number;  
+  overlapSize: number;
   motion: {
     enabled: boolean;
     threshold: number;
@@ -18,12 +19,6 @@ export interface ArtifactConfig {
     methods: string[];
     thresholds: Record<string, number>;
   };
-  wavelet: {
-    type: string;
-    levels: number;
-    threshold: string;
-    denoising: string;
-  };
   spectral: {
     enabled: boolean;
     method: string;
@@ -31,17 +26,6 @@ export interface ArtifactConfig {
     segments: number;
     overlap: number;
     bands: number[][];
-  };
-  classification: {
-    method: string;
-    models: string[];
-    weights: Record<string, number>;
-  };
-  validation: {
-    minQuality: number;
-    maxArtifacts: number;
-    consistency: number;
-    physiological: boolean;
   };
 }
 
@@ -75,6 +59,7 @@ export interface MotionAnalysis {
   jerk?: Float64Type;
   displacement?: Float64Type;
   energy?: Float64Type;
+  dispose(): void;
 }
 
 export interface NoiseAnalysis {
@@ -116,6 +101,7 @@ export interface TemplateMatching {
   template?: Float64Type;
   correlation?: Float64Type;
   distance?: number;
+  dispose(): void;
 }
 
 export interface ArtifactValidation extends ValidationResult {
@@ -125,6 +111,7 @@ export interface ArtifactValidation extends ValidationResult {
   wavelet?: boolean;
   template?: boolean;
   physiological?: boolean;
+  dispose(): void;
 }
 
 export interface ArtifactClassification {

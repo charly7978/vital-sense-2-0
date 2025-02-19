@@ -2,8 +2,7 @@ import {
   ArtifactConfig, ArtifactDetection, ArtifactFeatures,
   SignalQuality, MotionAnalysis, NoiseAnalysis,
   ArtifactClassification, SignalSegmentation, ArtifactMetrics,
-  TemplateMatching, WaveletAnalysis, SpectralAnalysis,
-  ArtifactValidation
+  TemplateMatching, ArtifactValidation
 } from '@/types';
 
 /**
@@ -20,6 +19,7 @@ export class ArtifactDetector {
     
     // Análisis de movimiento
     motion: {
+      enabled: true,          // Enable motion analysis
       threshold: 0.3,         // Umbral de movimiento
       window: 64,             // Ventana de análisis
       features: [
@@ -33,6 +33,7 @@ export class ArtifactDetector {
 
     // Análisis de ruido
     noise: {
+      enabled: true,         // Enable noise analysis
       methods: [
         'snr',               // Relación señal-ruido
         'entropy',           // Entropía
@@ -57,6 +58,7 @@ export class ArtifactDetector {
 
     // Análisis espectral
     spectral: {
+      enabled: true,         // Enable spectral analysis
       method: 'welch',       // Método de Welch
       window: 'hanning',     // Ventana Hanning
       segments: 8,           // Segmentos

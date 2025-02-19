@@ -31,6 +31,7 @@ export type {
   CalibrationState,
   CalibrationEntry,
   CalibratedResult,
+  CalibrationConfig,
   CalibrationInterface
 } from './calibration';
 
@@ -62,67 +63,34 @@ export type {
   SignalConditions,
 } from './vitals';
 
-// Artifact types
-export type {
-  ArtifactConfig,
-  ArtifactDetection,
-  ArtifactFeatures,
-  MotionAnalysis,
-  NoiseAnalysis,
-  SignalSegmentation,
-  ArtifactMetrics,
-  TemplateMatching,
-  ArtifactValidation,
-  ArtifactClassification
-} from './artifacts';
-
 // Analysis types
 export type {
-  FrequencyBands,
-  FrequencyConfig,
-  SpectralFeatures,
   SpectralAnalysis,
-  HarmonicAnalysis,
-  FrequencyMetrics,
-  SpectralQuality,
-  BandPower,
-  PhaseAnalysis,
-  WaveletAnalysis,
-  WaveletTransform,
-  WaveletCoefficients
-} from './analysis';
+  FrequencyResponse,
+  PowerSpectrum,
+  SpectralDensity, 
+  SpectralContent
+} from './spectral';
 
-// Analyzer types
+// Base analyzer types
 export type {
   BaseAnalyzer,
-  BeatDetection, 
-  BeatFeatures,
-  BeatMorphology,
-  BeatQuality,
-  BeatValidation,
-  BeatMetrics,
-  IntervalAnalysis,
-  BeatClassification,
-  BeatSegmentation,
-  AdaptiveThreshold,
-  PeakEnhancement,
   ProcessorOptimization,
   SignalCalibration,
   ProcessingQuality,
-  BPConfig,
-  BPEstimation,
-  FrequencyResponse,
-  PowerSpectrum,
-  SpectralDensity,
-  MotionConfig, 
-  CompensationMode,
-  StabilizationMatrix,
-  WaveletBasis,
-  WaveletPacket,
-  ScaleSpace,
-  SubbandFeatures,
-  OptimizedDWT
+  WaveletCoefficients,
+  WaveletBasis
 } from './analyzers';
+
+// Beat detection types
+export type {
+  BeatConfig,
+  BeatDetection,
+  BeatFeatures,
+  BeatQuality,
+  BeatMetrics
+} from './beat';
 
 // Constants
 export { SignalQualityLevel } from './quality';
+
