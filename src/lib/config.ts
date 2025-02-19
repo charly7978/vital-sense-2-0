@@ -1,53 +1,47 @@
 
-import { SystemConfig, SensitivitySettings, CalibrationState } from '@/types';
+import { SensitivitySettings, CalibrationState } from '@/types';
 
-// Configuración del sistema
-export const config: SystemConfig = {
+const defaultSensitivity: SensitivitySettings = {
+  brightness: 1.0,
+  redIntensity: 1.0,
+  signalAmplification: 1.0,
+  noiseReduction: 1.0,
+  peakDetection: 1.0,
+  heartbeatThreshold: 1.0,
+  responseTime: 1.0,
+  signalStability: 1.0
+};
+
+const defaultCalibration: CalibrationState = {
+  isCalibrating: false,
+  progress: 0,
+  message: '',
+  isCalibrated: false,
+  calibrationTime: 0
+};
+
+export const config = {
   processing: {
-    mode: 'normal',
+    mode: 'normal' as const,
+    sampleRate: 30,
     sensitivity: defaultSensitivity,
-    calibration: defaultCalibration
+    calibration: defaultCalibration,
   },
   camera: {
     constraints: {
       video: {
+        facingMode: 'user',
         width: { ideal: 640 },
-        height: { ideal: 480 },
-        frameRate: { ideal: 30 },
-        facingMode: { ideal: 'user' }
+        height: { ideal: 480 }
       }
     },
     settings: {
       width: 640,
       height: 480,
-      frameRate: 30,  
-      facingMode: 'user'
+      frameRate: 30,
+      facingMode: 'user' as const
     }
   },
   sensitivity: defaultSensitivity,
-  calibration: defaultCalibration,
-  sampling: {
-    rate: 30,
-    interval: 33
-  }
-};
-
-export const defaultSensitivity: SensitivitySettings = {
-  brightness: 1.0,
-  redIntensity: 1.0,
-  signalAmplification: 1.0,
-  noiseReduction: 0.5,
-  peakDetection: 0.7,
-  heartbeatThreshold: 0.5,
-  responseTime: 1.0,
-  signalStability: 0.8,
-  filterStrength: 0.5,
-  adaptiveThreshold: 0.3
-};
-
-export const defaultCalibration: CalibrationState = {
-  isCalibrating: false,
-  progress: 0,
-  message: '',
-  duration: 5000
+  calibration: defaultCalibration
 };

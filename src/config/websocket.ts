@@ -9,12 +9,10 @@ interface WebSocketConfig {
 }
 
 export const websocketConfig: WebSocketConfig = {
-  websocket: {
-    url: process.env.VITE_WEBSOCKET_URL || 'ws://localhost:8080',
-    options: {
-      reconnectAttempts: 5,
-      reconnectInterval: 3000,
-      timeout: 5000
-    }
+  url: process.env.VITE_WEBSOCKET_URL || 'ws://localhost:8080',
+  options: {
+    reconnectAttempts: 5,
+    reconnectInterval: 3000,
+    timeout: 5000
   }
 };
