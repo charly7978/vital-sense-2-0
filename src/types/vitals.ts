@@ -3,7 +3,7 @@ import { SignalQuality } from './quality';
 import { Float64Type } from './common';
 
 export interface VitalReading {
-  [key: string]: any;  // Add index signature
+  [key: string]: any;
   value: number;
   timestamp: number;
   confidence: number;
@@ -36,6 +36,7 @@ export interface PPGProcessingConfig {
   minPeakDistance?: number;
   adaptiveThreshold?: boolean;
   calibrationDuration?: number;
+  filterCoefficients?: Float64Type;
   calibration?: {
     enabled: boolean;
     duration: number;
@@ -44,7 +45,7 @@ export interface PPGProcessingConfig {
 }
 
 export interface SensitivitySettings {
-  [key: string]: any;  // Add index signature
+  [key: string]: any;
   brightness: number;
   redIntensity: number;
   signalAmplification: number;
@@ -55,29 +56,7 @@ export interface SensitivitySettings {
   signalStability?: number;
 }
 
-export interface ProcessingState {
-  isProcessing: boolean;
-  frameCount: number;
-  buffer: Float64Type;
-  timeBuffer: Float64Type;
-  lastTimestamp: number;
-  sampleRate: number;
-  calibration: {
-    isCalibrating: boolean;
-    progress: number;
-    message: string;
-    isCalibrated: boolean;
-    calibrationTime: number;
-    referenceValues: Float64Type;
-    calibrationQuality: number;
-  };
-  quality: SignalQuality;
-  optimization: {
-    cache: Map<string, any>;
-    performance: Map<string, number>;
-    resources: Map<string, any>;
-  };
-}
+export type MeasurementType = 'ppg' | 'bp' | 'spo2' | 'resp';
 
 export interface SignalConditions {
   noiseLevel: number;
@@ -90,10 +69,9 @@ export interface SignalConditions {
   coverage: number;
   temperature: number;
   stability: number;
-  measurementType: string;
+  measurementType: MeasurementType;
 }
 
-// Add new types for PPG analysis
 export interface VitalSigns {
   bpm: number;
   spo2?: number;

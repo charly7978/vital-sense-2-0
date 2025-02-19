@@ -8,7 +8,6 @@ export interface ArtifactConfig {
     enabled: boolean;
     threshold: number;
     window: number;
-    features: string[];
   };
   spectral: {
     enabled: boolean;
@@ -44,37 +43,13 @@ export interface ArtifactConfig {
   };
 }
 
-export interface ArtifactClassification {
-  type: string;
-  confidence: number;
-  features: ArtifactFeatures;
-}
-
-export interface SignalSegmentation {
-  segments: Float64Type[];
-  indices: number[];
-}
-
-export interface ArtifactMetrics {
-  temporal: number;
-  spectral: number;
-  statistical: number;
-  overall: number;
-}
-
-export interface ArtifactDetection extends Disposable {
-  isArtifact: boolean;
-  type: string;
-  confidence: number;
-  features: ArtifactFeatures;
-  quality: SignalQuality;
-  metrics?: ArtifactMetrics;
-}
-
-export interface ArtifactFeatures {
-  temporal: Float64Type;
-  spectral: Float64Type;
-  statistical: Float64Type;
+export interface NoiseAnalysis extends Disposable {
+  snr: number;
+  distribution: Float64Type;
+  spectrum: Float64Type; 
+  entropy: number;
+  kurtosis: number;
+  variance: number;
 }
 
 export interface MotionAnalysis extends Disposable {
@@ -85,18 +60,16 @@ export interface MotionAnalysis extends Disposable {
   quality: number;
 }
 
-export interface NoiseAnalysis extends Disposable {
-  snr: number;
-  distribution: Float64Type;
-  spectrum: Float64Type;
-  entropy: number;
-  kurtosis: number;
-  variance: number;
+export interface ArtifactFeatures {
+  temporal: Float64Type;
+  spectral: Float64Type;
+  statistical: Float64Type;
 }
 
-export interface ArtifactValidation extends Disposable {
-  isValid: boolean;
+export interface ArtifactDetection extends Disposable {
+  isArtifact: boolean;
+  type: string;
   confidence: number;
-  metrics: ArtifactMetrics;
+  features: ArtifactFeatures;
+  quality: SignalQuality;
 }
-
