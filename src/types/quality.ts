@@ -32,3 +32,23 @@ export interface QualityMetrics {
   overall: number;
   confidence: number;
 }
+
+export interface QualityConfig {
+  thresholds: {
+    snr: number;
+    artifacts: number;
+    stability: number;
+  };
+  weights: {
+    noise: number;
+    frequency: number;
+    amplitude: number;
+  };
+}
+
+export interface SignalStability {
+  temporal: number;
+  spectral: number;
+  phase: number;
+  overall: number;
+}

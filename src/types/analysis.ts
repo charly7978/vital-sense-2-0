@@ -3,55 +3,56 @@ import { Float64Type } from './common';
 import { SignalQuality } from './quality';
 import { Disposable } from './common';
 
-export interface IntervalAnalysis extends Disposable {
-  intervals: Float64Type;
-  mean: number;
-  std: number;
-  variability: number;
-}
-
-export interface SpectralAnalysis extends Disposable {
+export interface SpectralFeatures {
   frequencies: Float64Type;
-  amplitudes: Float64Type;
+  magnitudes: Float64Type;
   phases: Float64Type;
   power: Float64Type;
-  spectrum: Float64Type;
 }
 
-export interface FrequencyAnalysis extends SpectralAnalysis {
+export interface FrequencyResponse {
+  magnitude: Float64Type;
+  phase: Float64Type;
+  frequencies: Float64Type;
+}
+
+export interface PowerSpectrum {
+  power: Float64Type;
+  frequencies: Float64Type;
+}
+
+export interface SpectralDensity {
+  density: Float64Type;
+  frequencies: Float64Type;
+}
+
+export interface HarmonicAnalysis {
   fundamental: number;
-  harmonics: number[];
+  harmonics: Float64Type[];
+  ratios: Float64Type;
+  phases: Float64Type;
+}
+
+export interface FrequencyMetrics {
+  snr: number;
   bandwidth: number;
+  centralFreq: number;
+  harmonicRatio: number;
 }
 
-export interface PhaseAnalysis extends Disposable {
-  unwrapped: Float64Type;
-  instantaneous: Float64Type;
-  group: Float64Type;
+export interface SpectralQuality extends SignalQuality {
   coherence: number;
+  stationarity: number;
+  harmonicity: number;
 }
 
-export interface FrequencyBands {
-  vlf: [number, number];
-  lf: [number, number];
-  hf: [number, number];
-  total: [number, number];
-  cardiac: [number, number];
+export interface BandPower {
+  total: number;
+  bands: { [key: string]: number };
+  ratios: { [key: string]: number };
 }
 
-export type ComplexArray = {
-  real: Float64Array;
-  imag: Float64Array;
-}
-
-export interface WaveformQuality extends SignalQuality {
-  overall: number;
-  morphology: number;
-  frequency: number;
-  stability: number;
-}
-
-// Re-export wavelet types to avoid ambiguity
+// Re-export for convenience while maintaining proper isolation
 export type {
   WaveletCoefficients,
   WaveletTransform,
@@ -62,4 +63,3 @@ export type {
   OptimizedDWT,
   WaveletAnalysis
 } from './wavelet';
-

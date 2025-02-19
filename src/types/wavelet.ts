@@ -5,6 +5,8 @@ export interface WaveletCoefficients {
   approximation: Float64Type;
   details: Float64Type[];
   level: number;
+  space?: Float64Type[][];
+  bases?: WaveletBasis[];
 }
 
 export interface WaveletTransform {
@@ -19,6 +21,7 @@ export interface WaveletBasis {
   filter: Float64Type;
   scaling: Float64Type;
   scale?: number;
+  translation?: Float64Type;
 }
 
 export interface WaveletPacket {
@@ -48,5 +51,5 @@ export interface WaveletAnalysis {
   coefficients: WaveletCoefficients;
   features: SubbandFeatures;
   quality: number;
-  levels?: number[];
+  levels: number[];
 }

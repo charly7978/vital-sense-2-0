@@ -1,15 +1,26 @@
 
-import { Float64Type } from './common';
 import { SignalQuality } from './quality';
+import { Float64Type } from './common';
 
 export interface ProcessorConfig {
+  mode: 'normal' | 'calibration' | 'debug';
   sampleRate: number;
-  bufferSize: number;
-  windowSize: number;
+  precision: 'single' | 'double';
   optimization: {
-    vectorized: boolean;
-    parallel: boolean;
-    precision: 'single' | 'double';
+    vectorization: boolean;
+    parallelization: boolean;
+    cacheSize: number;
+    adaptiveWindow: boolean;
+  };
+  filter: {
+    enabled: boolean;
+    lowCut: number;
+    highCut: number;
+    order: number;
+  };
+  validation: {
+    minQuality: number;
+    maxArtifacts: number;
   };
 }
 
@@ -20,52 +31,44 @@ export interface SignalAnalysis {
 }
 
 export interface ProcessingPipeline {
-  stages: string[];
-  config: Record<string, any>;
-  callbacks: Record<string, Function>;
+  input: Float64Type;
+  filtered: Float64Type;
+  quality: SignalQuality;
+  features: SignalFeatures;
+  metrics: ProcessingMetrics;
 }
-
-export interface SignalValidation {
-  isValid: boolean;
-  confidence: number;
-  metrics: ValidationMetrics;
-}
-
-export interface ProcessingMetrics {
-  latency: number;
-  throughput: number;
-  quality: number;
-}
-
-export type AnalysisMode = 'realtime' | 'batch' | 'streaming';
 
 export interface SignalFeatures {
   temporal: Float64Type;
   spectral: Float64Type;
-  statistical: Float64Type; 
+  statistical: Float64Type;
 }
 
-export interface ProcessingQuality {
-  signal: number;
-  processing: number;
-  overall: number;
-}
-
-export interface SignalCalibration {
-  isCalibrated: boolean;
-  referenceValues: Float64Type;
-  calibrationTime: number;
+export interface ProcessingQuality extends SignalQuality {
+  snr: number;
+  stability: number;
+  complexity: number;
 }
 
 export interface ProcessorOptimization {
-  cacheEnabled: boolean;
-  vectorizationEnabled: boolean;
-  parallelizationEnabled: boolean;
+  cacheHits: number;
+  cacheMisses: number;
+  processingTime: number;
+  memoryUsage: number;
 }
 
-export interface ValidationMetrics {
-  accuracy: number;
-  precision: number;
-  recall: number;
+export interface ProcessingMetrics {
+  duration: number;
+  quality: number;
+  confidence: number;
+  optimization: ProcessorOptimization;
 }
 
+export interface SignalValidation {
+  isValid: boolean;
+  quality: SignalQuality;
+  confidence: number;
+  errors?: string[];
+}
+
+export type AnalysisMode = 'real-time' | 'batch' | 'streaming';
