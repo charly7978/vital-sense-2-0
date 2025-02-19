@@ -41,14 +41,11 @@ export function createZeroFloat64Array(length: number): Float64Array {
  * @param input Input array-like object
  * @returns Float64Array
  */
-export function safeFloat64Array(input: ArrayLike<number> | number[]): Float64Array {
+export function safeFloat64Array(input: ArrayLike<number>): Float64Array {
   if (input instanceof Float64Array) {
     return input;
   }
-  if (ArrayBuffer.isView(input)) {
-    return new Float64Array(input as TypedArray);
-  }
-  return new Float64Array(input as number[]);
+  return new Float64Array(input);
 }
 
 /**
