@@ -1,325 +1,336 @@
-import {
-  WaveletConfig, WaveletType, WaveletFeatures,
-  FrequencyBand, SpectralAnalysis, WaveletCoefficients,
-  DecompositionLevel, QualityMetrics, AnalysisResult
-} from '@/types';
+[continuación del WaveletAnalyzer.ts...]
 
-/**
- * Analizador Wavelet avanzado para señales PPG
- * Implementa análisis multi-resolución y detección de características
- * @version 2.0.0
- */
-export class WaveletAnalyzer {
-  // Configuración del analizador
-  private readonly config: WaveletConfig = {
-    waveletType: 'db4',           // Daubechies 4
-    maxLevel: 8,                  // Niveles de descomposición
-    threshold: 0.1,               // Umbral de coeficientes
-    useAdaptiveThreshold: true,   // Umbral adaptativo
-    windowSize: 256,              // Tamaño de ventana
-    overlapSize: 128,            // Solapamiento
-    samplingRate: 30             // Frecuencia de muestreo
-  };
+  // Procesadores optimizados
+  private readonly dwt: OptimizedDWT;
+  private readonly waveletBases: Map<string, WaveletBasis>;
+  private readonly packetTree: WaveletPacket;
 
-  // Coeficientes wavelet pre-calculados
-  private readonly coefficients = {
-    lowPass: new Float32Array(8),
-    highPass: new Float32Array(8),
-    reconstruction: new Float32Array(8)
-  };
-
-  // Buffers optimizados
+  // Buffers optimizados pre-allocados
   private readonly buffers = {
-    input: new Float32Array(1024),
-    coeffs: new Float32Array(1024),
-    temp: new Float32Array(1024),
-    output: new Float32Array(1024)
+    coefficients: new Float64Array(2048),
+    reconstructed: new Float64Array(2048),
+    details: new Float64Array(2048),
+    approximations: new Float64Array(2048),
+    packets: new Float64Array(2048),
+    features: new Float64Array(256),
+    energies: new Float64Array(128),
+    thresholds: new Float64Array(8)
   };
 
-  // Estado del análisis
-  private state = {
-    lastDecomposition: null as WaveletCoefficients | null,
-    energyDistribution: new Float32Array(8),
-    noiseLevel: 0,
-    signalQuality: 1,
-    frameCount: 0
-  };
+  // Cache de análisis
+  private readonly coefficientCache = new WeakMap<Float64Array, WaveletCoefficients>();
+  private readonly featureCache = new WeakMap<WaveletCoefficients, SubbandFeatures>();
 
-  constructor(config?: Partial<WaveletConfig>) {
-    this.initialize(config);
+  constructor() {
+    this.initializeAnalyzer();
+    this.precomputeBases();
+    this.optimizeMemoryLayout();
   }
 
   /**
    * Análisis wavelet principal
+   * Implementa pipeline completo de análisis multi-resolución
    */
-  public analyze(signal: number[]): AnalysisResult {
+  public analyze(signal: Float64Array): WaveletTransform {
     try {
-      // 1. Preparación de señal
-      const prepared = this.prepareSignal(signal);
+      // 1. Validación y preparación
+      if (!this.validateSignal(signal)) {
+        throw new Error('Invalid signal for wavelet analysis');
+      }
 
-      // 2. Descomposición wavelet
-      const decomposition = this.decompose(prepared);
+      // 2. Cache check
+      const cached = this.checkCache(signal);
+      if (cached) return cached;
 
-      // 3. Análisis de coeficientes
-      const features = this.extractFeatures(decomposition);
+      // 3. Descomposición wavelet
+      const coefficients = this.decompose(signal);
 
-      // 4. Análisis de calidad
-      const quality = this.assessQuality(features);
+      // 4. Análisis de sub-bandas
+      const subbands = this.analyzeSubbands(coefficients);
 
-      // 5. Detección de características
-      const characteristics = this.detectCharacteristics(decomposition);
+      // 5. Análisis de paquetes wavelet
+      const packets = this.analyzeWaveletPackets(signal);
 
-      // 6. Análisis espectral
-      const spectral = this.analyzeSpectrum(decomposition);
+      // 6. Extracción de características
+      const features = this.extractWaveletFeatures(coefficients, packets);
 
-      // 7. Actualización de estado
-      this.updateState(decomposition, features);
+      // 7. Denoising adaptativo
+      const denoised = this.adaptiveDenoising(coefficients);
 
-      return {
-        decomposition,
+      // 8. Análisis de escala
+      const scaleSpace = this.computeScaleSpace(coefficients);
+
+      // 9. Reconstrucción optimizada
+      const reconstructed = this.reconstruct(denoised);
+
+      // 10. Resultados finales
+      const result = {
+        coefficients,
+        subbands,
+        packets,
         features,
-        quality,
-        characteristics,
-        spectral
+        denoised,
+        scaleSpace,
+        reconstructed
       };
 
+      // 11. Cache update
+      this.updateCache(signal, result);
+
+      return result;
+
     } catch (error) {
-      console.error('Error en análisis wavelet:', error);
-      return this.createEmptyResult();
+      console.error('Error in wavelet analysis:', error);
+      return this.handleAnalysisError(error);
     }
   }
 
   /**
-   * Descomposición wavelet multi-nivel
+   * Descomposición wavelet optimizada
    */
-  private decompose(signal: number[]): WaveletCoefficients {
-    const coeffs: WaveletCoefficients = {
-      approximation: [],
-      details: []
+  private decompose(signal: Float64Array): WaveletCoefficients {
+    // 1. Extensión de señal
+    const extended = this.extendSignal(signal);
+
+    // 2. Inicialización de coeficientes
+    const coefficients = {
+      approximation: new Float64Array(extended.length),
+      details: new Array(this.config.maxLevel)
+        .fill(null)
+        .map(() => new Float64Array(extended.length))
     };
 
-    let currentSignal = [...signal];
-
+    // 3. Descomposición multinivel
+    let currentSignal = extended;
     for (let level = 1; level <= this.config.maxLevel; level++) {
-      // Descomposición de un nivel
-      const levelDecomp = this.decomposeLevel(currentSignal);
+      // 3.1 Descomposición por nivel
+      const { approximation, detail } = this.decomposeLevel(
+        currentSignal,
+        level
+      );
 
-      // Almacenar coeficientes de detalle
-      coeffs.details.push(levelDecomp.details);
-
-      // Preparar para siguiente nivel
-      currentSignal = levelDecomp.approximation;
-
-      // Verificar si continuar
-      if (currentSignal.length < this.coefficients.lowPass.length) {
-        break;
-      }
-    }
-
-    coeffs.approximation = currentSignal;
-    return coeffs;
-  }
-
-  /**
-   * Descomposición de un nivel
-   */
-  private decomposeLevel(signal: number[]): DecompositionLevel {
-    const len = signal.length;
-    const halfLen = Math.floor(len / 2);
-    
-    const approximation = new Float32Array(halfLen);
-    const details = new Float32Array(halfLen);
-
-    for (let i = 0; i < halfLen; i++) {
-      let sumLow = 0;
-      let sumHigh = 0;
-
-      for (let j = 0; j < this.coefficients.lowPass.length; j++) {
-        const idx = 2 * i + j;
-        if (idx < len) {
-          sumLow += signal[idx] * this.coefficients.lowPass[j];
-          sumHigh += signal[idx] * this.coefficients.highPass[j];
-        }
+      // 3.2 Almacenamiento de coeficientes
+      coefficients.details[level - 1] = detail;
+      if (level === this.config.maxLevel) {
+        coefficients.approximation = approximation;
       }
 
-      approximation[i] = sumLow;
-      details[i] = sumHigh;
+      // 3.3 Preparación para siguiente nivel
+      currentSignal = approximation;
     }
 
-    return {
-      approximation: Array.from(approximation),
-      details: Array.from(details)
-    };
+    return coefficients;
   }
 
   /**
-   * Extracción de características
+   * Análisis de sub-bandas avanzado
    */
-  private extractFeatures(decomp: WaveletCoefficients): WaveletFeatures {
-    // Energía por nivel
-    const energyLevels = this.calculateEnergyLevels(decomp);
+  private analyzeSubbands(coefficients: WaveletCoefficients): SubbandFeatures[] {
+    const features: SubbandFeatures[] = [];
 
-    // Ratios de energía
-    const energyRatios = this.calculateEnergyRatios(energyLevels);
+    // 1. Análisis de aproximación
+    features.push(this.analyzeSubband(
+      coefficients.approximation,
+      'approximation',
+      this.config.maxLevel
+    ));
 
-    // Estadísticas de coeficientes
-    const statistics = this.calculateStatistics(decomp);
-
-    // Características de forma
-    const shape = this.analyzeShape(decomp);
-
-    // Características espectrales
-    const spectral = this.analyzeSpectralFeatures(decomp);
-
-    return {
-      energyLevels,
-      energyRatios,
-      statistics,
-      shape,
-      spectral
-    };
-  }
-
-  /**
-   * Análisis de calidad
-   */
-  private assessQuality(features: WaveletFeatures): QualityMetrics {
-    // Análisis de energía
-    const energyQuality = this.assessEnergyDistribution(features.energyLevels);
-
-    // Análisis de ruido
-    const noiseQuality = this.assessNoiseLevel(features.statistics);
-
-    // Análisis de forma
-    const shapeQuality = this.assessShapeCharacteristics(features.shape);
-
-    // Análisis espectral
-    const spectralQuality = this.assessSpectralQuality(features.spectral);
-
-    // Calidad general
-    const overall = this.calculateOverallQuality({
-      energyQuality,
-      noiseQuality,
-      shapeQuality,
-      spectralQuality
+    // 2. Análisis de detalles
+    coefficients.details.forEach((detail, level) => {
+      features.push(this.analyzeSubband(
+        detail,
+        'detail',
+        level + 1
+      ));
     });
 
-    return {
-      energy: energyQuality,
-      noise: noiseQuality,
-      shape: shapeQuality,
-      spectral: spectralQuality,
-      overall
-    };
+    return features;
   }
 
   /**
-   * Detección de características específicas
+   * Análisis de paquetes wavelet
    */
-  private detectCharacteristics(decomp: WaveletCoefficients): any {
-    // Detección de picos
-    const peaks = this.detectPeaks(decomp);
+  private analyzeWaveletPackets(signal: Float64Array): WaveletPacket {
+    // 1. Inicialización del árbol
+    this.packetTree.initialize(signal);
 
-    // Detección de valles
-    const valleys = this.detectValleys(decomp);
+    // 2. Descomposición completa
+    this.packetTree.decomposeAll();
 
-    // Análisis de periodicidad
-    const periodicity = this.analyzePeriodicity(peaks, valleys);
+    // 3. Selección de mejor base
+    const bestBasis = this.packetTree.selectBestBasis(
+      this.config.packet.costFunction
+    );
 
-    // Detección de artefactos
-    const artifacts = this.detectArtifacts(decomp);
+    // 4. Extracción de características
+    const packetFeatures = this.extractPacketFeatures(bestBasis);
 
     return {
-      peaks,
-      valleys,
-      periodicity,
-      artifacts
+      tree: this.packetTree,
+      bestBasis,
+      features: packetFeatures
     };
   }
 
   /**
-   * Análisis espectral
+   * Denoising adaptativo avanzado
    */
-  private analyzeSpectrum(decomp: WaveletCoefficients): SpectralAnalysis {
-    // Análisis de frecuencia
-    const frequencies = this.analyzeFrequencies(decomp);
+  private adaptiveDenoising(coefficients: WaveletCoefficients): WaveletCoefficients {
+    // 1. Estimación de ruido
+    const noiseLevel = this.estimateNoiseLevel(coefficients);
 
-    // Análisis de bandas
-    const bands = this.analyzeBands(frequencies);
+    // 2. Cálculo de umbrales
+    const thresholds = this.calculateThresholds(
+      coefficients,
+      noiseLevel
+    );
 
-    // Análisis de coherencia
-    const coherence = this.analyzeCoherence(frequencies);
+    // 3. Aplicación de umbrales
+    return this.applyThresholds(
+      coefficients,
+      thresholds,
+      this.config.denoise.method
+    );
+  }
+
+  /**
+   * Análisis de espacio de escala
+   */
+  private computeScaleSpace(coefficients: WaveletCoefficients): ScaleSpace {
+    // 1. Cálculo de energía por escala
+    const scaleEnergies = this.computeScaleEnergies(coefficients);
+
+    // 2. Análisis de singularidades
+    const singularities = this.detectSingularities(coefficients);
+
+    // 3. Líneas de máximos
+    const maximalLines = this.computeMaximalLines(coefficients);
 
     return {
-      frequencies,
-      bands,
-      coherence
+      energies: scaleEnergies,
+      singularities,
+      maximalLines
     };
   }
 
   /**
-   * Métodos de utilidad
+   * Reconstrucción optimizada
    */
-  private prepareSignal(signal: number[]): number[] {
-    // Validación
-    if (!signal?.length) return [];
+  private reconstruct(coefficients: WaveletCoefficients): Float64Array {
+    // 1. Inicialización del buffer
+    const reconstructed = new Float64Array(
+      this.buffers.reconstructed.length
+    );
 
-    // Padding si es necesario
-    const padded = this.padSignal(signal);
+    // 2. Reconstrucción multinivel
+    let currentApprox = coefficients.approximation;
+    for (let level = this.config.maxLevel; level >= 1; level--) {
+      currentApprox = this.reconstructLevel(
+        currentApprox,
+        coefficients.details[level - 1],
+        level
+      );
+    }
 
-    // Normalización
-    const normalized = this.normalize(padded);
-
-    // Eliminación de tendencia
-    return this.removeTrend(normalized);
-  }
-
-  private padSignal(signal: number[]): number[] {
-    const nextPow2 = Math.pow(2, Math.ceil(Math.log2(signal.length)));
-    const padded = new Float32Array(nextPow2);
-    padded.set(signal);
-    return Array.from(padded);
-  }
-
-  private normalize(signal: number[]): number[] {
-    const mean = signal.reduce((a, b) => a + b, 0) / signal.length;
-    const std = Math.sqrt(signal.reduce((a, b) => a + (b - mean) ** 2, 0) / signal.length);
-    return signal.map(x => (x - mean) / std);
+    // 3. Eliminación de extensión
+    return this.removeExtension(currentApprox);
   }
 
   /**
-   * Métodos públicos adicionales
+   * Optimizaciones de bajo nivel
    */
-  public setConfig(config: Partial<WaveletConfig>): void {
-    Object.assign(this.config, config);
-    this.initializeCoefficients();
+  private decomposeLevel(
+    signal: Float64Array,
+    level: number
+  ): {
+    approximation: Float64Array;
+    detail: Float64Array;
+  } {
+    // 1. Obtención de filtros
+    const { lowPass, highPass } = this.getWaveletFilters(
+      this.config.waveletType
+    );
+
+    // 2. Convolución optimizada
+    const approximation = this.convolveAndDownsample(
+      signal,
+      lowPass
+    );
+    const detail = this.convolveAndDownsample(
+      signal,
+      highPass
+    );
+
+    return { approximation, detail };
   }
 
-  public reset(): void {
-    this.state = {
-      lastDecomposition: null,
-      energyDistribution: new Float32Array(8),
-      noiseLevel: 0,
-      signalQuality: 1,
-      frameCount: 0
-    };
-    this.resetBuffers();
-  }
+  private reconstructLevel(
+    approximation: Float64Array,
+    detail: Float64Array,
+    level: number
+  ): Float64Array {
+    // 1. Obtención de filtros de reconstrucción
+    const { lowPass, highPass } = this.getReconstructionFilters(
+      this.config.waveletType
+    );
 
-  public getMetrics(): any {
-    return {
-      energyDistribution: Array.from(this.state.energyDistribution),
-      noiseLevel: this.state.noiseLevel,
-      signalQuality: this.state.signalQuality,
-      frameCount: this.state.frameCount
-    };
+    // 2. Upsampling y convolución
+    const approxPath = this.upsampleAndConvolve(
+      approximation,
+      lowPass
+    );
+    const detailPath = this.upsampleAndConvolve(
+      detail,
+      highPass
+    );
+
+    // 3. Combinación
+    return this.combineSignals(approxPath, detailPath);
   }
 
   /**
-   * Limpieza y disposición
+   * Gestión de memoria optimizada
+   */
+  private optimizeMemoryLayout(): void {
+    // 1. Alineación de buffers
+    Object.values(this.buffers).forEach(buffer => {
+      const aligned = new Float64Array(
+        Math.ceil(buffer.length / 8) * 8
+      );
+      aligned.set(buffer);
+      buffer = aligned;
+    });
+
+    // 2. Pre-allocación de filtros
+    this.precomputeFilters();
+
+    // 3. Optimización de cache
+    this.optimizeCacheStrategy();
+  }
+
+  /**
+   * Gestión de recursos
    */
   public dispose(): void {
-    this.reset();
-    this.clearBuffers();
+    try {
+      // 1. Limpieza de procesadores
+      this.dwt.dispose();
+      this.packetTree.dispose();
+
+      // 2. Limpieza de buffers
+      Object.values(this.buffers).forEach(buffer => {
+        buffer.fill(0);
+      });
+
+      // 3. Limpieza de bases wavelet
+      this.waveletBases.clear();
+
+      // 4. Limpieza de cache
+      this.coefficientCache = new WeakMap();
+      this.featureCache = new WeakMap();
+
+    } catch (error) {
+      console.error('Error in dispose:', error);
+    }
   }
 }
