@@ -198,3 +198,215 @@ export interface WaveletTransform {
   scaleSpace: ScaleSpace;
   reconstructed: Float64Array;
 }
+
+// Tipos para la cámara
+export interface MediaTrackConstraintsExtended extends MediaTrackConstraints {
+  width: { ideal: number };
+  height: { ideal: number };
+  frameRate: { ideal: number };
+  facingMode: { ideal: string };
+}
+
+export interface ExtendedMediaTrackCapabilities extends MediaTrackCapabilities {
+  torch?: boolean;
+}
+
+// Tipos para procesamiento de señal
+export interface SignalConditions {
+  noiseLevel: number;
+  signalStrength: number;
+  stability: number;
+}
+
+export interface CalibrationEntry {
+  timestamp: number;
+  values: number[];
+  conditions: SignalConditions;
+}
+
+export interface CalibratedResult {
+  isValid: boolean;
+  values: number[];
+  quality: number;
+}
+
+export type MeasurementType = 'ppg' | 'bp' | 'spo2' | 'resp';
+
+// Tipos para detección de artefactos
+export interface ArtifactConfig {
+  sensitivity: number;
+  threshold: number;
+  windowSize: number;
+}
+
+export interface ArtifactFeatures {
+  temporal: number[];
+  spectral: number[];
+  statistical: number[];
+}
+
+export interface SignalQuality {
+  level: SignalQualityLevel;
+  score: number;
+  confidence: number;
+}
+
+export interface MotionAnalysis {
+  displacement: number[];
+  velocity: number[];
+  acceleration: number[];
+}
+
+export interface NoiseAnalysis {
+  snr: number;
+  distribution: number[];
+  spectrum: number[];
+}
+
+// Tipos para análisis de frecuencia
+export interface FrequencyConfig {
+  sampleRate: number;
+  windowSize: number;
+  overlap: number;
+}
+
+export interface SpectralAnalysis {
+  frequencies: number[];
+  magnitudes: number[];
+  phases: number[];
+}
+
+// Tipos para configuración y procesamiento
+export interface ProcessingConfig {
+  mode: ProcessingMode;
+  sensitivity: SensitivitySettings;
+  calibration: CalibrationState;
+}
+
+export interface ProcessingState {
+  isProcessing: boolean;
+  frameCount: number;
+  quality: SignalQuality;
+  calibration: CalibrationState;
+}
+
+export interface QualityParams {
+  signal: number[];
+  noise: NoiseAnalysis;
+  motion: MotionAnalysis;
+}
+
+export interface ProcessorMetrics {
+  frameRate: number;
+  processingTime: number;
+  memoryUsage: number;
+  quality: SignalQuality;
+}
+
+// Tipos para buffer circular
+export interface CircularBuffer<T> {
+  push(item: T): void;
+  get(index: number): T;
+  clear(): void;
+  isFull(): boolean;
+  length: number;
+  capacity: number;
+}
+
+// Tipos para el sistema
+export interface SystemConfig {
+  processing: ProcessingConfig;
+  camera: CameraConfig;
+  sensitivity: SensitivitySettings;
+  calibration: CalibrationState;
+}
+
+// Tipos para análisis de imágenes
+export interface ROI {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface ColorProfile {
+  mean: number[];
+  std: number[];
+  histogram: number[][];
+}
+
+export interface DetectionQuality {
+  overall: number;
+  confidence: number;
+  metrics: {
+    coverage: number;
+    stability: number;
+    contrast: number;
+  };
+}
+
+export interface TextureAnalysis {
+  contrast: number;
+  correlation: number;
+  energy: number;
+  homogeneity: number;
+}
+
+export interface DetectionError {
+  code: string;
+  message: string;
+  timestamp: number;
+}
+
+// Tipos para movimiento y compensación
+export interface MotionConfig {
+  threshold: number;
+  windowSize: number;
+  sensitivity: number;
+}
+
+export interface MotionVector {
+  dx: number;
+  dy: number;
+  magnitude: number;
+  confidence: number;
+}
+
+export interface CompensationResult {
+  compensated: Float64Array;
+  quality: number;
+  motion: MotionVector;
+}
+
+export interface FrameData {
+  data: Uint8Array;
+  width: number;
+  height: number;
+  timestamp: number;
+}
+
+export interface StabilityMetrics {
+  temporal: number;
+  spatial: number;
+  overall: number;
+}
+
+export type CompensationMode = 'normal' | 'aggressive' | 'conservative';
+
+export interface MotionEstimate {
+  vector: MotionVector;
+  confidence: number;
+  quality: number;
+}
+
+export type QualityLevel = 'high' | 'medium' | 'low' | 'invalid';
+
+// Tipos adicionales necesarios
+export interface RegionAnalysis {
+  roi: ROI;
+  quality: DetectionQuality;
+  features: any;
+}
+
+// Re-exportar otros tipos necesarios
+export type { WaveletBasis, WaveletCoefficients, SubbandFeatures } from './wavelet';
