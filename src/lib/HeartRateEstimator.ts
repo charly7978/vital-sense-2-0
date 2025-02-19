@@ -1,9 +1,11 @@
 import {
   HREstimationConfig, HeartRateResult, ConfidenceMetrics,
   PeakDetection, BeatMorphology, RRIntervals, BeatQuality,
-  AdaptiveThreshold, PeakValidation, EstimationMode,
-  SignalQuality, FrequencyAnalysis, WaveletAnalysis
+  PeakValidation, EstimationMode, SignalQuality,
+  FrequencyAnalysis, WaveletAnalysis
 } from '@/types';
+
+import { AdaptiveThreshold } from './AdaptiveThreshold';
 
 /**
  * Estimador avanzado de ritmo cardíaco

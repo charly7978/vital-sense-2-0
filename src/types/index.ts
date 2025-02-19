@@ -410,3 +410,35 @@ export interface RegionAnalysis {
 
 // Re-exportar otros tipos necesarios
 export type { WaveletBasis, WaveletCoefficients, SubbandFeatures } from './wavelet';
+
+// Tipos para umbral adaptativo
+export interface AdaptiveThreshold {
+  current: number;
+  min: number;
+  max: number;
+  alpha: number;
+  update: (value: number, confidence: number) => void;
+}
+
+// Re-exportamos los tipos existentes
+export type {
+  Percent,
+  BPM,
+  Milliseconds,
+  SignalQualityLevel,
+  SensitivitySettings,
+  VitalReading,
+  PPGData,
+  FingerDetection,
+  DeviceInfo,
+  CameraConfig,
+  ProcessingMode,
+  PPGConfig,
+  WaveletConfig,
+  SignalFilterConfig,
+  CalibrationState,
+  ProcessorEvent,
+  SpectralFeatures,
+  WaveletCoefficients,
+  SubbandFeatures
+};
