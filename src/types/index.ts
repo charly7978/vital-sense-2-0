@@ -7,18 +7,16 @@ export * from './quality';
 export * from './vitals';
 export * from './camera';
 
-// Declare global Float64Array type
+// Declare global Float64Array interface
 declare global {
-  type Float64Array = {
-    [index: number]: number;
-    length: number;
+  interface Float64Array extends ArrayLike<number> {
     readonly BYTES_PER_ELEMENT: number;
     readonly buffer: ArrayBuffer;
     readonly byteLength: number;
     readonly byteOffset: number;
-    copyWithin(target: number, start: number, end?: number): Float64Array;
+    copyWithin(target: number, start: number, end?: number): this;
     every(predicate: (value: number, index: number, array: Float64Array) => unknown): boolean;
-    fill(value: number, start?: number, end?: number): Float64Array;
+    fill(value: number, start?: number, end?: number): this;
     filter(predicate: (value: number, index: number, array: Float64Array) => unknown): Float64Array;
     find(predicate: (value: number, index: number, array: Float64Array) => unknown): number | undefined;
     findIndex(predicate: (value: number, index: number, array: Float64Array) => unknown): number;
@@ -38,5 +36,5 @@ declare global {
     subarray(begin: number, end?: number): Float64Array;
     toString(): string;
     valueOf(): Float64Array;
-  };
+  }
 }

@@ -1,15 +1,17 @@
 
+// Basic enums
+export const SignalQualityLevel = {
+  Excellent: 'excellent',
+  Good: 'good',
+  Fair: 'fair',
+  Poor: 'poor',
+  Invalid: 'invalid'
+} as const;
+
+export type SignalQualityLevelType = typeof SignalQualityLevel[keyof typeof SignalQualityLevel];
+
 // Basic numeric types
 export type Float64Array = number[];
-
-// Basic enums
-export enum SignalQualityLevel {
-  Excellent = 'excellent',
-  Good = 'good',
-  Fair = 'fair',
-  Poor = 'poor',
-  Invalid = 'invalid'
-}
 
 // Basic types
 export type ProcessingMode = 'normal' | 'calibration' | 'debug';

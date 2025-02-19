@@ -1,9 +1,9 @@
 
-import { SignalQualityLevel, Disposable } from './common';
+import { SignalQualityLevelType, Disposable } from './common';
 import { NoiseAnalysis, MotionAnalysis } from './analysis';
 
 export interface SignalQuality extends Disposable {
-  level: SignalQualityLevel;
+  level: SignalQualityLevelType;
   score: number;
   confidence: number;
   overall: number;
