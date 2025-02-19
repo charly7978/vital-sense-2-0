@@ -1,104 +1,177 @@
 
-import React, { useRef, useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { toast } from '@/components/ui/use-toast';
-import { MediaTrackConstraintsExtended } from '@/types';
+import React, { useRef, useEffect, useState } from "react";
+import Webcam from "react-webcam";
+import CameraPreview from "./camera/CameraPreview";
+import CameraOverlay from "./camera/CameraOverlay";
+import CameraStatus from "./camera/CameraStatus";
+import { useCameraProcessor } from "./camera/useCameraProcessor";
+import { useCameraInitializer } from "./camera/useCameraInitializer";
+import { useToast } from "@/hooks/use-toast";
+import { MediaTrackConstraintsExtended, ExtendedMediaTrackCapabilities } from "@/types";
 
 interface CameraViewProps {
-  onImageCapture: (imageData: ImageData) => void;
+  onFrame: (imageData: ImageData) => void;
+  isActive: boolean;
 }
 
-const CameraView: React.FC<CameraViewProps> = ({ onImageCapture }) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
+const CameraView: React.FC<CameraViewProps> = ({ 
+  onFrame, 
+  isActive
+}) => {
+  const webcamRef = useRef<Webcam>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [hasPermission, setHasPermission] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [hasError, setHasError] = useState(false);
+  const [frameCount, setFrameCount] = useState(0);
+  const [isFlashlightOn, setIsFlashlightOn] = useState(false);
+  const { toast } = useToast();
 
-  useEffect(() => {
-    initializeCamera();
-  }, []);
+  const videoConstraints = {
+    width: { ideal: 1280 },
+    height: { ideal: 720 },
+    frameRate: { ideal: 30 },
+    facingMode: "environment"
+  };
 
-  const initializeCamera = async () => {
+  const { initializeCamera } = useCameraInitializer({
+    videoConstraints,
+    setIsInitializing,
+    setHasError
+  });
+
+  const { processFrame, animationFrameRef } = useCameraProcessor({
+    isActive,
+    onFrame,
+    setFrameCount
+  });
+
+  const toggleFlashlight = async () => {
+    if (!webcamRef.current?.video) return;
+
     try {
+      const track = (await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" }
+      })).getVideoTracks()[0];
+
+      const capabilities = track.getCapabilities() as ExtendedMediaTrackCapabilities;
+      
+      // Verificar si el dispositivo tiene linterna
+      if (!capabilities.torch) {
+        toast({
+          title: "Error",
+          description: "Este dispositivo no tiene linterna",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const newTorchState = !isFlashlightOn;
       const constraints: MediaTrackConstraintsExtended = {
-        video: {
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          frameRate: { ideal: 30 },
-          facingMode: 'environment'
-        }
+        advanced: [{ torch: newTorchState }]
       };
 
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      await track.applyConstraints(constraints);
+
+      setIsFlashlightOn(newTorchState);
       
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-        setHasPermission(true);
-        
-        if (canvasRef.current) {
-          canvasRef.current.width = videoRef.current.videoWidth;
-          canvasRef.current.height = videoRef.current.videoHeight;
-        }
-      }
+      toast({
+        title: newTorchState ? "Linterna encendida" : "Linterna apagada",
+        description: "Ajusta la luz según sea necesario",
+      });
+
     } catch (error) {
-      console.error('Error accessing camera:', error);
+      console.error('Error al controlar la linterna:', error);
       toast({
         title: "Error",
-        description: "No se pudo acceder a la cámara. Por favor, verifica los permisos.",
-        variant: "destructive"
+        description: "No se pudo controlar la linterna",
+        variant: "destructive",
       });
     }
   };
 
-  const captureFrame = () => {
-    if (!videoRef.current || !canvasRef.current) return;
+  useEffect(() => {
+    let isMounted = true;
 
-    const context = canvasRef.current.getContext('2d');
-    if (!context) return;
+    const setupCamera = async () => {
+      if (isActive) {
+        console.log('Iniciando cámara...');
+        setIsInitializing(true);
+        const success = await initializeCamera();
+        
+        if (isMounted) {
+          setIsInitializing(false);
+          if (success) {
+            console.log('Cámara iniciada exitosamente');
+            // Intentar encender la linterna automáticamente al iniciar
+            await toggleFlashlight();
+          }
+        }
+      }
+    };
 
-    try {
-      context.drawImage(
-        videoRef.current,
-        0,
-        0,
-        canvasRef.current.width,
-        canvasRef.current.height
-      );
+    setupCamera();
 
-      const imageData = context.getImageData(
-        0,
-        0,
-        canvasRef.current.width,
-        canvasRef.current.height
-      );
+    return () => {
+      isMounted = false;
+      // Asegurarse de apagar la linterna al desmontar
+      if (isFlashlightOn) {
+        toggleFlashlight();
+      }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [isActive, initializeCamera]);
 
-      onImageCapture(imageData);
-    } catch (error) {
-      console.error('Error capturing frame:', error);
+  useEffect(() => {
+    if (isActive && !isInitializing && !hasError && webcamRef.current?.video?.readyState === 4) {
+      console.log('Iniciando procesamiento de frames...');
+      processFrame(webcamRef, canvasRef);
     }
-  };
+
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [isActive, isInitializing, hasError, processFrame]);
 
   return (
-    <Card className="relative overflow-hidden">
-      <video
-        ref={videoRef}
-        className="w-full h-auto"
-        playsInline
-        muted
-      />
-      <canvas
-        ref={canvasRef}
-        className="hidden"
-      />
-      {!hasPermission && (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/80">
-          <Button onClick={initializeCamera}>
-            Activar Cámara
-          </Button>
-        </div>
-      )}
-    </Card>
+    <div className="relative w-full h-screen bg-black">
+      <div className="absolute inset-0">
+        {isActive && (
+          <>
+            <CameraPreview 
+              webcamRef={webcamRef}
+              videoConstraints={videoConstraints}
+            />
+
+            <canvas 
+              ref={canvasRef} 
+              style={{ display: "none" }}
+            />
+
+            <CameraOverlay
+              frameCount={frameCount}
+              isInitializing={isInitializing}
+              hasError={hasError}
+            />
+
+            <button
+              onClick={toggleFlashlight}
+              className="absolute bottom-4 right-4 z-50 p-3 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 text-white/80"
+            >
+              {isFlashlightOn ? "Apagar Linterna" : "Encender Linterna"}
+            </button>
+          </>
+        )}
+
+        <CameraStatus
+          isInitializing={isInitializing}
+          hasError={hasError}
+        />
+      </div>
+    </div>
   );
 };
 
