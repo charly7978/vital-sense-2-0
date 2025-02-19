@@ -15,10 +15,16 @@ export default defineConfig(({ mode }) => {
       host: "0.0.0.0",
       port: 8080,
       strictPort: true,
+      cors: {
+        origin: [`https://${hmrHost}`, 'https://*.lovableproject.com'],
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        credentials: true
+      },
       hmr: {
         clientPort: 443,
         host: hmrHost,
-        protocol: 'wss'
+        protocol: 'wss',
+        timeout: 120000
       }
     },
     plugins: [
