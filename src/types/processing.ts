@@ -1,79 +1,77 @@
 
-import { SignalQuality, SensitivitySettings } from './index';
+import { SignalQuality } from './quality';
+import { MeasurementType } from './base';
 
-export interface ImageConfig {
-  width: number;
-  height: number;
-  channels: number;
-  colorSpace: 'rgb' | 'hsv' | 'lab';
-}
-
-export interface ProcessingResult {
-  success: boolean;
-  data?: ImageData;
-  error?: Error;
-}
-
-export interface ColorSpace {
-  name: string;
-  channels: number;
-  ranges: number[][];
-}
-
-export interface ROIDetection {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  confidence: number;
-}
-
-export interface ImageEnhancement {
+export interface SensitivitySettings {
   brightness: number;
-  contrast: number;
-  sharpness: number;
-  denoise: number;
+  redIntensity: number;
+  signalAmplification: number;
+  noiseReduction: number;
+  peakDetection: number;
+  heartbeatThreshold: number;
+  responseTime: number;
+  signalStability: number;
 }
 
-export interface ColorAnalysis {
-  mean: number[];
-  std: number[];
-  histogram: number[][];
+export interface CalibrationState {
+  isCalibrating: boolean;
+  progress: number;
+  message: string;
+  isCalibrated?: boolean;
+  calibrationTime?: number;
+  lastCalibration?: number;
+  referenceValues?: Float64Array;
+  calibrationQuality?: number;
 }
 
-export interface NoiseReduction {
-  method: 'gaussian' | 'median' | 'bilateral';
-  params: Record<string, number>;
+export interface ProcessingConfig {
+  mode: 'normal' | 'calibration' | 'debug';
+  sampleRate?: number;
+  sensitivity: SensitivitySettings;
+  calibration: CalibrationState;
+  bufferSize: number;
+  filterOrder: number;
+  lowCutoff: number;
+  highCutoff: number;
+  peakThreshold: number;
+  minPeakDistance: number;
+  calibrationDuration: number;
+  adaptiveThreshold: boolean;
 }
 
-export interface EdgeDetection {
-  method: 'sobel' | 'canny';
-  threshold: number;
-  sigma?: number;
-}
-
-export interface ImageQuality {
-  sharpness: number;
-  noise: number;
-  exposure: number;
-  contrast: number;
-}
-
-export interface AdaptiveFilter {
-  type: 'lms' | 'rls' | 'kalman';
-  params: Record<string, number>;
-}
-
-export interface ImageMetrics {
-  quality: ImageQuality;
-  processing: {
-    time: number;
-    memory: number;
+export interface ProcessingState {
+  isProcessing: boolean;
+  frameCount: number;
+  buffer: Float64Array;
+  timeBuffer: Float64Array;
+  lastTimestamp: number;
+  sampleRate: number;
+  calibration: CalibrationState;
+  quality: SignalQuality;
+  optimization: {
+    cache: Map<string, any>;
+    performance: Map<string, number>;
+    resources: Map<string, number>;
   };
 }
 
-export interface ProcessingMode {
-  name: string;
-  params: Record<string, any>;
+export interface VitalReading {
+  timestamp: number;
+  value: number;
+  quality: number;
+  type: MeasurementType;
 }
 
+export interface PPGData {
+  timestamp: number;
+  values: number[];
+  bpm: number;
+  confidence: number;
+}
+
+export interface ProcessorMetrics {
+  snr: number;
+  bpm: number;
+  quality: SignalQuality;
+  timestamp: number;
+}
