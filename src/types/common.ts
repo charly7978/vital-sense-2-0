@@ -9,8 +9,12 @@ export type ColorSpace = 'rgb' | 'yuv' | 'hsv';
 export type MeasurementType = 'ppg' | 'bp' | 'spo2' | 'resp';
 export type SignalQualityLevelType = 'excellent' | 'good' | 'fair' | 'poor' | 'invalid';
 
-// Basic interfaces
-export interface BasicMetrics {
+export interface Disposable {
+  dispose(): void;
+}
+
+// Basic interfaces with dispose capability
+export interface BasicMetrics extends Disposable {
   timestamp: number;
   value: number;
   confidence: number;
@@ -30,9 +34,5 @@ export interface MediaTrackConstraintsExtended extends MediaTrackConstraints {
   facingMode?: 'user' | 'environment';
   frameRate?: { ideal: number };
   advanced?: MediaTrackConstraintSet[];
-}
-
-export interface Disposable {
-  dispose?: () => void;
 }
 

@@ -1,6 +1,17 @@
 
 import { ProcessingMode } from './common';
 import { FrequencyBands } from './analysis';
+import { Float64Type } from './common';
+
+export interface CalibrationState {
+  isCalibrating: boolean;
+  progress: number;
+  message: string;
+  isCalibrated: boolean;
+  calibrationTime: number;
+  referenceValues: Float64Type;
+  calibrationQuality: number;
+}
 
 export interface ProcessingConfig {
   mode: ProcessingMode;
@@ -15,16 +26,10 @@ export interface ProcessingConfig {
   minPeakDistance: number;
   calibrationDuration: number;
   adaptiveThreshold: boolean;
-}
-
-export interface CalibrationState {
-  isCalibrating: boolean;
-  progress: number;
-  message: string;
-  isCalibrated: boolean;
-  calibrationTime: number;
-  referenceValues: Float64Array;
-  calibrationQuality: number;
+  validation?: {
+    minQuality: number;
+    maxArtifacts: number;
+  };
 }
 
 export interface SensitivitySettings {

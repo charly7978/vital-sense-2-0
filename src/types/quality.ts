@@ -15,5 +15,21 @@ export interface SignalQuality {
   confidence: number;
   overall: number;
   history: number[];
+  noise?: number;
+  frequency?: number;
+  amplitude?: number;
   dispose?: () => void;
+  threshold?: number;
 }
+
+export interface QualityMetrics {
+  snr: number;
+  artifacts: number;
+  stability: number;
+  overall: number;
+  confidence: number;
+  noise: number;
+  frequency: number;
+  amplitude: number;
+}
+
