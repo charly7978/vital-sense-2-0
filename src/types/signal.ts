@@ -1,72 +1,63 @@
 
-// IMPORTANTE: NO MODIFICAR FUNCIONALIDAD
-// Este archivo solo contiene definiciones de tipos
+import { Float64Array } from '@/types';
 
-import { SignalQualityLevel } from './index';
-
-export interface SignalConditions {
-  noiseLevel: number;
-  signalStrength: number;
-  stability: number;
-  signalQuality: number;
-  lightLevel: number;
-  movement: number;
-  coverage: number;
-  temperature: number;
-  measurementType: string;
+export interface SignalAnalysis {
+  features: SignalFeatures;
+  quality: SignalQuality;
+  metrics: ProcessorMetrics;
 }
 
-export interface SignalQuality {
-  level: SignalQualityLevel;
-  score: number;
-  confidence: number;
-  overall: number;
-  history: Array<number>;
-  dispose?: () => void;
-}
-
-export interface NoiseAnalysis {
-  snr: number;
-  distribution: number[];
-  spectrum: number[];
-  entropy: number;
-  kurtosis: number;
-  variance: number;
-  dispose?: () => void;
-  spectralNoise?: any;
-  threshold?: number;
-}
-
-export interface MotionAnalysis {
-  displacement: number[];
-  velocity: number[];
-  acceleration: number[];
-  features?: any[];
-  dispose?: () => void;
-  transform?: any;
-  threshold?: number;
-}
-
-export type QualityLevel = 'excellent' | 'good' | 'fair' | 'poor' | 'invalid';
-
-// NO MODIFICAR: Mantener compatibilidad con implementaciones existentes
 export interface SignalFeatures {
-  temporal: number[];
-  spectral: number[];
-  statistical: number[];
-  morphological?: number[];
-  wavelet?: number[];
+  temporal: TemporalFeatures;
+  spectral: SpectralFeatures;
+  statistical: StatisticalFeatures;
 }
 
-export interface SpectralAnalysis {
-  spectrum: Float32Array;
-  frequencies: Float32Array;
-  magnitude: Float32Array;
-  phase: Float32Array;
+export interface TemporalFeatures {
+  peaks: number[];
+  valleys: number[];
+  intervals: number[];
+  amplitudes: number[];
 }
 
-export interface WaveletAnalysis {
-  coefficients: Float32Array[];
-  scales: number[];
-  features: any[];
+export interface SpectralFeatures {
+  mainFrequency: number;
+  harmonics: number[];
+  bandwidth: number;
+  energy: number[];
+}
+
+export interface StatisticalFeatures {
+  mean: number;
+  variance: number;
+  skewness: number;
+  kurtosis: number;
+}
+
+export interface SignalValidation {
+  isValid: boolean;
+  confidence: number;
+  errors: string[];
+}
+
+export interface ProcessingQuality {
+  snr: number;
+  stability: number;
+  artifacts: number;
+  overall: number;
+}
+
+export type AnalysisMode = 'realtime' | 'offline' | 'batch';
+
+export interface ProcessingPipeline {
+  filters: FilterConfig[];
+  features: string[];
+  validators: string[];
+}
+
+export interface ProcessorOptimization {
+  cacheSize: number;
+  batchSize: number;
+  parallel: boolean;
+  precision: 'single' | 'double';
 }
