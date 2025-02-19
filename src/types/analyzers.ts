@@ -47,31 +47,10 @@ export interface ProcessingQuality extends SignalQuality {
   artifacts: number;
 }
 
-export interface BPConfig {
-  sampleRate: number;
-  windowSize: number;
-  method: 'PTT' | 'PAT' | 'PWV';
-  calibration: {
-    duration: number;
-    samples: number;
-    reference: {
-      systolic: number;
-      diastolic: number;
-    };
-  };
-  validation?: {
-    minQuality: number;
-    maxError: number;
-  };
-}
-
-export interface BPEstimation {
-  timestamp: number;
-  systolic: number;
-  diastolic: number;
-  map: number;
-  confidence: number;
-  quality: ProcessingQuality;
+export interface WaveletBasis {
+  level: number;
+  detail: Float64Array;
+  approximation: Float64Array;
 }
 
 export interface WaveletCoefficients {
@@ -112,3 +91,9 @@ export interface ArtifactConfig {
     bands: number[][];
   };
 }
+
+// Re-export common analyzer types
+export * from './beat';
+export * from './quality';
+export * from './spectral';
+export * from './wavelet';

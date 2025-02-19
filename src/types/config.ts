@@ -3,6 +3,18 @@ import { ProcessingMode } from './common';
 import { Float64Type } from './common';
 import { CalibrationState } from './calibration';
 
+export interface SensitivitySettings {
+  brightness: number;
+  redIntensity: number;
+  signalAmplification: number;
+  noiseReduction: number;
+  peakDetection: number;
+  heartbeatThreshold: number;
+  responseTime: number;
+  signalStability: number;
+  snr?: number;
+}
+
 export interface ProcessingConfig {
   mode: ProcessingMode;
   sampleRate?: number;
@@ -40,18 +52,6 @@ export interface ProcessingConfig {
     level: number;
     threshold: number;
   };
-}
-
-export interface SensitivitySettings {
-  brightness: number;
-  redIntensity: number;
-  signalAmplification: number;
-  noiseReduction: number;
-  peakDetection: number;
-  heartbeatThreshold: number;
-  responseTime: number;
-  signalStability: number;
-  snr?: number;
 }
 
 export type { CalibrationState };
