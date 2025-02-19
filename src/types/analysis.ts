@@ -1,11 +1,11 @@
 
-import { Float64Array, Disposable } from './common';
+import { Float64Type, Disposable } from './common';
 
 export interface SpectralAnalysis extends Disposable {
-  spectrum: Float64Array;
-  frequencies: Float64Array;
-  magnitude: Float64Array;
-  phase: Float64Array;
+  spectrum: Float64Type;
+  frequencies: Float64Type;
+  magnitude: Float64Type;
+  phase: Float64Type;
 }
 
 export interface WaveletAnalysis extends Disposable {
@@ -33,8 +33,8 @@ export interface SpectralFeatures {
 }
 
 export interface WaveletCoefficients {
-  approximation: Float64Array;
-  details: Float64Array[];
+  approximation: Float64Type;
+  details: Float64Type[];
 }
 
 export interface SubbandFeatures {

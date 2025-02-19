@@ -7,6 +7,7 @@ export * from './vitals';
 export * from './camera';
 
 declare global {
+  // Browser's native Float64Array type declaration
   interface Float64Array extends ArrayLike<number> {
     readonly BYTES_PER_ELEMENT: number;
     readonly buffer: ArrayBufferLike;
@@ -37,3 +38,6 @@ declare global {
     valueOf(): Float64Array;
   }
 }
+
+// Re-export Float64Array type alias
+export type Float64Array = globalThis.Float64Array;

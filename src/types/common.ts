@@ -11,7 +11,8 @@ export const SignalQualityLevel = {
 export type SignalQualityLevelType = typeof SignalQualityLevel[keyof typeof SignalQualityLevel];
 
 // Tipos numéricos básicos
-export type Float64 = number[];
+export type Float64Type = number[];
+export type Float32Type = number[];
 
 // Tipos básicos
 export type ProcessingMode = 'normal' | 'calibration' | 'debug';
