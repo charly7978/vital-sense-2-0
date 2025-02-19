@@ -200,15 +200,13 @@ export interface WaveletTransform {
 }
 
 // Tipos para la cámara
-export interface MediaTrackConstraintsExtended extends MediaTrackConstraints {
-  width: { ideal: number };
-  height: { ideal: number };
-  frameRate: { ideal: number };
-  facingMode: { ideal: string };
-}
-
-export interface ExtendedMediaTrackCapabilities extends MediaTrackCapabilities {
-  torch?: boolean;
+export interface MediaTrackConstraintsExtended extends MediaStreamConstraints {
+  video?: {
+    width: { ideal: number };
+    height: { ideal: number };
+    frameRate: { ideal: number };
+    facingMode: { ideal: string };
+  };
 }
 
 // Tipos para procesamiento de señal
@@ -408,10 +406,7 @@ export interface RegionAnalysis {
   features: any;
 }
 
-// Re-exportar otros tipos necesarios
-export type { WaveletBasis, WaveletCoefficients, SubbandFeatures } from './wavelet';
-
-// Tipos para umbral adaptativo
+// Interfaces para umbrales adaptativos
 export interface AdaptiveThreshold {
   current: number;
   min: number;
@@ -422,23 +417,7 @@ export interface AdaptiveThreshold {
 
 // Re-exportamos los tipos existentes
 export type {
-  Percent,
-  BPM,
-  Milliseconds,
-  SignalQualityLevel,
-  SensitivitySettings,
-  VitalReading,
-  PPGData,
-  FingerDetection,
-  DeviceInfo,
-  CameraConfig,
-  ProcessingMode,
-  PPGConfig,
-  WaveletConfig,
-  SignalFilterConfig,
-  CalibrationState,
-  ProcessorEvent,
-  SpectralFeatures,
+  WaveletBasis,
   WaveletCoefficients,
   SubbandFeatures
-};
+} from './wavelet';
