@@ -1,4 +1,3 @@
-
 import { SensitivitySettings, CalibrationState } from '@/types';
 
 const defaultSensitivity: SensitivitySettings = {
@@ -12,12 +11,15 @@ const defaultSensitivity: SensitivitySettings = {
   signalStability: 1.0
 };
 
-const defaultCalibration: CalibrationState = {
+// Default calibration state
+export const defaultCalibrationState: CalibrationState = {
   isCalibrating: false,
   progress: 0,
   message: '',
   isCalibrated: false,
-  calibrationTime: 0
+  calibrationTime: 0,
+  referenceValues: new Float64Array(),
+  calibrationQuality: 0
 };
 
 export const config = {
@@ -25,7 +27,7 @@ export const config = {
     mode: 'normal' as const,
     sampleRate: 30,
     sensitivity: defaultSensitivity,
-    calibration: defaultCalibration,
+    calibration: defaultCalibrationState,
   },
   camera: {
     constraints: {
@@ -43,5 +45,5 @@ export const config = {
     }
   },
   sensitivity: defaultSensitivity,
-  calibration: defaultCalibration
+  calibration: defaultCalibrationState
 };

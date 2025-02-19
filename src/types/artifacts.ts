@@ -7,6 +7,37 @@ export interface ArtifactConfig {
   spectral: boolean;
   statistical: boolean;
   minQuality: number;
+  windowSize?: number;
+  overlapSize?: number;
+  validation?: boolean;
+  noise?: {
+    enabled: boolean;
+    methods: string[];
+    thresholds: Record<string, number>;
+  };
+  motion?: {
+    enabled: boolean;
+    threshold: number;
+    window: number;
+  };
+}
+
+export interface ArtifactClassification {
+  type: string;
+  confidence: number;
+  features: ArtifactFeatures;
+}
+
+export interface SignalSegmentation {
+  segments: Float64Type[];
+  indices: number[];
+}
+
+export interface ArtifactMetrics {
+  temporal: number;
+  spectral: number;
+  statistical: number;
+  overall: number;
 }
 
 export interface ArtifactDetection {
@@ -15,6 +46,8 @@ export interface ArtifactDetection {
   confidence: number;
   features: ArtifactFeatures;
   quality: SignalQuality;
+  metrics?: ArtifactMetrics;
+  dispose?: () => void;
 }
 
 export interface ArtifactFeatures {
@@ -23,7 +56,7 @@ export interface ArtifactFeatures {
   statistical: Float64Type;
 }
 
-export interface MotionAnalysis {
+export interface MotionAnalysis extends Disposable {
   displacement: number;
   velocity: number;
   acceleration: number;
@@ -31,7 +64,7 @@ export interface MotionAnalysis {
   quality: number;
 }
 
-export interface NoiseAnalysis {
+export interface NoiseAnalysis extends Disposable {
   snr: number;
   distribution: Float64Type;
   spectrum: Float64Type;
@@ -40,3 +73,13 @@ export interface NoiseAnalysis {
   variance: number;
 }
 
+export interface ArtifactValidation {
+  isValid: boolean;
+  confidence: number;
+  metrics: ArtifactMetrics;
+}
+
+// Add Disposable interface
+interface Disposable {
+  dispose(): void;
+}
