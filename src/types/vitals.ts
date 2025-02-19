@@ -1,6 +1,7 @@
+
 import { Float64Type, ProcessingMode } from './common';
 import { SignalQuality } from './quality';
-import { CalibrationState, SensitivitySettings } from './calibration';
+import { CalibrationState } from './calibration';
 
 export interface VitalReading {
   value: number;
@@ -26,6 +27,7 @@ export interface PPGProcessingConfig {
     lowCut: number;
     highCut: number;
     order: number;
+    nfft?: number;
   };
   filterOrder?: number;
   lowCutoff?: number;
@@ -44,12 +46,12 @@ export interface SignalConditions {
   stability: number;
   coverage: number;
   signalQuality: number;
-  measurementType: string;
+  measurementType: MeasurementType;
 }
 
 export interface VitalSigns {
   heartRate: VitalReading;
-   SpO2: VitalReading;
+  SpO2: VitalReading;
   respirationRate: VitalReading;
   bloodPressure: BloodPressure;
 }
@@ -67,3 +69,5 @@ export enum ArrhythmiaType {
   Tachycardia,
   Irregular
 }
+
+export type { SensitivitySettings } from './config';

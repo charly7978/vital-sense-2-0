@@ -22,7 +22,6 @@ export interface MediaTrackConstraintsExtended extends MediaTrackConstraints {
   advanced?: MediaTrackConstraintSet[];
 }
 
-// Basic interfaces with dispose capability
 export interface BasicMetrics extends Disposable {
   timestamp: number;
   value: number;

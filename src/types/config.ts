@@ -16,6 +16,13 @@ export interface ProcessingConfig {
   minPeakDistance: number;
   calibrationDuration: number;
   adaptiveThreshold: boolean;
+  filter: {
+    enabled: boolean;
+    lowCut: number;
+    highCut: number;
+    order: number;
+    nfft?: number;
+  };
   validation?: {
     minQuality: number;
     maxArtifacts: number;
@@ -47,4 +54,4 @@ export interface SensitivitySettings {
   snr?: number;
 }
 
-export { CalibrationState };
+export type { CalibrationState };
