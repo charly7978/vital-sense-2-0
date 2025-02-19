@@ -1,7 +1,9 @@
-// Base types
+
+// Base numeric types
+export type { Float64Type, Float32Type } from './common';
+
+// Base enums and types
 export type {
-  Float64Type,
-  Float32Type,
   ProcessingMode,
   ColorSpace,
   MeasurementType,
@@ -11,17 +13,50 @@ export type {
   Disposable
 } from './common';
 
-// Quality types and constants
+// Quality types
 export { SignalQualityLevel } from './quality';
 export type { SignalQualityLevelType, SignalQuality } from './quality';
 
-// Other type exports
-export * from './analysis';
-export * from './config';
-export * from './vitals';
-export * from './camera';
+// Analysis types
+export type {
+  SpectralAnalysis,
+  WaveletAnalysis,
+  FrequencyBands,
+  SpectralFeatures,
+  WaveletCoefficients,
+  SubbandFeatures,
+  NoiseAnalysis,
+  MotionAnalysis,
+  CalibrationEntry,
+  CalibratedResult,
+  WaveletTransform,
+  WaveletBasis,
+  WaveletPacket,
+  ScaleSpace,
+  OptimizedDWT
+} from './analysis';
 
-// Global declarations
+// Configuration types
+export type {
+  ProcessingConfig,
+  CalibrationState,
+  SensitivitySettings,
+  FilterConfig,
+  FrequencyConfig
+} from './config';
+
+// Vital signs types
+export type {
+  VitalReading,
+  PPGData,
+  VitalMeasurement,
+  VitalConfig,
+  ProcessingState,
+  PPGProcessingConfig,
+  ProcessorMetrics
+} from './vitals';
+
+// Declare global Float64Array interface
 declare global {
   interface Float64Array extends ArrayLike<number> {
     readonly BYTES_PER_ELEMENT: number;

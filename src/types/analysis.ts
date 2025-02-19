@@ -6,12 +6,15 @@ export interface SpectralAnalysis extends Disposable {
   frequencies: Float64Type;
   magnitude: Float64Type;
   phase: Float64Type;
+  bands?: FrequencyBands;
 }
 
 export interface WaveletAnalysis extends Disposable {
   coefficients: WaveletCoefficients;
   features: SubbandFeatures;
   levels: number;
+  bases: WaveletBasis[];
+  space: ScaleSpace;
 }
 
 export interface FrequencyBands {
@@ -22,9 +25,20 @@ export interface FrequencyBands {
   respiratory?: [number, number];
   cardiac?: [number, number];
   mains?: [number, number];
+  noise?: [number, number];
   ratios?: {
     lfHf: number;
     vlfTotal: number;
+  };
+  normalized?: {
+    vlf: number;
+    lf: number;
+    hf: number;
+  };
+  relative?: {
+    vlf: number;
+    lf: number;
+    hf: number;
   };
 }
 
@@ -53,6 +67,7 @@ export interface NoiseAnalysis extends Disposable {
   entropy: number;
   kurtosis: number;
   variance: number;
+  overall?: number;
   spectralNoise?: number;
   threshold?: number;
   waveletNoise?: number;
@@ -64,29 +79,14 @@ export interface MotionAnalysis extends Disposable {
   displacement: number[];
   velocity: number[];
   acceleration: number[];
-  threshold?: number;
   features?: any[];
   detection?: number;
-}
-
-export interface CalibrationEntry {
-  timestamp: number;
-  raw: number;
-  calibrated: number;
-  conditions: any;
-  factor: number;
-}
-
-export interface CalibratedResult {
-  value: number;
-  confidence: number;
-  factor: number;
+  threshold?: number;
 }
 
 export interface WaveletTransform {
   coefficients: WaveletCoefficients;
   bases: WaveletBasis[];
-  packets: WaveletPacket[];
   space: ScaleSpace;
 }
 
@@ -94,20 +94,28 @@ export interface WaveletBasis {
   scale: number;
   translation: number;
   coefficients: Float64Type;
+  filters?: Float64Type[];
 }
 
-export interface WaveletPacket {
+export interface WaveletPacket extends Array<number> {
   level: number;
   index: number;
   coefficients: Float64Type;
+  tree?: any;
+  initialize?: () => void;
+  decomposeAll?: () => void;
+  selectBestBasis?: () => void;
+  dispose?: () => void;
 }
 
 export interface ScaleSpace {
   scales: number[];
   coefficients: Float64Type[][];
+  energies?: number[];
 }
 
 export interface OptimizedDWT {
   forward: (signal: Float64Type) => WaveletTransform;
   inverse: (transform: WaveletTransform) => Float64Type;
+  dispose?: () => void;
 }
