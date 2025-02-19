@@ -45,7 +45,15 @@ export class PPGProcessor {
       timeBuffer: new Float64Array(this.config.bufferSize),
       lastTimestamp: 0,
       sampleRate: this.config.sampleRate,
-      calibration: { ...config.calibration },
+      calibration: {
+        isCalibrating: false,
+        progress: 0,
+        message: '',
+        isCalibrated: false,
+        calibrationTime: 0,
+        referenceValues: new Float64Array(),
+        calibrationQuality: 0
+      },
       quality: {
         level: SignalQualityLevel.Invalid,
         score: 0,
@@ -304,8 +312,8 @@ export class PPGProcessor {
 
     return {
       snr,
-      distribution: Array.from(magnitude),
-      spectrum: Array.from(phase),
+      distribution: toFloat64Array(magnitude),
+      spectrum: toFloat64Array(phase),
       entropy: this.calculateEntropy(magnitude),
       kurtosis: this.calculateKurtosis(signal, mean, Math.sqrt(variance)),
       variance
@@ -406,9 +414,10 @@ export class PPGProcessor {
   private updateCalibration(rawSignal: number): void {
     if (!this.state.calibration.isCalibrating) return;
 
-    const newReferenceValues = new Float64Array(this.state.calibration.referenceValues.length + 1);
-    newReferenceValues.set(this.state.calibration.referenceValues);
-    newReferenceValues[this.state.calibration.referenceValues.length] = rawSignal;
+    const currentValues = this.state.calibration.referenceValues;
+    const newReferenceValues = new Float64Array(currentValues.length + 1);
+    newReferenceValues.set(currentValues);
+    newReferenceValues[currentValues.length] = rawSignal;
 
     this.state.calibration = {
       ...this.state.calibration,
