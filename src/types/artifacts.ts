@@ -4,19 +4,40 @@ import { SignalQuality } from './quality';
 import { Disposable } from './common';
 
 export interface ArtifactConfig {
-  temporal: boolean;
-  spectral: boolean;
-  statistical: boolean;
+  temporal: {
+    enabled: boolean;
+    threshold: number;
+    window: number;
+    features: string[];
+  };
+  spectral: {
+    enabled: boolean;
+    method: string;
+    window: string;
+    segments: number;
+    overlap: number;
+    bands: number[][];
+  };
+  statistical: {
+    enabled: boolean;
+    metrics: string[];
+    threshold: number;
+  };
   minQuality: number;
-  windowSize?: number;
-  overlapSize?: number;
-  validation?: boolean;
-  noise?: {
+  windowSize: number;
+  overlapSize: number;
+  validation: {
+    minQuality: number;
+    maxArtifacts: number;
+    consistency: number;
+    physiological: boolean;
+  };
+  noise: {
     enabled: boolean;
     methods: string[];
     thresholds: Record<string, number>;
   };
-  motion?: {
+  motion: {
     enabled: boolean;
     threshold: number;
     window: number;
@@ -73,8 +94,9 @@ export interface NoiseAnalysis extends Disposable {
   variance: number;
 }
 
-export interface ArtifactValidation {
+export interface ArtifactValidation extends Disposable {
   isValid: boolean;
   confidence: number;
   metrics: ArtifactMetrics;
 }
+

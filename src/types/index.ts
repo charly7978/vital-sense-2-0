@@ -1,15 +1,72 @@
 
-// Re-export everything with type keyword to avoid ambiguity
-export type * from './common';
-export type * from './config';
-export type * from './quality';
-export type * from './artifacts';
-export type * from './analysis';
-export type * from './frequency';
-export type * from './processing';
-export type * from './signal-processing';
-export type * from './wavelet';
-export type * from './vitals';
+// Export only what's needed and avoid duplicates
+export type {
+  // Common types
+  Float64Type,
+  Float32Type,
+  ProcessingMode,
+  ColorSpace,
+  MeasurementType,
+  SignalQualityLevelType,
+  Disposable,
+  BasicMetrics,
+  ROI
+} from './common';
 
-// Export consts and values normally
+// Quality types
+export type {
+  SignalQuality,
+  QualityMetrics
+} from './quality';
+
+// Config types
+export type {
+  CalibrationState,
+  ProcessingConfig,
+  SensitivitySettings
+} from './config';
+
+// Artifact types
+export type {
+  ArtifactConfig,
+  ArtifactDetection,
+  ArtifactFeatures,
+  ArtifactMetrics,
+  MotionAnalysis,
+  NoiseAnalysis,
+  ArtifactValidation,
+  ArtifactClassification,
+  SignalSegmentation
+} from './artifacts';
+
+// Analysis types
+export type {
+  IntervalAnalysis,
+  SpectralAnalysis,
+  FrequencyAnalysis,
+  PhaseAnalysis,
+  FrequencyBands,
+  ComplexArray,
+  WaveformQuality,
+  // Wavelet types
+  WaveletCoefficients,
+  WaveletTransform,
+  WaveletBasis,
+  WaveletPacket,
+  ScaleSpace,
+  SubbandFeatures,
+  OptimizedDWT,
+  WaveletAnalysis
+} from './analysis';
+
+// Vital types
+export type {
+  VitalReading,
+  PPGData,
+  PPGProcessingConfig,
+  ProcessingState
+} from './vitals';
+
+// Only export constants normally
 export { SignalQualityLevel } from './quality';
+
