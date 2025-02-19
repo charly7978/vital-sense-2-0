@@ -10,15 +10,15 @@ export interface WaveletCoefficients {
 export interface WaveletTransform {
   transform: (signal: Float64Type) => WaveletCoefficients;
   inverse: (coefficients: WaveletCoefficients) => Float64Type;
-  coefficients?: WaveletCoefficients;  // Optional storage for coefficients
-  forward?: (signal: Float64Type) => WaveletCoefficients; // Alias for transform
+  coefficients?: WaveletCoefficients;
+  forward?: (signal: Float64Type) => WaveletCoefficients;
 }
 
 export interface WaveletBasis {
   name: string;
   filter: Float64Type;
   scaling: Float64Type;
-  scale?: number; // Optional scale parameter
+  scale?: number;
 }
 
 export interface WaveletPacket {

@@ -18,18 +18,17 @@ export interface SignalQuality {
   noise?: number;
   frequency?: number;
   amplitude?: number;
-  dispose?: () => void;
   threshold?: number;
+  dispose?: () => void;
 }
 
 export interface QualityMetrics {
   snr: number;
   artifacts: number;
   stability: number;
-  overall: number;
-  confidence: number;
   noise: number;
   frequency: number;
   amplitude: number;
+  overall: number;
+  confidence: number;
 }
-

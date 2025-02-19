@@ -1,11 +1,9 @@
+
 import { SignalQuality } from './quality';
-import { CalibrationState, ProcessingConfig, SensitivitySettings } from './config';
-import { MeasurementType, MediaTrackConstraintsExtended } from './common';
 
 export interface VitalReading {
-  timestamp: number;
   value: number;
-  type: MeasurementType;
+  timestamp: number;
   confidence: number;
   quality?: SignalQuality;
 }
@@ -15,20 +13,23 @@ export interface PPGData {
   values: number[];
   bpm: number;
   confidence: number;
-  quality?: SignalQuality;
 }
 
-export interface VitalMeasurement {
-  reading: VitalReading;
-  calibration: CalibrationState;
-  timestamp: number;
-}
-
-export interface VitalConfig {
-  type: MeasurementType;
+export interface PPGProcessingConfig {
+  mode: 'normal' | 'calibration' | 'debug';
   sampleRate: number;
-  calibrationDuration: number;
-  updateInterval: number;
+  bufferSize: number;
+  sensitivity: {
+    brightness: number;
+    redIntensity: number;
+    signalAmplification: number;
+  };
+  filter: {
+    enabled: boolean;
+    lowCut: number;
+    highCut: number;
+    order: number;
+  };
 }
 
 export interface ProcessingState {
@@ -38,7 +39,15 @@ export interface ProcessingState {
   timeBuffer: Float64Array;
   lastTimestamp: number;
   sampleRate: number;
-  calibration: CalibrationState;
+  calibration: {
+    isCalibrating: boolean;
+    progress: number;
+    message: string;
+    isCalibrated: boolean;
+    calibrationTime: number;
+    referenceValues: Float64Array;
+    calibrationQuality: number;
+  };
   quality: SignalQuality;
   optimization: {
     cache: Map<string, any>;
@@ -46,22 +55,3 @@ export interface ProcessingState {
     resources: Map<string, any>;
   };
 }
-
-export interface PPGProcessingConfig extends ProcessingConfig {
-  filterCoefficients?: Float64Array;
-  mode: 'normal' | 'calibration' | 'debug';
-  sampleRate: number;
-  sensitivity: SensitivitySettings;
-  calibration: CalibrationState;
-}
-
-export interface ProcessorMetrics {
-  fps: number;
-  cpuTime: number;
-  memoryUsage: number;
-  cacheHits: number;
-  cacheMisses: number;
-  latency: number;
-}
-
-export type { MediaTrackConstraintsExtended };

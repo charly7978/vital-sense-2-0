@@ -1,6 +1,7 @@
 
 import { Float64Type } from './common';
 import { SignalQuality } from './quality';
+import { Disposable } from './common';
 
 export interface ArtifactConfig {
   temporal: boolean;
@@ -40,14 +41,13 @@ export interface ArtifactMetrics {
   overall: number;
 }
 
-export interface ArtifactDetection {
+export interface ArtifactDetection extends Disposable {
   isArtifact: boolean;
   type: string;
   confidence: number;
   features: ArtifactFeatures;
   quality: SignalQuality;
   metrics?: ArtifactMetrics;
-  dispose?: () => void;
 }
 
 export interface ArtifactFeatures {
@@ -77,9 +77,4 @@ export interface ArtifactValidation {
   isValid: boolean;
   confidence: number;
   metrics: ArtifactMetrics;
-}
-
-// Add Disposable interface
-interface Disposable {
-  dispose(): void;
 }
