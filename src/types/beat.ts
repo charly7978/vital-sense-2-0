@@ -1,6 +1,6 @@
 
 import { Float64Type } from './common';
-import { SignalQuality } from './quality';
+import { SignalQuality, SignalQualityLevelType } from './quality';
 
 export interface BeatConfig {
   sampleRate: number;
@@ -40,7 +40,7 @@ export interface BeatQuality extends SignalQuality {
   morphology: number;
   timing: number;
   physiological: number;
-  level: string;
+  level: SignalQualityLevelType; // Fixed type
   artifacts: number;
   noise: number;
 }

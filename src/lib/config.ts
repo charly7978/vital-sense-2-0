@@ -1,48 +1,40 @@
 
-import { SensitivitySettings, CalibrationState, ProcessingConfig } from '../types/calibration';
-import { ProcessingMode } from '../types/common';
+import { ProcessingConfig } from '../types/config';
 
-export const defaultSensitivitySettings: SensitivitySettings = {
-  brightness: 1.0,
-  redIntensity: 1.0,
-  signalAmplification: 1.0,
-  noiseReduction: 0.5,
-  peakDetection: 0.7,
-  heartbeatThreshold: 0.3,
-  responseTime: 0.2,
-  signalStability: 0.8,
-  snr: 10
-};
-
-export const defaultCalibrationState: CalibrationState = {
-  isCalibrating: false,
-  progress: 0,
-  message: '',
-  isCalibrated: false,
-  calibrationTime: 0,
-  referenceValues: new Float64Array(),
-  calibrationQuality: 0,
-  enabled: true,
-  duration: 5000,
-  reference: new Float64Array(),
-  lastCalibration: Date.now()
-};
-
-export const defaultConfig: ProcessingConfig = {
+export const config: ProcessingConfig = {
   mode: 'normal',
   sampleRate: 30,
-  bufferSize: 256,
-  enabled: true,
-  duration: 5000,
-  reference: new Float64Array(),
-  calibration: defaultCalibrationState,
+  sensitivity: {
+    brightness: 1.0,
+    redIntensity: 1.2,
+    signalAmplification: 1.5,
+    noiseReduction: 0.8,
+    peakDetection: 0.7,
+    heartbeatThreshold: 0.6,
+    responseTime: 100,
+    signalStability: 0.9
+  },
+  calibration: {
+    isCalibrating: false,
+    progress: 0,
+    message: '',
+    isCalibrated: false,
+    calibrationTime: 0,
+    referenceValues: new Float64Array(),
+    calibrationQuality: 0,
+    enabled: true,
+    duration: 5000,
+    reference: new Float64Array(),
+    lastCalibration: 0
+  },
   filter: {
     enabled: true,
     lowCut: 0.5,
     highCut: 4.0,
     order: 4,
-    nfft: 1024
+    nfft: 512
   },
+  bufferSize: 512,
   filterOrder: 4,
   lowCutoff: 0.5,
   highCutoff: 4.0,
@@ -50,10 +42,8 @@ export const defaultConfig: ProcessingConfig = {
   minPeakDistance: 0.3,
   calibrationDuration: 5000,
   adaptiveThreshold: true,
-  harmonics: {
-    enabled: true,
-    maxHarmonics: 5,
-    minAmplitude: 0.1,
-    tracking: true
+  validation: {
+    minQuality: 0.7,
+    maxArtifacts: 3
   }
 };
