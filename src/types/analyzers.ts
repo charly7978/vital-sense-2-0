@@ -1,11 +1,10 @@
-
 import { Float64Type } from './common';
 import { SignalQuality } from './quality';
 import { ValidationResult } from './core';
 import { SpectralAnalysis, WaveletAnalysis } from './analysis';
+import { CalibrationState } from './calibration';
 
-// Base analyzer interface
-export interface AnalyzerBase {
+export interface BaseAnalyzer {
   initialize(): void;
   dispose(): void;
   validateInput(input: Float64Type): boolean;
@@ -13,7 +12,49 @@ export interface AnalyzerBase {
   updateState(state: any): void;
 }
 
-// Beat detection types
+export interface ProcessorOptimization {
+  vectorization: boolean;
+  parallelization: boolean;
+  precision: 'single' | 'double';
+  cacheSize: number;
+  adaptiveWindow: boolean;
+}
+
+export interface SignalCalibration extends CalibrationState {
+  validate(): boolean;
+  reset(): void;
+}
+
+export interface ProcessingQuality extends SignalQuality {
+  temporal: number;
+  spectral: number;
+  wavelet?: number;
+  artifacts: number;
+}
+
+export interface BPConfig {
+  sampleRate: number;
+  windowSize: number;
+  method: 'PTT' | 'PAT' | 'PWV';  
+  calibration: {
+    duration: number;
+    samples: number;
+    reference: {
+      systolic: number;
+      diastolic: number;
+    };
+  };
+}
+
+export interface BPEstimation {
+  timestamp: number;
+  systolic: number;
+  diastolic: number;
+  map: number;
+  confidence: number;
+  quality: ProcessingQuality;
+}
+
 export interface BeatConfig {
   sampleRate: number;
   windowSize: number;
@@ -152,7 +193,6 @@ export interface PeakEnhancement {
   coefficients: Float64Type;
 }
 
-// Frequency analysis types
 export interface FrequencyResponse {
   magnitude: Float64Type;
   phase: Float64Type;
@@ -188,7 +228,6 @@ export interface FrequencyBands {
   cardiac: [number, number];
 }
 
-// Motion analysis types
 export interface MotionConfig {
   windowSize: number;
   overlap: number;
@@ -217,7 +256,6 @@ export interface StabilizationMatrix {
   quality: number;
 }
 
-// Wavelet analysis types
 export interface WaveletBasis {
   name: string;
   coefficients: Float64Type;
@@ -255,4 +293,3 @@ export interface WaveletCoefficients {
   details: Float64Type[];
   level: number;
 }
-

@@ -1,12 +1,10 @@
 
 import { SignalQualityLevel } from '../types/quality';
-import { 
-  ProcessingConfig, 
-  SensitivitySettings,
-  CalibrationState
-} from '../types/config';
+import { ProcessingMode, Float64Type } from '../types/common';
+import { ProcessingConfig, SensitivitySettings } from '../types/config';
+import { CalibrationState } from '../types/calibration';
 
-const defaultSensitivity: SensitivitySettings = {
+const defaultSensitivitySettings: SensitivitySettings = {
   brightness: 1.0,
   redIntensity: 1.2,
   signalAmplification: 1.0,
@@ -23,8 +21,12 @@ const defaultCalibration: CalibrationState = {
   message: '',
   isCalibrated: false,
   calibrationTime: 0,
-  referenceValues: new Float64Array(512),
-  calibrationQuality: 0
+  referenceValues: new Float64Array(),
+  calibrationQuality: 0,
+  enabled: true,
+  duration: 5000,
+  reference: new Float64Array(),
+  lastCalibration: Date.now()
 };
 
 export const config = {
@@ -44,7 +46,7 @@ export const config = {
     bufferSize: 512,
     windowSize: 256,
     mode: 'normal' as const,
-    sensitivity: defaultSensitivity,
+    sensitivity: defaultSensitivitySettings,
     calibration: defaultCalibration,
     optimization: {
       vectorization: true,
@@ -54,10 +56,10 @@ export const config = {
       adaptiveWindow: true
     }
   },
-  sensitivity: defaultSensitivity,
+  sensitivity: defaultSensitivitySettings,
   calibration: defaultCalibration,
   analysis: {
-    mode: 'normal' as const,
+    mode: 'normal' as ProcessingMode,
     quality: {
       minConfidence: 0.6,
       maxArtifacts: 0.3,

@@ -1,6 +1,5 @@
 
 import { ProcessingMode } from './common';
-import { FrequencyBands } from './analysis';
 import { Float64Type } from './common';
 import { CalibrationState } from './calibration';
 
@@ -47,3 +46,5 @@ export interface SensitivitySettings {
   signalStability: number;
   snr?: number;
 }
+
+export { CalibrationState };
