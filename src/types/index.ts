@@ -1,3 +1,4 @@
+
 // Export common types
 export type {
   Float64Type,
@@ -22,11 +23,14 @@ export type {
 
 // Config types
 export type {
+  ProcessingConfig,
+  SensitivitySettings,
+} from './config';
+
+export type {
   CalibrationState,
   CalibrationEntry,
   CalibratedResult,
-  ProcessingConfig,
-  SensitivitySettings,
   CalibrationInterface
 } from './calibration';
 
@@ -91,8 +95,7 @@ export type {
 // Analyzer types
 export type {
   BaseAnalyzer,
-  BeatConfig,
-  BeatDetection,
+  BeatDetection, 
   BeatFeatures,
   BeatMorphology,
   BeatQuality,
@@ -111,7 +114,7 @@ export type {
   FrequencyResponse,
   PowerSpectrum,
   SpectralDensity,
-  MotionConfig,
+  MotionConfig, 
   CompensationMode,
   StabilizationMatrix,
   WaveletBasis,

@@ -1,6 +1,6 @@
 
 import { SignalQualityLevel } from '../types/quality';
-import { ProcessingMode, Float64Type } from '../types/common';
+import { ProcessingMode } from '../types/common';
 import { ProcessingConfig, SensitivitySettings } from '../types/config';
 import { CalibrationState } from '../types/calibration';
 
@@ -45,7 +45,7 @@ export const config = {
     sampleRate: 30,
     bufferSize: 512,
     windowSize: 256,
-    mode: 'normal' as const,
+    mode: 'normal' as ProcessingMode,
     sensitivity: defaultSensitivitySettings,
     calibration: defaultCalibration,
     optimization: {
