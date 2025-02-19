@@ -16,6 +16,13 @@ export enum SignalQualityLevel {
 // Measurement types
 export type MeasurementType = 'ppg' | 'bp' | 'spo2' | 'resp';
 
+export interface VitalReading {
+  timestamp: number;
+  value: number;
+  quality: number;
+  type: MeasurementType;
+}
+
 export interface DeviceInfo {
   frameRate: number;
   resolution: {
@@ -23,6 +30,32 @@ export interface DeviceInfo {
     height: number;
   };
   lightLevel: Percent;
+}
+
+export interface SignalQuality {
+  level: SignalQualityLevel;
+  score: number;
+  confidence: number;
+  overall: number;
+  history: number[];
+  dispose?: () => void;
+}
+
+export interface MotionAnalysis {
+  displacement: number[];
+  velocity: number[];
+  acceleration: number[];
+  dispose?: () => void;
+}
+
+export interface NoiseAnalysis {
+  snr: number;
+  distribution: number[];
+  spectrum: number[];
+  entropy: number;
+  kurtosis: number;
+  variance: number;
+  dispose?: () => void;
 }
 
 export interface CalibrationState {
@@ -35,37 +68,6 @@ export interface CalibrationState {
   referenceValues?: Float64Array;
   calibrationQuality?: number;
 }
-
-export interface SignalQuality {
-  level: SignalQualityLevel;
-  score: number;
-  confidence: number;
-  overall: number;
-  history: number[];
-}
-
-export interface MotionAnalysis {
-  displacement: number[];
-  velocity: number[];
-  acceleration: number[];
-}
-
-export interface NoiseAnalysis {
-  snr: number;
-  distribution: number[];
-  spectrum: number[];
-  entropy: number;
-  kurtosis: number;
-  variance: number;
-}
-
-// Re-export shared types while avoiding duplicates
-export * from './signal';
-export * from './calibration';
-export * from './processing';
-export * from './wavelet';
-export * from './vitals';
-export * from './core';
 
 // Helper functions
 export const createPercent = (n: number): Percent => Math.max(0, Math.min(100, n)) as Percent;

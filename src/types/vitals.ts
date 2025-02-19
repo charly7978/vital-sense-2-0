@@ -1,4 +1,3 @@
-
 // IMPORTANTE: NO MODIFICAR FUNCIONALIDAD
 // Este archivo contiene los tipos base del sistema
 
@@ -21,6 +20,18 @@ export interface CircularBuffer<T> {
 export interface MediaTrackConstraintsExtended extends MediaTrackConstraints {
   deviceId?: string;
   facingMode?: 'user' | 'environment';
+  advanced?: {
+    exposureMode?: string;
+    exposureTime?: number;
+    exposureCompensation?: number;
+    brightness?: number;
+    contrast?: number;
+    whiteBalanceMode?: string;
+    colorTemperature?: number;
+    saturation?: number;
+    sharpness?: number;
+    torch?: boolean;
+  }[];
 }
 
 export interface FingerDetection {
@@ -122,4 +133,11 @@ export interface SensitivitySettings {
   signalStability: number;
   filterStrength?: number;
   adaptiveThreshold?: number;
+}
+
+export interface VitalReading {
+  timestamp: number;
+  value: number;
+  quality: number;
+  type: string;
 }

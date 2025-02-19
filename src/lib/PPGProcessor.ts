@@ -4,7 +4,8 @@ import {
   ProcessingConfig,
   CalibrationState,
   ProcessingState,
-  ProcessorMetrics
+  ProcessorMetrics,
+  SignalQualityLevel
 } from '@/types';
 
 export class PPGProcessor {
@@ -88,7 +89,7 @@ export class PPGProcessor {
         confidence: 0,
         score: 0,
         history: [],
-        level: 'invalid'
+        level: SignalQualityLevel.Invalid
       }
     };
 
@@ -361,7 +362,11 @@ export class PPGProcessor {
       signal: Math.min(Math.max(snr / 10, 0), 1),
       noise: Math.min(Math.max(1 - noisePower / signalPower, 0), 1),
       movement: Math.min(Math.max(1 - movement, 0), 1),
-      overall: 0
+      overall: 0,
+      level: SignalQualityLevel.Invalid,
+      score: 0,
+      confidence: 0,
+      history: []
     };
 
     // Calidad general ponderada
@@ -506,7 +511,7 @@ export class PPGProcessor {
         confidence: 0,
         score: 0,
         history: [],
-        level: 'invalid'
+        level: SignalQualityLevel.Invalid
       };
     } catch (error) {
       console.error('Error cleaning up resources:', error);
