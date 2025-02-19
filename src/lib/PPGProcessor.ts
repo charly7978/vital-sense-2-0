@@ -1,3 +1,4 @@
+
 import { 
   SignalQuality,
   SignalQualityLevel,
@@ -348,14 +349,14 @@ export class PPGProcessor {
     const movement = this.detectMovement(signal);
 
     // Calcular calidad general
-    const quality = {
-      signal: Math.min(Math.max(snr / 10, 0), 1),
-      noise: Math.min(Math.max(1 - noisePower / signalPower, 0), 1),
-      movement: Math.min(Math.max(1 - movement, 0), 1),
-      overall: 0,
+    const quality: SignalQuality = {
       level: SignalQualityLevel.Invalid,
       score: 0,
       confidence: 0,
+      overall: 0,
+      signal: Math.min(Math.max(snr / 10, 0), 1),
+      noise: Math.min(Math.max(1 - noisePower / signalPower, 0), 1),
+      movement: Math.min(Math.max(1 - movement, 0), 1),
       history: []
     };
 

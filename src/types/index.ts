@@ -16,11 +16,19 @@ export enum SignalQualityLevel {
 // Measurement types
 export type MeasurementType = 'ppg' | 'bp' | 'spo2' | 'resp';
 
+// Core data interfaces
 export interface PPGData {
   timestamp: number;
   values: number[];
   bpm: number;
   confidence: number;
+}
+
+export interface VitalReading {
+  timestamp: number;
+  value: number;
+  quality: number;
+  type: MeasurementType;
 }
 
 export interface SignalQuality {
@@ -29,9 +37,13 @@ export interface SignalQuality {
   confidence: number;
   overall: number;
   history: number[];
+  signal?: number;
+  noise?: number;
+  movement?: number;
   dispose?: () => void;
 }
 
+// Calibration interfaces
 export interface CalibrationState {
   isCalibrating: boolean;
   progress: number;
@@ -43,6 +55,7 @@ export interface CalibrationState {
   calibrationQuality?: number;
 }
 
+// Analysis interfaces
 export interface NoiseAnalysis {
   snr: number;
   distribution: number[];
@@ -52,6 +65,7 @@ export interface NoiseAnalysis {
   variance: number;
   spectralNoise?: number;
   threshold?: number;
+  waveletNoise?: number;
   dispose?: () => void;
 }
 
@@ -59,21 +73,60 @@ export interface MotionAnalysis {
   displacement: number[];
   velocity: number[];
   acceleration: number[];
+  threshold?: number;
   features?: any[];
   dispose?: () => void;
 }
 
-// Artifact Detection types
+// Signal processing interfaces
+export interface SignalConditions {
+  brightness: number;
+  contrast: number;
+  noise: number;
+  stability: number;
+}
+
+export interface CalibrationEntry {
+  timestamp: number;
+  values: Float64Array;
+  conditions: SignalConditions;
+  quality: number;
+}
+
+export interface CalibratedResult {
+  isCalibrated: boolean;
+  referenceValues?: Float64Array;
+  quality?: number;
+  timestamp?: number;
+}
+
+// Artifact detection interfaces
 export interface ArtifactConfig {
   threshold: number;
   windowSize: number;
   mode: 'default' | 'strict' | 'lenient';
+  sampleRate?: number;
+  overlapSize?: number;
+  noise?: {
+    methods: string[];
+    thresholds: Record<string, number>;
+  };
+  motion?: {
+    threshold: number;
+    window: number;
+    features: string[];
+    fusion: string;
+  };
 }
 
 export interface ArtifactDetection {
   isArtifact: boolean;
   confidence: number;
   type?: string;
+  artifacts?: ArtifactFeatures;
+  features?: any;
+  motion?: any;
+  dispose?: () => void;
 }
 
 export interface ArtifactFeatures {
@@ -82,7 +135,32 @@ export interface ArtifactFeatures {
   quality: SignalQuality;
 }
 
-// Signal Processing types
+export interface ArtifactClassification {
+  type: string;
+  confidence: number;
+  features: any[];
+}
+
+export interface SignalSegmentation {
+  segments: Float64Array[];
+  timestamps: number[];
+  quality: number[];
+}
+
+export interface ArtifactMetrics {
+  noise: number;
+  motion: number;
+  quality: number;
+  overall: number;
+}
+
+export interface ArtifactValidation {
+  isValid: boolean;
+  confidence: number;
+  metrics: ArtifactMetrics;
+}
+
+// Processing configuration interfaces
 export interface ProcessingConfig {
   mode: 'normal' | 'calibration' | 'debug';
   sampleRate?: number;
@@ -96,6 +174,13 @@ export interface ProcessingConfig {
   minPeakDistance: number;
   calibrationDuration: number;
   adaptiveThreshold: boolean;
+}
+
+export interface ProcessorMetrics {
+  snr: number;
+  bpm: number;
+  quality: SignalQuality;
+  timestamp: number;
 }
 
 export interface ProcessingState {
@@ -123,63 +208,6 @@ export interface SensitivitySettings {
   heartbeatThreshold: number;
   responseTime: number;
   signalStability: number;
-}
-
-// Camera types
-export interface MediaTrackConstraintsExtended extends MediaTrackConstraints {
-  width?: { ideal: number };
-  height?: { ideal: number };
-  facingMode?: 'user' | 'environment';
-  frameRate?: number;
-  exposureMode?: string;
-  exposureTime?: number;
-  exposureCompensation?: number;
-  brightness?: number;
-  contrast?: number;
-  whiteBalanceMode?: string;
-  colorTemperature?: number;
-  saturation?: number;
-  sharpness?: number;
-  torch?: boolean;
-}
-
-// Analysis types
-export interface SpectralAnalysis {
-  spectrum: Float64Array;
-  frequencies: Float64Array;
-  magnitude: Float64Array;
-  phase: Float64Array;
-  dispose?: () => void;
-}
-
-export interface WaveletAnalysis {
-  coefficients: Float64Array;
-  levels: number;
-  features: {
-    energy: number[];
-    entropy: number[];
-  };
-  dispose?: () => void;
-}
-
-// Template matching types
-export interface TemplateMatching {
-  similarity: number;
-  offset: number;
-  scale: number;
-}
-
-// Filter types
-export interface FilterConfig {
-  order: number;
-  cutoff: number[];
-  type: 'lowpass' | 'highpass' | 'bandpass';
-}
-
-export interface FilterResponse {
-  magnitude: Float64Array;
-  phase: Float64Array;
-  frequencies: Float64Array;
 }
 
 // Helper functions
