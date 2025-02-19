@@ -2,22 +2,14 @@ import {
   PPGData,
   SignalQuality,
   ProcessingConfig,
-  CalibrationState
+  CalibrationState,
+  ProcessingState,
+  ProcessorMetrics
 } from '@/types';
 
 export class PPGProcessor {
   private config: ProcessingConfig;
-  private state: {
-    buffer: Float64Array;
-    timeBuffer: Float64Array;
-    lastTimestamp: number;
-    frameCount: number;
-    sampleRate: number;
-    isProcessing: boolean;
-    calibration: CalibrationState;
-    quality: SignalQuality;
-  };
-
+  private state: ProcessingState;
   private components: {
     filter: {
       coefficients: Float64Array;
@@ -48,29 +40,55 @@ export class PPGProcessor {
       peakThreshold: 0.3,
       minPeakDistance: 0.3,
       calibrationDuration: 5000,
-      adaptiveThreshold: true
+      adaptiveThreshold: true,
+      mode: 'normal',
+      sensitivity: {
+        brightness: 1.0,
+        redIntensity: 1.0,
+        signalAmplification: 1.0,
+        noiseReduction: 1.0,
+        peakDetection: 1.0,
+        heartbeatThreshold: 1.0,
+        responseTime: 1.0,
+        signalStability: 1.0
+      },
+      calibration: {
+        isCalibrating: false,
+        progress: 0,
+        message: '',
+        isCalibrated: false,
+        calibrationTime: 0,
+        referenceValues: new Float64Array(),
+        calibrationQuality: 0
+      }
     };
 
     // Estado inicial
     this.state = {
+      isProcessing: false,
+      frameCount: 0,
       buffer: new Float64Array(this.config.bufferSize),
       timeBuffer: new Float64Array(this.config.bufferSize),
       lastTimestamp: 0,
-      frameCount: 0,
       sampleRate: this.config.sampleRate,
-      isProcessing: false,
       calibration: {
-        isCalibrated: false,
         isCalibrating: false,
         progress: 0,
+        message: '',
+        isCalibrated: false,
+        calibrationTime: 0,
         referenceValues: new Float64Array(),
-        quality: 0
+        calibrationQuality: 0
       },
       quality: {
         overall: 0,
         signal: 0,
         noise: 0,
-        movement: 0
+        movement: 0,
+        confidence: 0,
+        score: 0,
+        history: [],
+        level: 'invalid'
       }
     };
 
@@ -394,8 +412,10 @@ export class PPGProcessor {
       isCalibrated: false,
       isCalibrating: true,
       progress: 0,
+      message: '',
       referenceValues: new Float64Array(this.config.bufferSize),
-      quality: 0
+      calibrationQuality: 0,
+      calibrationTime: 0
     };
 
     // Detener calibración después del tiempo configurado
@@ -431,7 +451,7 @@ export class PPGProcessor {
     // Finalizar calibración
     this.state.calibration.isCalibrating = false;
     this.state.calibration.isCalibrated = true;
-    this.state.calibration.quality = this.calculateCalibrationQuality();
+    this.state.calibration.calibrationQuality = this.calculateCalibrationQuality();
   }
 
   private calculateCalibrationQuality(): number {
@@ -443,7 +463,53 @@ export class PPGProcessor {
 
   public stop(): void {
     this.state.isProcessing = false;
+    this.cleanupResources();
     this.resetBuffers();
     this.state.calibration.isCalibrating = false;
+  }
+
+  private cleanupResources(): void {
+    try {
+      // Limpiar buffers
+      this.state.buffer = new Float64Array(this.config.bufferSize);
+      this.state.timeBuffer = new Float64Array(this.config.bufferSize);
+      
+      // Limpiar componentes
+      this.components.filter.state.fill(0);
+      this.components.detector.peaks = [];
+      this.components.detector.valleys = [];
+      this.components.analyzer.spectrum.fill(0);
+      this.components.analyzer.phase.fill(0);
+      this.components.analyzer.magnitude.fill(0);
+      
+      // Resetear métricas y estados
+      this.state.frameCount = 0;
+      this.state.lastTimestamp = 0;
+      
+      // Limpiar calibración
+      this.state.calibration = {
+        isCalibrated: false,
+        isCalibrating: false,
+        progress: 0,
+        message: '',
+        referenceValues: new Float64Array(),
+        calibrationQuality: 0,
+        calibrationTime: 0
+      };
+      
+      // Limpiar calidad
+      this.state.quality = {
+        overall: 0,
+        signal: 0,
+        noise: 0,
+        movement: 0,
+        confidence: 0,
+        score: 0,
+        history: [],
+        level: 'invalid'
+      };
+    } catch (error) {
+      console.error('Error cleaning up resources:', error);
+    }
   }
 }

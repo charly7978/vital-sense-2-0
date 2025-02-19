@@ -11,20 +11,30 @@ export interface ProcessingConfig {
   sampleRate?: number;
   sensitivity: SensitivitySettings;
   calibration: CalibrationState;
+  bufferSize: number;
+  filterOrder: number;
+  lowCutoff: number;
+  highCutoff: number;
+  peakThreshold: number;
+  minPeakDistance: number;
+  calibrationDuration: number;
+  adaptiveThreshold: boolean;
 }
 
 export interface ProcessingState {
   isProcessing: boolean;
   frameCount: number;
   calibration: CalibrationState;
+  buffer: Float64Array;
+  timeBuffer: Float64Array;
+  lastTimestamp: number;
+  sampleRate: number;
+  quality: SignalQuality;
   optimization?: {
     cache: boolean;
     performance: boolean;
     memory: boolean;
   };
-  startTime: number;
-  errorCount: number;
-  lastProcessingTime: number;
 }
 
 export interface ProcessorMetrics {
@@ -33,6 +43,19 @@ export interface ProcessorMetrics {
   memoryUsage: number;
   quality: SignalQuality;
   errorRate: number;
+  signalQuality: number;
+  signalToNoise: number;
+  movementIndex: number;
+  perfusionIndex: number;
+  confidence: number;
+  stability: number;
+  coverage: number;
+}
+
+export interface ProcessingPipeline {
+  initialize(): void;
+  process(data: any): Promise<any>;
+  cleanup(): void;
 }
 
 export interface QualityParams {
@@ -41,11 +64,7 @@ export interface QualityParams {
   motion: MotionAnalysis;
   heartRate: number;
   features: any;
+  fingerDetection?: any;
 }
 
-// NO MODIFICAR: Mantener compatibilidad con implementaciones existentes
-export interface ProcessingPipeline {
-  initialize(): void;
-  process(data: any): Promise<any>;
-  cleanup(): void;
-}
+export type ProcessingMode = 'normal' | 'calibration' | 'debug';
