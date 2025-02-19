@@ -100,6 +100,37 @@ export class PPGProcessor {
     }
   }
 
+  private handleInitializationError(error: any): void {
+    console.error('Error initializing PPG processor:', error);
+    this.metrics = {
+      signalQuality: 0,
+      signalToNoise: 0,
+      movementIndex: 0,
+      perfusionIndex: 0,
+      confidence: 0,
+      stability: 0,
+      coverage: 0
+    };
+    this.processingState = {
+      isProcessing: false,
+      calibrationPhase: 'initial',
+      lastProcessingTime: 0,
+      frameCount: 0,
+      validFrames: 0,
+      errorCount: 0,
+      startTime: 0,
+      lastHeartRate: 0,
+      stability: 0,
+      confidence: 0
+    };
+    
+    // Emit error event
+    this.emit('error', { 
+      type: 'initialization_error',
+      message: error.message || 'Failed to initialize PPG processor'
+    });
+  }
+
   /**
    * Procesa un nuevo frame de video
    * @param frame Frame de la cámara
