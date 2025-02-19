@@ -45,8 +45,8 @@ export interface FilterConfig {
   window?: 'hamming' | 'hanning' | 'blackman';
   sampleRate?: number;
   bands?: FrequencyBands;
-  adaptive?: boolean;
-  bank?: boolean;
+  adaptive: boolean;
+  bank: boolean;
   threshold?: number;
 }
 
@@ -84,3 +84,4 @@ export interface FrequencyConfig {
     adaptiveWindow: boolean;
   };
 }
+

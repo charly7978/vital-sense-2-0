@@ -1,12 +1,13 @@
 
 // Numeric types
-export type Float64Type = Float64Array; // Changed from number[] to Float64Array
+export type Float64Type = Float64Array; 
 export type Float32Type = Float32Array;
 
 // Basic types
 export type ProcessingMode = 'normal' | 'calibration' | 'debug';
 export type ColorSpace = 'rgb' | 'yuv' | 'hsv';
 export type MeasurementType = 'ppg' | 'bp' | 'spo2' | 'resp';
+export type SignalQualityLevelType = 'excellent' | 'good' | 'fair' | 'poor' | 'invalid';
 
 // Basic interfaces
 export interface BasicMetrics {
@@ -34,3 +35,4 @@ export interface MediaTrackConstraintsExtended extends MediaTrackConstraints {
 export interface Disposable {
   dispose?: () => void;
 }
+

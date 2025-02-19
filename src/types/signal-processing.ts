@@ -1,6 +1,5 @@
-
 import { SignalQuality } from './quality';
-import { Float64Type } from './common';
+import { Float64Type, MeasurementType } from './common';
 import { FrequencyBands, SpectralFeatures } from './analysis';
 
 export interface SignalConditions {
@@ -10,7 +9,7 @@ export interface SignalConditions {
   coverage: number;
   temperature: number;
   stability: number;
-  measurementType: string;
+  measurementType: MeasurementType;
 }
 
 export interface CalibrationEntry {
@@ -144,5 +143,3 @@ export interface BeatValidation {
   confidence: number;
   metrics: BeatMetrics;
 }
-
-// Add more interfaces as needed

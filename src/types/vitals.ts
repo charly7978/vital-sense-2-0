@@ -1,4 +1,3 @@
-
 import { SignalQuality } from './quality';
 import { CalibrationState, ProcessingConfig, SensitivitySettings } from './config';
 import { MeasurementType, MediaTrackConstraintsExtended } from './common';
@@ -65,4 +64,4 @@ export interface ProcessorMetrics {
   latency: number;
 }
 
-export { MediaTrackConstraintsExtended };
+export type { MediaTrackConstraintsExtended };
