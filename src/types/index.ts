@@ -199,6 +199,23 @@ export interface WaveletTransform {
   reconstructed: Float64Array;
 }
 
+// Extender MediaTrackConstraints correctamente
+export interface MediaTrackConstraintsExtended extends MediaTrackConstraints {
+  width: { ideal: number };
+  height: { ideal: number };
+  frameRate: { ideal: number };
+  facingMode: { ideal: string } | string;
+  torch?: boolean;
+}
+
+// Agregar el método startCalibration a PPGProcessor
+export interface PPGProcessor {
+  startCalibration(): void;
+  stop(): void;
+  processFrame(frame: ImageData): PPGData;
+  // ... otros métodos existentes
+}
+
 // Tipos para la cámara
 export interface MediaTrackConstraintsExtended extends MediaTrackConstraints {
   width: { ideal: number };
