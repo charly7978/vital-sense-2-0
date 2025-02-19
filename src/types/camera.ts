@@ -1,32 +1,55 @@
 
-export interface CameraConfig extends MediaTrackConstraints {
-  width: { ideal: number };
-  height: { ideal: number };
-  facingMode: 'user' | 'environment';
-  frameRate: { ideal: number };
-  advanced?: MediaTrackConstraintSet[];
-}
+import { ColorSpace, ROI } from './common';
 
-export interface ImageEnhancement {
-  brightness: number;
-  contrast: number;
-  saturation: number;
-  sharpness: number;
-}
-
-export interface ColorAnalysis {
-  channels: number[][];
-  histogram: number[][];
-  statistics: {
-    mean: number[];
-    std: number[];
-    entropy: number[];
+export interface ImageConfig {
+  width: number;
+  height: number;
+  channels: number;
+  colorSpace: ColorSpace;
+  resolution?: {
+    width: number;
+    height: number;
+  };
+  optimization?: {
+    cache: boolean;
+    parallel: boolean;
+    cacheSize: number;
+    vectorization: boolean;
   };
 }
 
-export interface EdgeDetection {
-  method: 'sobel' | 'canny';
-  threshold: number;
+export interface ColorProfile {
+  mean: number[];
+  std: number[];
+  histogram: number[][];
+  skinLikelihood?: number;
+  ratios?: number[];
+}
+
+export interface ImageQuality {
+  sharpness: number;
+  brightness: number;
+  contrast: number;
+  noise: number;
+  exposure?: number;
+  overall?: number;
+}
+
+export interface ImageMetrics {
+  quality: ImageQuality;
+  profile: ColorProfile;
+  roi: ROI;
+}
+
+export interface ProcessingResult {
+  image: ImageData;
+  metrics: ImageMetrics;
+  timestamp: number;
+}
+
+export interface AdaptiveFilter {
+  type: 'mean' | 'gaussian';
+  kernelSize: number;
   sigma?: number;
 }
 
@@ -36,18 +59,8 @@ export interface NoiseReduction {
   sigma?: number;
 }
 
-export interface AdaptiveFilter {
-  type: 'mean' | 'gaussian';
-  blockSize: number;
-  constant: number;
+export interface EdgeDetection {
+  method: 'sobel' | 'canny';
+  threshold: number;
+  sigma?: number;
 }
-
-export interface ImageMetrics {
-  sharpness: number;
-  brightness: number;
-  contrast: number;
-  noise: number;
-  quality: number;
-}
-
-export type ProcessingMode = 'preview' | 'capture' | 'analysis';

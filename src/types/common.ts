@@ -1,11 +1,19 @@
 
-// Basic numeric types and arrays
+// Basic numeric types
 export type Float64Array = number[];
 
-// Basic enums and types
+// Basic enums
+export enum SignalQualityLevel {
+  Excellent = 'excellent',
+  Good = 'good',
+  Fair = 'fair',
+  Poor = 'poor',
+  Invalid = 'invalid'
+}
+
+// Basic types
 export type ProcessingMode = 'normal' | 'calibration' | 'debug';
 export type ColorSpace = 'rgb' | 'yuv' | 'hsv';
-export type SignalQualityLevel = 'excellent' | 'good' | 'fair' | 'poor' | 'invalid';
 export type MeasurementType = 'ppg' | 'bp' | 'spo2' | 'resp';
 
 // Basic interfaces
@@ -20,6 +28,15 @@ export interface ROI {
   y: number;
   width: number;
   height: number;
+}
+
+// Media interfaces
+export interface MediaTrackConstraintsExtended extends MediaTrackConstraints {
+  width?: { ideal: number };
+  height?: { ideal: number };
+  facingMode?: 'user' | 'environment';
+  frameRate?: { ideal: number };
+  advanced?: MediaTrackConstraintSet[];
 }
 
 export interface Disposable {

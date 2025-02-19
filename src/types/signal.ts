@@ -1,5 +1,7 @@
 
-import { Float64Array } from '@/types';
+import { SignalQuality } from './quality';
+import { ProcessingConfig } from './config';
+import { Float64Array } from './common';
 
 export interface SignalAnalysis {
   features: SignalFeatures;
@@ -11,6 +13,32 @@ export interface SignalFeatures {
   temporal: TemporalFeatures;
   spectral: SpectralFeatures;
   statistical: StatisticalFeatures;
+}
+
+export interface ProcessorMetrics {
+  snr: number;
+  bpm: number;
+  quality: SignalQuality;
+  timestamp: number;
+}
+
+export interface FilterConfig {
+  order: number;
+  cutoff: number[];
+  type: 'lowpass' | 'highpass' | 'bandpass';
+  window?: 'hamming' | 'hanning' | 'blackman';
+  sampleRate?: number;
+  bands?: {
+    vlf: [number, number];
+    lf: [number, number];
+    hf: [number, number];
+    total: [number, number];
+    cardiac?: [number, number];
+    respiratory?: [number, number];
+    mains?: [number, number];
+  };
+  adaptive?: boolean;
+  bank?: boolean;
 }
 
 export interface TemporalFeatures {
