@@ -1,488 +1,530 @@
-import { SignalQualityLevel, SensitivitySettings } from '@/types';
+import {
+  QualityConfig, QualityMetrics, SignalFeatures,
+  NoiseAnalysis, ArtifactDetection, SignalStability,
+  FrequencyContent, PhaseAnalysis, AmplitudeAnalysis,
+  QualityScore, ValidationResult, ConfidenceLevel,
+  SpectralDensity, WaveletDecomposition
+} from '@/types';
 
+/**
+ * Analizador avanzado de calidad de señal PPG
+ * Implementa técnicas de última generación para validación de señal
+ * @version 2.0.0
+ */
 export class SignalQualityAnalyzer {
-  // Configuración de análisis
-  private readonly config = {
-    windowSize: 256,
-    minSNR: 5.0,        // dB
-    maxMotion: 0.3,     // Umbral de movimiento
-    minBrightness: 0.2,
-    maxBrightness: 0.9,
-    minContrast: 0.15,
-    minStability: 0.7,
-    sampleRate: 30,     // Hz
+  // Configuración optimizada
+  private readonly config: QualityConfig = {
+    windowSize: 256,        // Muestras
+    overlapSize: 128,       // Solapamiento
+    minQuality: 0.7,        // 0-1
+    maxNoise: 0.3,         // 0-1
     
-    // Pesos para métricas de calidad
-    weights: {
-      snr: 0.25,
-      stability: 0.20,
-      motion: 0.15,
-      brightness: 0.15,
-      contrast: 0.15,
-      frequency: 0.10
+    // Configuración de análisis
+    analysis: {
+      snrThreshold: 10.0,   // dB
+      stabilityThreshold: 0.8,
+      artifactThreshold: 0.2,
+      frequencyBands: {
+        noise: [0.0, 0.5],   // Hz
+        respiratory: [0.5, 1.0],
+        cardiac: [1.0, 2.5],
+        harmonic: [2.5, 5.0]
+      }
     },
 
-    // Umbrales de calidad
-    thresholds: {
-      excellent: 0.85,
-      good: 0.70,
-      fair: 0.50,
-      poor: 0.30
+    // Configuración de validación
+    validation: {
+      minAmplitude: 0.1,
+      maxAmplitude: 2.0,
+      minFrequency: 0.8,    // Hz
+      maxFrequency: 2.5,    // Hz
+      phaseCoherence: 0.7,
+      waveformStability: 0.8
+    },
+
+    // Pesos de métricas
+    weights: {
+      snr: 0.3,
+      stability: 0.2,
+      artifacts: 0.2,
+      frequency: 0.15,
+      amplitude: 0.15
+    },
+
+    // Configuración de wavelet
+    wavelet: {
+      type: 'db4',
+      levels: 5,
+      threshold: 'sure',
+      noiseEstimate: 'mad'
     }
   };
 
-  // Propiedades de clase
-  private buffer: Float32Array;
-  private qualityHistory: number[] = [];
-  private motionHistory: number[] = [];
-  private frequencyHistory: number[] = [];
-  private baselineNoise: number;
-  private lastUpdate: number;
-  private readonly hannWindow: Float32Array;
-  private readonly fft: FFTAnalyzer;
-  private readonly fftSize = 256;
-  private maxHistoryLength = 10;
-  private settings: SensitivitySettings = {
-    signalAmplification: 1,
-    noiseReduction: 1,
-    signalStability: 1
+  // Procesadores especializados
+  private readonly noiseAnalyzer: NoiseAnalysis;
+  private readonly artifactDetector: ArtifactDetection;
+  private readonly stabilityAnalyzer: SignalStability;
+  private readonly frequencyAnalyzer: FrequencyContent;
+  private readonly phaseAnalyzer: PhaseAnalysis;
+  private readonly amplitudeAnalyzer: AmplitudeAnalysis;
+
+  // Buffers optimizados
+  private readonly buffers = {
+    signal: new Float64Array(1024),
+    noise: new Float64Array(1024),
+    spectrum: new Float64Array(512),
+    wavelets: new Float64Array(1024),
+    features: new Float64Array(64),
+    metrics: new Float64Array(32)
   };
 
+  // Cache y estado
+  private readonly metricsHistory: QualityMetrics[] = [];
+  private readonly featureCache = new Map<string, SignalFeatures>();
+  private lastValidSignal: Float64Array | null = null;
+
   constructor() {
-    this.buffer = new Float32Array(this.config.windowSize);
-    this.hannWindow = this.createHannWindow();
-    this.fft = new FFTAnalyzer(this.fftSize);
     this.initializeAnalyzer();
   }
 
-  private initializeAnalyzer(): void {
-    this.qualityHistory = new Array(10).fill(0);
-    this.motionHistory = new Array(10).fill(0);
-    this.frequencyHistory = new Array(10).fill(0);
-    this.baselineNoise = 0.1;
-    this.lastUpdate = Date.now();
-  }
-
-  public analyzeQuality(signal: Float32Array): SignalQualityLevel {
+  /**
+   * Análisis principal de calidad
+   * Implementa pipeline completo de validación
+   */
+  public analyze(signal: Float64Array): QualityMetrics {
     try {
-      if (!signal || signal.length === 0) {
-        throw new Error('Invalid signal input');
+      // 1. Validación de señal
+      if (!this.validateSignal(signal)) {
+        throw new Error('Invalid signal for quality analysis');
       }
 
-      // Actualizar buffer
-      this.updateBuffer(signal);
+      // 2. Extracción de características
+      const features = this.extractFeatures(signal);
 
-      // Análisis completo
-      const metrics = this.calculateMetrics();
-      
-      // Calcular score de calidad
-      const qualityScore = this.calculateQualityScore(metrics);
-      
-      // Actualizar historiales
-      this.updateHistories(metrics, qualityScore);
-      
-      // Determinar nivel de calidad
-      return this.determineQualityLevel(qualityScore);
+      // 3. Análisis de ruido
+      const noise = this.analyzeNoise(signal, features);
+
+      // 4. Detección de artefactos
+      const artifacts = this.detectArtifacts(signal, features);
+
+      // 5. Análisis de estabilidad
+      const stability = this.analyzeStability(signal, features);
+
+      // 6. Análisis frecuencial
+      const frequency = this.analyzeFrequencyContent(signal);
+
+      // 7. Análisis de fase
+      const phase = this.analyzePhase(signal, frequency);
+
+      // 8. Análisis de amplitud
+      const amplitude = this.analyzeAmplitude(signal);
+
+      // 9. Cálculo de métricas
+      const metrics = this.calculateMetrics({
+        noise,
+        artifacts,
+        stability,
+        frequency,
+        phase,
+        amplitude
+      });
+
+      // 10. Validación de calidad
+      const validation = this.validateQuality(metrics);
+
+      // 11. Actualización de estado
+      this.updateState(signal, metrics, validation);
+
+      return {
+        metrics,
+        validation,
+        features,
+        confidence: this.calculateConfidence(metrics)
+      };
 
     } catch (error) {
-      console.error('Error analyzing quality:', error);
-      return SignalQualityLevel.Invalid;
+      console.error('Error in quality analysis:', error);
+      return this.handleAnalysisError(error);
     }
   }
 
-  private calculateMetrics(): {
-    snr: number;
-    stability: number;
-    motion: number;
-    brightness: number;
-    contrast: number;
-    frequency: number;
-    entropy: number;
-    harmonics: number[];
-  } {
-    try {
-      // Preparar señal para análisis
-      const windowedSignal = this.applyWindow(this.buffer);
-      
-      // Análisis espectral
-      const spectrum = this.fft.forward(windowedSignal);
-      const harmonics = this.analyzeHarmonics(spectrum);
-      
-      // Calcular métricas individuales
-      return {
-        snr: this.calculateSNR(windowedSignal, spectrum),
-        stability: this.calculateStability(windowedSignal),
-        motion: this.calculateMotion(),
-        brightness: this.calculateBrightness(windowedSignal),
-        contrast: this.calculateContrast(windowedSignal),
-        frequency: this.estimateFrequency(spectrum),
-        entropy: this.calculateSpectralEntropy(spectrum),
-        harmonics
-      };
-    } catch (error) {
-      console.error('Error calculating metrics:', error);
-      return {
-        snr: 0,
-        stability: 0,
-        motion: 1,
-        brightness: 0,
-        contrast: 0,
-        frequency: 0,
-        entropy: 0,
-        harmonics: []
-      };
+  /**
+   * Extracción avanzada de características
+   */
+  private extractFeatures(signal: Float64Array): SignalFeatures {
+    // 1. Características temporales
+    const temporal = this.extractTemporalFeatures(signal);
+
+    // 2. Características frecuenciales
+    const spectral = this.extractSpectralFeatures(signal);
+
+    // 3. Características wavelet
+    const wavelet = this.extractWaveletFeatures(signal);
+
+    // 4. Características morfológicas
+    const morphological = this.extractMorphologicalFeatures(signal);
+
+    // 5. Características estadísticas
+    const statistical = this.extractStatisticalFeatures(signal);
+
+    return {
+      temporal,
+      spectral,
+      wavelet,
+      morphological,
+      statistical
+    };
+  }
+
+  /**
+   * Análisis avanzado de ruido
+   */
+  private analyzeNoise(
+    signal: Float64Array,
+    features: SignalFeatures
+  ): NoiseAnalysis {
+    // 1. Estimación de SNR
+    const snr = this.estimateSNR(signal);
+
+    // 2. Análisis espectral de ruido
+    const spectralNoise = this.analyzeSpectralNoise(
+      features.spectral
+    );
+
+    // 3. Análisis wavelet de ruido
+    const waveletNoise = this.analyzeWaveletNoise(
+      features.wavelet
+    );
+
+    // 4. Detección de impulsos
+    const impulseNoise = this.detectImpulseNoise(signal);
+
+    // 5. Análisis de baseline
+    const baselineNoise = this.analyzeBaselineNoise(signal);
+
+    return {
+      snr,
+      spectralNoise,
+      waveletNoise,
+      impulseNoise,
+      baselineNoise,
+      overall: this.calculateOverallNoise([
+        snr,
+        spectralNoise,
+        waveletNoise,
+        impulseNoise,
+        baselineNoise
+      ])
+    };
+  }
+
+  /**
+   * Detección avanzada de artefactos
+   */
+  private detectArtifacts(
+    signal: Float64Array,
+    features: SignalFeatures
+  ): ArtifactDetection {
+    // 1. Detección de movimiento
+    const motion = this.detectMotionArtifacts(signal);
+
+    // 2. Detección de saturación
+    const saturation = this.detectSaturation(signal);
+
+    // 3. Detección de pérdida de señal
+    const signalLoss = this.detectSignalLoss(signal);
+
+    // 4. Detección de interferencias
+    const interference = this.detectInterference(
+      features.spectral
+    );
+
+    // 5. Detección de outliers
+    const outliers = this.detectOutliers(signal);
+
+    return {
+      motion,
+      saturation,
+      signalLoss,
+      interference,
+      outliers,
+      overall: this.calculateOverallArtifacts([
+        motion,
+        saturation,
+        signalLoss,
+        interference,
+        outliers
+      ])
+    };
+  }
+
+  /**
+   * Análisis de estabilidad
+   */
+  private analyzeStability(
+    signal: Float64Array,
+    features: SignalFeatures
+  ): SignalStability {
+    // 1. Estabilidad temporal
+    const temporal = this.analyzeTemporalStability(signal);
+
+    // 2. Estabilidad frecuencial
+    const spectral = this.analyzeSpectralStability(
+      features.spectral
+    );
+
+    // 3. Estabilidad de fase
+    const phase = this.analyzePhaseStability(signal);
+
+    // 4. Estabilidad morfológica
+    const morphological = this.analyzeMorphologicalStability(
+      features.morphological
+    );
+
+    // 5. Estabilidad estadística
+    const statistical = this.analyzeStatisticalStability(
+      features.statistical
+    );
+
+    return {
+      temporal,
+      spectral,
+      phase,
+      morphological,
+      statistical,
+      overall: this.calculateOverallStability([
+        temporal,
+        spectral,
+        phase,
+        morphological,
+        statistical
+      ])
+    };
+  }
+
+  /**
+   * Análisis de contenido frecuencial
+   */
+  private analyzeFrequencyContent(signal: Float64Array): FrequencyContent {
+    // 1. Análisis espectral
+    const spectrum = this.computeSpectrum(signal);
+
+    // 2. Análisis de bandas
+    const bands = this.analyzeBands(spectrum);
+
+    // 3. Análisis de armónicos
+    const harmonics = this.analyzeHarmonics(spectrum);
+
+    // 4. Análisis de coherencia
+    const coherence = this.analyzeSpectralCoherence(spectrum);
+
+    // 5. Análisis de estacionariedad
+    const stationarity = this.analyzeStationarity(spectrum);
+
+    return {
+      spectrum,
+      bands,
+      harmonics,
+      coherence,
+      stationarity,
+      overall: this.calculateFrequencyQuality([
+        bands,
+        harmonics,
+        coherence,
+        stationarity
+      ])
+    };
+  }
+
+  /**
+   * Validación de calidad
+   */
+  private validateQuality(metrics: QualityMetrics): ValidationResult {
+    // 1. Validación de SNR
+    const snrValid = metrics.noise.snr > this.config.analysis.snrThreshold;
+
+    // 2. Validación de estabilidad
+    const stabilityValid = metrics.stability.overall > 
+      this.config.validation.waveformStability;
+
+    // 3. Validación de artefactos
+    const artifactsValid = metrics.artifacts.overall < 
+      this.config.analysis.artifactThreshold;
+
+    // 4. Validación frecuencial
+    const frequencyValid = this.validateFrequencyContent(
+      metrics.frequency
+    );
+
+    // 5. Validación de amplitud
+    const amplitudeValid = this.validateAmplitude(
+      metrics.amplitude
+    );
+
+    return {
+      snrValid,
+      stabilityValid,
+      artifactsValid,
+      frequencyValid,
+      amplitudeValid,
+      overall: this.calculateOverallValidation([
+        snrValid,
+        stabilityValid,
+        artifactsValid,
+        frequencyValid,
+        amplitudeValid
+      ])
+    };
+  }
+
+  /**
+   * Cálculo de confianza
+   */
+  private calculateConfidence(metrics: QualityMetrics): ConfidenceLevel {
+    // 1. Confianza basada en ruido
+    const noiseConfidence = this.calculateNoiseConfidence(
+      metrics.noise
+    );
+
+    // 2. Confianza basada en estabilidad
+    const stabilityConfidence = this.calculateStabilityConfidence(
+      metrics.stability
+    );
+
+    // 3. Confianza basada en artefactos
+    const artifactConfidence = this.calculateArtifactConfidence(
+      metrics.artifacts
+    );
+
+    // 4. Confianza frecuencial
+    const frequencyConfidence = this.calculateFrequencyConfidence(
+      metrics.frequency
+    );
+
+    // 5. Confianza de amplitud
+    const amplitudeConfidence = this.calculateAmplitudeConfidence(
+      metrics.amplitude
+    );
+
+    return {
+      noise: noiseConfidence,
+      stability: stabilityConfidence,
+      artifacts: artifactConfidence,
+      frequency: frequencyConfidence,
+      amplitude: amplitudeConfidence,
+      overall: this.calculateOverallConfidence([
+        noiseConfidence,
+        stabilityConfidence,
+        artifactConfidence,
+        frequencyConfidence,
+        amplitudeConfidence
+      ])
+    };
+  }
+
+  /**
+   * Optimizaciones de bajo nivel
+   */
+  private computeSpectrum(signal: Float64Array): SpectralDensity {
+    const spectrum = new Float64Array(this.buffers.spectrum.length);
+    
+    // FFT optimizada
+    const fft = this.computeOptimizedFFT(signal);
+    
+    // Cálculo de densidad espectral
+    for (let i = 0; i < spectrum.length; i++) {
+      const real = fft[i * 2];
+      const imag = fft[i * 2 + 1];
+      spectrum[i] = (real * real + imag * imag) / spectrum.length;
     }
-  }
-
-  private calculateSNR(signal: Float32Array, spectrum: Float32Array): number {
-    const signalBand = this.extractSignalBand(spectrum);
-    const noiseBand = this.extractNoiseBand(spectrum);
     
-    const signalPower = signalBand.reduce((sum, val) => sum + val * val, 0);
-    const noisePower = noiseBand.reduce((sum, val) => sum + val * val, 0);
+    return {
+      frequencies: this.generateFrequencyAxis(),
+      magnitudes: spectrum,
+      resolution: this.config.windowSize
+    };
+  }
+
+  private computeWaveletDecomposition(
+    signal: Float64Array
+  ): WaveletDecomposition {
+    const coefficients = new Float64Array(signal.length);
+    const details = new Array(this.config.wavelet.levels)
+      .fill(null)
+      .map(() => new Float64Array(signal.length));
     
-    return noisePower === 0 ? 
-      Number.POSITIVE_INFINITY : 
-      10 * Math.log10(signalPower / noisePower);
-  }
-
-  private calculateStability(signal: Float32Array): number {
-    if (this.qualityHistory.length < 2) return 1;
-
-    const variations = this.qualityHistory
-      .slice(-10)
-      .map((q, i, arr) => i > 0 ? Math.abs(q - arr[i-1]) : 0);
-    
-    const avgVariation = variations.reduce((sum, v) => sum + v, 0) / variations.length;
-    return Math.exp(-avgVariation * 5);
-  }
-
-  private calculateMotion(): number {
-    if (this.motionHistory.length < 2) return 0;
-
-    const recentMotion = this.motionHistory.slice(-5);
-    return recentMotion.reduce((sum, m) => sum + m, 0) / recentMotion.length;
-  }
-
-  private calculateBrightness(signal: Float32Array): number {
-    const mean = signal.reduce((sum, val) => sum + val, 0) / signal.length;
-    return (mean + 1) / 2; // Normalizar a [0,1]
-  }
-
-  private calculateContrast(signal: Float32Array): number {
-    let min = Infinity;
-    let max = -Infinity;
-    
-    for (const value of signal) {
-      min = Math.min(min, value);
-      max = Math.max(max, value);
-    }
-    
-    return max - min;
-  }
-
-  private estimateFrequency(spectrum: Float32Array): number {
-    const peakBin = this.findPeakFrequencyBin(spectrum);
-    return (peakBin * this.config.sampleRate) / this.fftSize;
-  }
-
-  private calculateSpectralEntropy(spectrum: Float32Array): number {
-    const totalPower = spectrum.reduce((sum, val) => sum + val * val, 0);
-    if (totalPower === 0) return 0;
-
-    let entropy = 0;
-    for (const val of spectrum) {
-      const p = (val * val) / totalPower;
-      if (p > 0) {
-        entropy -= p * Math.log2(p);
-      }
-    }
-
-    return entropy / Math.log2(spectrum.length);
-  }
-
-  private analyzeHarmonics(spectrum: Float32Array): number[] {
-    const fundamentalBin = this.findPeakFrequencyBin(spectrum);
-    const harmonics: number[] = [];
-
-    for (let i = 1; i <= 4; i++) {
-      const harmonicBin = fundamentalBin * i;
-      if (harmonicBin < spectrum.length) {
-        const harmonicPower = this.calculateBandPower(
-          spectrum,
-          harmonicBin - 1,
-          harmonicBin + 1
-        );
-        harmonics.push(harmonicPower);
-      }
-    }
-
-    return harmonics;
-  }
-
-  private calculateQualityScore(metrics: {
-    snr: number;
-    stability: number;
-    motion: number;
-    brightness: number;
-    contrast: number;
-    frequency: number;
-  }): number {
-    try {
-      // Normalizar métricas
-      const normalizedSNR = Math.min(1, metrics.snr / this.config.minSNR);
-      const normalizedMotion = 1 - Math.min(1, metrics.motion / this.config.maxMotion);
-      const normalizedBrightness = this.normalizeBrightness(metrics.brightness);
-      const normalizedContrast = Math.min(1, metrics.contrast / this.config.minContrast);
-      const normalizedFrequency = this.normalizeFrequency(metrics.frequency);
-
-      // Aplicar pesos
-      return (
-        this.config.weights.snr * normalizedSNR +
-        this.config.weights.stability * metrics.stability +
-        this.config.weights.motion * normalizedMotion +
-        this.config.weights.brightness * normalizedBrightness +
-        this.config.weights.contrast * normalizedContrast +
-        this.config.weights.frequency * normalizedFrequency
+    // Descomposición wavelet
+    let current = signal;
+    for (let level = 0; level < this.config.wavelet.levels; level++) {
+      const { approximation, detail } = this.waveletStep(
+        current,
+        level
       );
-    } catch (error) {
-      console.error('Error calculating quality score:', error);
-      return 0;
+      
+      details[level].set(detail);
+      current = approximation;
     }
+    
+    coefficients.set(current);
+    
+    return {
+      coefficients,
+      details,
+      levels: this.config.wavelet.levels
+    };
   }
 
-  private determineQualityLevel(score: number): SignalQualityLevel {
-    if (score >= this.config.thresholds.excellent)
-      return SignalQualityLevel.Excellent;
-    if (score >= this.config.thresholds.good)
-      return SignalQualityLevel.Good;
-    if (score >= this.config.thresholds.fair)
-      return SignalQualityLevel.Fair;
-    if (score >= this.config.thresholds.poor)
-      return SignalQualityLevel.Poor;
-    return SignalQualityLevel.Invalid;
-  }
-
-  // Métodos auxiliares
-  private createHannWindow(): Float32Array {
-    const window = new Float32Array(this.config.windowSize);
-    for (let i = 0; i < this.config.windowSize; i++) {
-      window[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (this.config.windowSize - 1)));
-    }
-    return window;
-  }
-
-  private applyWindow(signal: Float32Array): Float32Array {
-    const windowed = new Float32Array(signal.length);
-    for (let i = 0; i < signal.length; i++) {
-      windowed[i] = signal[i] * this.hannWindow[i];
-    }
-    return windowed;
-  }
-
-  private updateBuffer(newData: Float32Array): void {
-    // Desplazar datos existentes
-    this.buffer.set(
-      this.buffer.subarray(newData.length),
-      0
-    );
-    // Añadir nuevos datos
-    this.buffer.set(
-      newData,
-      this.buffer.length - newData.length
-    );
-  }
-
-  private updateHistories(
-    metrics: {
-      motion: number;
-      frequency: number;
-    },
-    quality: number
+  /**
+   * Gestión de estado
+   */
+  private updateState(
+    signal: Float64Array,
+    metrics: QualityMetrics,
+    validation: ValidationResult
   ): void {
-    // Actualizar historiales
-    this.qualityHistory.push(quality);
-    this.motionHistory.push(metrics.motion);
-    this.frequencyHistory.push(metrics.frequency);
+    // 1. Actualización de historial
+    this.metricsHistory.push(metrics);
+    if (this.metricsHistory.length > 30) {
+      this.metricsHistory.shift();
+    }
 
-    // Mantener longitud máxima
-    while (this.qualityHistory.length > this.maxHistoryLength) {
-      this.qualityHistory.shift();
-      this.motionHistory.shift();
-      this.frequencyHistory.shift();
+    // 2. Actualización de última señal válida
+    if (validation.overall) {
+      this.lastValidSignal = signal.slice();
+    }
+
+    // 3. Limpieza de cache si necesario
+    if (this.featureCache.size > 100) {
+      const oldestKey = this.featureCache.keys().next().value;
+      this.featureCache.delete(oldestKey);
     }
   }
 
-  private normalizeBrightness(brightness: number): number {
-    if (brightness < this.config.minBrightness) {
-      return brightness / this.config.minBrightness;
+  /**
+   * Gestión de recursos
+   */
+  public dispose(): void {
+    try {
+      // 1. Limpieza de procesadores
+      this.noiseAnalyzer.dispose();
+      this.artifactDetector.dispose();
+      this.stabilityAnalyzer.dispose();
+      this.frequencyAnalyzer.dispose();
+      this.phaseAnalyzer.dispose();
+      this.amplitudeAnalyzer.dispose();
+
+      // 2. Limpieza de buffers
+      Object.values(this.buffers).forEach(buffer => {
+        buffer.fill(0);
+      });
+
+      // 3. Limpieza de cache y estado
+      this.featureCache.clear();
+      this.metricsHistory.length = 0;
+      this.lastValidSignal = null;
+
+    } catch (error) {
+      console.error('Error in dispose:', error);
     }
-    if (brightness > this.config.maxBrightness) {
-      return 1 - (brightness - this.config.maxBrightness) / 
-                 (1 - this.config.maxBrightness);
-    }
-    return 1;
-  }
-
-  private normalizeFrequency(frequency: number): number {
-    // Rango esperado: 0.5-4.0 Hz (30-240 BPM)
-    const minFreq = 0.5;
-    const maxFreq = 4.0;
-    const normalizedFreq = (frequency - minFreq) / (maxFreq - minFreq);
-    return Math.max(0, Math.min(1, normalizedFreq));
-  }
-
-  private findPeakFrequencyBin(spectrum: Float32Array): number {
-    let maxBin = 0;
-    let maxValue = -Infinity;
-    
-    for (let i = 0; i < spectrum.length; i++) {
-      if (spectrum[i] > maxValue) {
-        maxValue = spectrum[i];
-        maxBin = i;
-      }
-    }
-    
-    return maxBin;
-  }
-
-  private calculateBandPower(
-    spectrum: Float32Array, 
-    startBin: number, 
-    endBin: number
-  ): number {
-    let power = 0;
-    for (let i = startBin; i <= endBin; i++) {
-      if (i >= 0 && i < spectrum.length) {
-        power += spectrum[i] * spectrum[i];
-      }
-    }
-    return power;
-  }
-
-  private extractSignalBand(spectrum: Float32Array): Float32Array {
-    const start = Math.floor(0.5 * this.fftSize / this.config.sampleRate);
-    const end = Math.floor(4.0 * this.fftSize / this.config.sampleRate);
-    return spectrum.slice(start, end);
-  }
-
-  private extractNoiseBand(spectrum: Float32Array): Float32Array {
-    const signalBand = this.extractSignalBand(spectrum);
-    const noiseBand = new Float32Array(spectrum.length - signalBand.length);
-    let j = 0;
-    
-    for (let i = 0; i < spectrum.length; i++) {
-      if (!signalBand.includes(spectrum[i])) {
-        noiseBand[j++] = spectrum[i];
-      }
-    }
-    
-    return noiseBand;
-  }
-
-  public updateSettings(newSettings: SensitivitySettings): void {
-    this.settings = newSettings;
-    this.updateConfigurationThresholds();
-  }
-
-  private updateConfigurationThresholds(): void {
-    // Ajustar umbrales basados en la sensibilidad
-    this.config.minSNR *= this.settings.signalAmplification;
-    this.config.maxMotion *= (2 - this.settings.noiseReduction);
-    this.config.minContrast *= this.settings.signalStability;
-  }
-}
-
-// Clase auxiliar para análisis FFT
-class FFTAnalyzer {
-  private readonly size: number;
-  private readonly real: Float32Array;
-  private readonly imag: Float32Array;
-  private readonly sinTable: Float32Array;
-  private readonly cosTable: Float32Array;
-
-  constructor(size: number) {
-    this.size = size;
-    this.real = new Float32Array(size);
-    this.imag = new Float32Array(size);
-    this.sinTable = new Float32Array(size);
-    this.cosTable = new Float32Array(size);
-    this.initializeTables();
-  }
-
-  private initializeTables(): void {
-    for (let i = 0; i < this.size; i++) {
-      const angle = (2 * Math.PI * i) / this.size;
-      this.sinTable[i] = Math.sin(angle);
-      this.cosTable[i] = Math.cos(angle);
-    }
-  }
-
-  public forward(signal: Float32Array): Float32Array {
-    // Copiar señal a buffer real
-    this.real.set(signal);
-    this.imag.fill(0);
-
-    // Realizar FFT
-    this.fft(this.real, this.imag);
-
-    // Calcular magnitud
-    const magnitude = new Float32Array(this.size / 2);
-    for (let i = 0; i < this.size / 2; i++) {
-      magnitude[i] = Math.sqrt(
-        this.real[i] * this.real[i] + 
-        this.imag[i] * this.imag[i]
-      );
-    }
-
-    return magnitude;
-  }
-
-  private fft(real: Float32Array, imag: Float32Array): void {
-    // Implementación optimizada de FFT in-place
-    // Reordenamiento bit-reversal
-    this.bitreversal(real, imag);
-
-    // Cálculo de FFT
-    for (let size = 2; size <= this.size; size *= 2) {
-      const halfsize = size / 2;
-      const tablestep = this.size / size;
-      
-      for (let i = 0; i < this.size; i += size) {
-        for (let j = i, k = 0; j < i + halfsize; j++, k += tablestep) {
-          const tr = real[j+halfsize] * this.cosTable[k] + 
-                    imag[j+halfsize] * this.sinTable[k];
-          const ti = imag[j+halfsize] * this.cosTable[k] - 
-                    real[j+halfsize] * this.sinTable[k];
-          
-          real[j + halfsize] = real[j] - tr;
-          imag[j + halfsize] = imag[j] - ti;
-          real[j] += tr;
-          imag[j] += ti;
-        }
-      }
-    }
-  }
-
-  private bitreversal(real: Float32Array, imag: Float32Array): void {
-    for (let i = 0; i < this.size; i++) {
-      const j = this.reverseBits(i);
-      if (j > i) {
-        [real[i], real[j]] = [real[j], real[i]];
-        [imag[i], imag[j]] = [imag[j], imag[i]];
-      }
-    }
-  }
-
-  private reverseBits(index: number): number {
-    let reversed = 0;
-    let bits = Math.log2(this.size);
-    
-    for (let i = 0; i < bits; i++) {
-      reversed = (reversed << 1) | (index & 1);
-      index >>= 1;
-    }
-    
-    return reversed;
   }
 }
