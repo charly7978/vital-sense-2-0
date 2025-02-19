@@ -1,5 +1,7 @@
 
-// Tipos relacionados con el procesamiento de señales
+// IMPORTANTE: NO MODIFICAR FUNCIONALIDAD
+// Este archivo solo contiene definiciones de tipos
+
 export interface SignalConditions {
   noiseLevel: number;
   signalStrength: number;
@@ -21,10 +23,23 @@ export interface SignalQuality {
 }
 
 export interface NoiseAnalysis {
-  snr: number;
+  snr: number; 
   distribution: number[];
   spectrum: number[];
   entropy: number;
   kurtosis: number;
   variance: number;
+}
+
+export interface MotionAnalysis {
+  displacement: number[];
+  velocity: number[];
+  acceleration: number[];
+}
+
+// NO MODIFICAR: Mantener compatibilidad con implementaciones existentes
+export interface SignalFeatures {
+  temporal: number[];
+  spectral: number[];
+  statistical: number[];
 }

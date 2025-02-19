@@ -1,5 +1,11 @@
 
-// Tipos para procesamiento
+// IMPORTANTE: NO MODIFICAR FUNCIONALIDAD
+// Este archivo solo contiene definiciones de tipos
+
+import { SignalQuality, NoiseAnalysis, MotionAnalysis } from './signal';
+import { CalibrationState } from './calibration';
+import { SensitivitySettings } from './index';
+
 export interface ProcessingConfig {
   mode: 'normal' | 'calibration' | 'debug';
   sampleRate?: number;
@@ -35,4 +41,11 @@ export interface QualityParams {
   motion: MotionAnalysis;
   heartRate: number;
   features: any;
+}
+
+// NO MODIFICAR: Mantener compatibilidad con implementaciones existentes
+export interface ProcessingPipeline {
+  initialize(): void;
+  process(data: any): Promise<any>;
+  cleanup(): void;
 }

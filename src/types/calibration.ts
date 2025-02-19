@@ -1,4 +1,9 @@
 
+// IMPORTANTE: NO MODIFICAR FUNCIONALIDAD
+// Este archivo solo contiene definiciones de tipos
+
+import { SignalConditions } from './signal';
+
 export interface CalibrationEntry {
   timestamp: number;
   values: number[];
