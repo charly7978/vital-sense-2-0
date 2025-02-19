@@ -4,6 +4,15 @@ export type Percent = number & { __brand: 'Percent' };
 export type BPM = number & { __brand: 'BPM' };
 export type Milliseconds = number & { __brand: 'Milliseconds' };
 
+// Niveles de calidad de señal
+export enum SignalQualityLevel {
+  Excellent = 'excellent',
+  Good = 'good',
+  Fair = 'fair',
+  Poor = 'poor',
+  Invalid = 'invalid'
+}
+
 // Configuración de sensibilidad
 export interface SensitivitySettings {
   brightness: number;
