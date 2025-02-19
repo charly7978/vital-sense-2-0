@@ -1,4 +1,10 @@
-// Tipos básicos para mediciones
+// Re-exportamos todos los tipos organizados
+export * from './signal';
+export * from './calibration';
+export * from './processing';
+export * from './wavelet';
+
+// Tipos básicos que se mantienen aquí
 export type Percent = number & { __brand: 'Percent' };
 export type BPM = number & { __brand: 'BPM' };
 export type Milliseconds = number & { __brand: 'Milliseconds' };
@@ -10,43 +16,6 @@ export enum SignalQualityLevel {
   Fair = 'fair',
   Poor = 'poor',
   Invalid = 'invalid'
-}
-
-// Configuración de sensibilidad
-export interface SensitivitySettings {
-  brightness: number;
-  redIntensity: number;
-  signalAmplification: number;
-  noiseReduction: number;
-  peakDetection: number;
-  heartbeatThreshold: number;
-  responseTime: number;
-  signalStability: number;
-}
-
-// Lectura vital individual
-export interface VitalReading {
-  timestamp: number;
-  value: number;
-  quality?: Percent;
-}
-
-// Datos PPG procesados
-export interface PPGData {
-  timestamp: number;
-  bpm: number;
-  spo2: Percent;
-  systolic: number;
-  diastolic: number;
-  perfusionIndex: Percent;
-  respiratoryRate: number;
-  stressIndex: Percent;
-  arrhythmia: boolean | null;
-  quality: Percent;
-  message: string;
-  features: Record<string, number>;
-  fingerDetection: FingerDetection;
-  deviceInfo: DeviceInfo;
 }
 
 // Información de detección de dedo
@@ -77,50 +46,10 @@ export interface CameraConfig {
   };
 }
 
-// Modo de procesamiento
-export type ProcessingMode = 'normal' | 'calibration' | 'debug';
-
-// Configuración del procesador PPG
-export interface PPGConfig {
-  frameRate: number;
-  bufferSize: number;
-  minQuality: Percent;
-  calibrationTime: Milliseconds;
-  processingInterval: Milliseconds;
-}
-
-// Configuración del analizador wavelet
-export interface WaveletConfig {
-  samplingRate: number;
-  windowSize: number;
-  scales: number[];
-  waveletType: 'morlet' | 'mexican_hat';
-}
-
-// Configuración del filtro de señal
-export interface SignalFilterConfig {
-  samplingRate: number;
-  cutoffLow: number;
-  cutoffHigh: number;
-  order: number;
-}
-
 // Helpers para crear tipos branded
 export const createPercent = (n: number): Percent => Math.max(0, Math.min(100, n)) as Percent;
 export const createBPM = (n: number): BPM => Math.max(0, Math.min(300, n)) as BPM;
 export const createMilliseconds = (n: number): Milliseconds => Math.max(0, n) as Milliseconds;
-
-// Tipo para el estado de calibración
-export interface CalibrationState {
-  isCalibrating: boolean;
-  progress: Percent;
-  message: string;
-  results?: {
-    baselineNoise: number;
-    signalStrength: Percent;
-    recommendations: string[];
-  };
-}
 
 // Tipo para eventos del procesador
 export type ProcessorEvent = 
@@ -135,36 +64,6 @@ export interface SpectralFeatures {
   variability: number[];
   respiratory: number[];
   artifacts: number[];
-}
-
-// Descomposición wavelet
-export interface WaveletCoefficients {
-  approximation: Float64Array;
-  details: Float64Array[];
-}
-
-export interface SubbandFeatures {
-  energy: number;
-  entropy: number;
-  variance: number;
-  mean: number;
-  level: number;
-  type: string;
-}
-
-export interface WaveletBasis {
-  filters: {
-    decomposition: {
-      lowPass: Float64Array;
-      highPass: Float64Array;
-    };
-    reconstruction: {
-      lowPass: Float64Array;
-      highPass: Float64Array;
-    };
-  };
-  support: number;
-  vanishingMoments: number;
 }
 
 export interface WaveletPacket {
@@ -209,31 +108,6 @@ export interface MediaTrackConstraintsExtended extends MediaStreamConstraints {
   };
 }
 
-// Tipos para procesamiento de señal
-export interface SignalConditions {
-  noiseLevel: number;
-  signalStrength: number;
-  stability: number;
-  signalQuality: number;
-  lightLevel: number;
-  movement: number;
-  coverage: number;
-  temperature: number;
-  measurementType: string;
-}
-
-export interface CalibrationEntry {
-  timestamp: number;
-  values: number[];
-  conditions: SignalConditions;
-}
-
-export interface CalibratedResult {
-  isValid: boolean;
-  values: number[];
-  quality: number;
-}
-
 export type MeasurementType = 'ppg' | 'bp' | 'spo2' | 'resp';
 
 // Tipos para detección de artefactos
@@ -249,22 +123,10 @@ export interface ArtifactFeatures {
   statistical: number[];
 }
 
-export interface SignalQuality {
-  level: SignalQualityLevel;
-  score: number;
-  confidence: number;
-}
-
 export interface MotionAnalysis {
   displacement: number[];
   velocity: number[];
   acceleration: number[];
-}
-
-export interface NoiseAnalysis {
-  snr: number;
-  distribution: number[];
-  spectrum: number[];
 }
 
 // Tipos para análisis de frecuencia
@@ -280,33 +142,6 @@ export interface SpectralAnalysis {
   phases: number[];
 }
 
-// Tipos para configuración y procesamiento
-export interface ProcessingConfig {
-  mode: ProcessingMode;
-  sensitivity: SensitivitySettings;
-  calibration: CalibrationState;
-}
-
-export interface ProcessingState {
-  isProcessing: boolean;
-  frameCount: number;
-  quality: SignalQuality;
-  calibration: CalibrationState;
-}
-
-export interface QualityParams {
-  signal: number[];
-  noise: NoiseAnalysis;
-  motion: MotionAnalysis;
-}
-
-export interface ProcessorMetrics {
-  frameRate: number;
-  processingTime: number;
-  memoryUsage: number;
-  quality: SignalQuality;
-}
-
 // Tipos para buffer circular
 export interface CircularBuffer<T> {
   push(item: T): void;
@@ -315,14 +150,6 @@ export interface CircularBuffer<T> {
   isFull(): boolean;
   length: number;
   capacity: number;
-}
-
-// Tipos para el sistema
-export interface SystemConfig {
-  processing: ProcessingConfig;
-  camera: CameraConfig;
-  sensitivity: SensitivitySettings;
-  calibration: CalibrationState;
 }
 
 // Tipos para análisis de imágenes
