@@ -1,4 +1,3 @@
-
 import { 
   SignalQuality,
   SignalQualityLevel,
@@ -33,6 +32,7 @@ export class PPGProcessor {
   constructor() {
     // Configuración inicial
     this.config = {
+      mode: 'normal',
       bufferSize: 512,
       sampleRate: 30,
       filterOrder: 32,
@@ -42,7 +42,6 @@ export class PPGProcessor {
       minPeakDistance: 0.3,
       calibrationDuration: 5000,
       adaptiveThreshold: true,
-      mode: 'normal',
       sensitivity: {
         brightness: 1.0,
         redIntensity: 1.0,
@@ -82,14 +81,19 @@ export class PPGProcessor {
         calibrationQuality: 0
       },
       quality: {
+        level: SignalQualityLevel.Invalid,
+        score: 0,
+        confidence: 0,
         overall: 0,
+        history: [],
         signal: 0,
         noise: 0,
-        movement: 0,
-        confidence: 0,
-        score: 0,
-        history: [],
-        level: SignalQualityLevel.Invalid
+        movement: 0
+      },
+      optimization: {
+        cache: new Map(),
+        performance: new Map(),
+        resources: new Map()
       }
     };
 
