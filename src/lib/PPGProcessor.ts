@@ -1,11 +1,10 @@
 import { 
-  PPGData,
   SignalQuality,
+  SignalQualityLevel,
+  PPGData,
   ProcessingConfig,
-  CalibrationState,
   ProcessingState,
-  ProcessorMetrics,
-  SignalQualityLevel
+  ProcessorMetrics 
 } from '@/types';
 
 export class PPGProcessor {
@@ -161,34 +160,24 @@ export class PPGProcessor {
         throw new Error('Processor not initialized');
       }
 
-      // Extraer señal PPG del frame
       const signal = this.extractPPGSignal(imageData);
-      
-      // Actualizar buffer circular
       this.updateBuffers(signal);
-
-      // Filtrar señal
       const filteredSignal = this.filterSignal(this.state.buffer);
-
-      // Detectar picos y valles
       this.detectPeaks(filteredSignal);
-
-      // Calcular BPM y métricas
       const bpm = this.calculateBPM();
       const quality = this.assessQuality(filteredSignal);
-      
-      // Actualizar estado de calibración si es necesario
+
       if (this.state.calibration.isCalibrating) {
         this.updateCalibration(signal);
       }
 
-      // Análisis espectral
       this.performSpectralAnalysis(filteredSignal);
 
       return {
         bpm: Math.round(bpm),
         confidence: quality.overall,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        values: Array.from(filteredSignal)
       };
 
     } catch (error) {
@@ -196,7 +185,8 @@ export class PPGProcessor {
       return {
         bpm: 0,
         confidence: 0,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        values: []
       };
     }
   }

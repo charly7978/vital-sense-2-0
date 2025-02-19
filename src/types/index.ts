@@ -32,20 +32,27 @@ export interface SignalQuality {
   dispose?: () => void;
 }
 
-export interface VitalReading {
+export interface ProcessorMetrics {
+  snr: number;
+  bpm: number;
+  quality: SignalQuality;
   timestamp: number;
-  value: number;
-  quality: number;
-  type: MeasurementType;
 }
 
-export interface DeviceInfo {
-  frameRate: number;
-  resolution: {
-    width: number;
-    height: number;
+export interface ProcessingState {
+  isProcessing: boolean;
+  frameCount: number;
+  buffer: Float64Array;
+  timeBuffer: Float64Array;
+  lastTimestamp: number;
+  sampleRate: number;
+  calibration: CalibrationState;
+  quality: SignalQuality;
+  optimization: {
+    cache: Map<string, any>;
+    performance: Map<string, number>;
+    resources: Map<string, number>;
   };
-  lightLevel: Percent;
 }
 
 export interface CalibrationState {
@@ -59,13 +66,6 @@ export interface CalibrationState {
   calibrationQuality?: number;
 }
 
-export interface MotionAnalysis {
-  displacement: number[];
-  velocity: number[];
-  acceleration: number[];
-  dispose?: () => void;
-}
-
 export interface NoiseAnalysis {
   snr: number;
   distribution: number[];
@@ -74,8 +74,16 @@ export interface NoiseAnalysis {
   kurtosis: number;
   variance: number;
   dispose?: () => void;
-  spectralNoise?: any;
+  spectralNoise?: number;
   threshold?: number;
+}
+
+export interface MotionAnalysis {
+  displacement: number[];
+  velocity: number[];
+  acceleration: number[];
+  features?: any[];
+  dispose?: () => void;
 }
 
 export interface ProcessingConfig {
@@ -93,17 +101,6 @@ export interface ProcessingConfig {
   adaptiveThreshold: boolean;
 }
 
-export interface ProcessingState {
-  isProcessing: boolean;
-  frameCount: number;
-  buffer: Float64Array;
-  timeBuffer: Float64Array;
-  lastTimestamp: number;
-  sampleRate: number;
-  calibration: CalibrationState;
-  quality: SignalQuality;
-}
-
 export interface SensitivitySettings {
   brightness: number;
   redIntensity: number;
@@ -119,3 +116,25 @@ export interface SensitivitySettings {
 export const createPercent = (n: number): Percent => Math.max(0, Math.min(100, n)) as Percent;
 export const createBPM = (n: number): BPM => Math.max(0, Math.min(300, n)) as BPM;
 export const createMilliseconds = (n: number): Milliseconds => Math.max(0, n) as Milliseconds;
+
+export interface WaveletAnalysis {
+  subbands: {
+    approximation: Float64Array;
+    details: Float64Array[];
+  };
+  features: {
+    energy: number[];
+    entropy: number[];
+    variance: number[];
+  };
+  dispose?: () => void;
+}
+
+export interface SpectralAnalysis {
+  spectrum: Float64Array;
+  frequencies: Float64Array;
+  magnitude: Float64Array;
+  phase: Float64Array;
+  dispose?: () => void;
+}
+

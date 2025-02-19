@@ -1,70 +1,79 @@
 
-// IMPORTANTE: NO MODIFICAR FUNCIONALIDAD
-// Este archivo solo contiene definiciones de tipos
+import { SignalQuality, SensitivitySettings } from './index';
 
-import { SignalQuality, NoiseAnalysis, MotionAnalysis } from './signal';
-import { CalibrationState } from './calibration';
-import { SensitivitySettings } from './index';
-
-export interface ProcessingConfig {
-  mode: 'normal' | 'calibration' | 'debug';
-  sampleRate?: number;
-  sensitivity: SensitivitySettings;
-  calibration: CalibrationState;
-  bufferSize: number;
-  filterOrder: number;
-  lowCutoff: number;
-  highCutoff: number;
-  peakThreshold: number;
-  minPeakDistance: number;
-  calibrationDuration: number;
-  adaptiveThreshold: boolean;
+export interface ImageConfig {
+  width: number;
+  height: number;
+  channels: number;
+  colorSpace: 'rgb' | 'hsv' | 'lab';
 }
 
-export interface ProcessingState {
-  isProcessing: boolean;
-  frameCount: number;
-  calibration: CalibrationState;
-  buffer: Float64Array;
-  timeBuffer: Float64Array;
-  lastTimestamp: number;
-  sampleRate: number;
-  quality: SignalQuality;
-  optimization?: {
-    cache: boolean;
-    performance: boolean;
-    memory: boolean;
+export interface ProcessingResult {
+  success: boolean;
+  data?: ImageData;
+  error?: Error;
+}
+
+export interface ColorSpace {
+  name: string;
+  channels: number;
+  ranges: number[][];
+}
+
+export interface ROIDetection {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  confidence: number;
+}
+
+export interface ImageEnhancement {
+  brightness: number;
+  contrast: number;
+  sharpness: number;
+  denoise: number;
+}
+
+export interface ColorAnalysis {
+  mean: number[];
+  std: number[];
+  histogram: number[][];
+}
+
+export interface NoiseReduction {
+  method: 'gaussian' | 'median' | 'bilateral';
+  params: Record<string, number>;
+}
+
+export interface EdgeDetection {
+  method: 'sobel' | 'canny';
+  threshold: number;
+  sigma?: number;
+}
+
+export interface ImageQuality {
+  sharpness: number;
+  noise: number;
+  exposure: number;
+  contrast: number;
+}
+
+export interface AdaptiveFilter {
+  type: 'lms' | 'rls' | 'kalman';
+  params: Record<string, number>;
+}
+
+export interface ImageMetrics {
+  quality: ImageQuality;
+  processing: {
+    time: number;
+    memory: number;
   };
 }
 
-export interface ProcessorMetrics {
-  frameRate: number;
-  processingTime: number;
-  memoryUsage: number;
-  quality: SignalQuality;
-  errorRate: number;
-  signalQuality: number;
-  signalToNoise: number;
-  movementIndex: number;
-  perfusionIndex: number;
-  confidence: number;
-  stability: number;
-  coverage: number;
+export interface ProcessingMode {
+  name: string;
+  params: Record<string, any>;
 }
 
-export interface ProcessingPipeline {
-  initialize(): void;
-  process(data: any): Promise<any>;
-  cleanup(): void;
-}
-
-export interface QualityParams {
-  signal: number[];
-  noise: NoiseAnalysis;
-  motion: MotionAnalysis;
-  heartRate: number;
-  features: any;
-  fingerDetection?: any;
-}
-
-export type ProcessingMode = 'normal' | 'calibration' | 'debug';
