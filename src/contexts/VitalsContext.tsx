@@ -1,7 +1,8 @@
+
 import React, { createContext, useContext, useRef, useEffect, useState } from 'react';
 import { PPGProcessor } from '@/lib/PPGProcessor';
 import { BeepPlayer } from '@/lib/BeepPlayer';
-import { PPGData, SignalQuality } from '@/types';
+import { PPGData, SignalQuality, SignalQualityLevel } from '@/types';
 
 // Definir el tipo para el contexto
 interface VitalsContextType {
@@ -13,7 +14,7 @@ interface VitalsContextType {
   ppgData: Array<{ time: number; value: number }>;
   startProcessing: () => Promise<void>;
   stopProcessing: () => void;
-  calibrate: () => void;
+  startCalibration: () => void;
 }
 
 // Crear el contexto
@@ -51,7 +52,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     confidence: 0,
     score: 0,
     history: [],
-    level: 'invalid'
+    level: SignalQualityLevel.Invalid
   });
 
   // Procesar frame de video con verificaciones
@@ -87,21 +88,28 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       // Procesar frame
       const results = ppgProcessor.current.processFrame(imageData);
-      setVitals(results);
       
-      // Actualizar datos PPG
-      setPpgData(prevData => {
-        const newData = [...prevData, { 
-          time: Date.now(), 
-          value: results.values[results.values.length - 1] || 0 
-        }];
-        if (newData.length > 100) newData.shift();
-        return newData;
-      });
+      if (results) {
+        setVitals(results);
+        
+        // Actualizar datos PPG - con verificación de valores
+        setPpgData(prevData => {
+          const value = results.values && results.values.length > 0 
+            ? results.values[results.values.length - 1] 
+            : 0;
+            
+          const newData = [...prevData, { 
+            time: Date.now(), 
+            value
+          }];
+          
+          return newData.length > 100 ? newData.slice(-100) : newData;
+        });
 
-      // Reproducir beep si hay pulso detectado
-      if (results.bpm > 0 && beepPlayer.current) {
-        beepPlayer.current.play(440, 50);
+        // Reproducir beep si hay pulso detectado
+        if (results.bpm && results.bpm > 0 && beepPlayer.current) {
+          beepPlayer.current.play(440, 50);
+        }
       }
 
       // Continuar procesamiento
@@ -111,51 +119,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setIsProcessing(false);
     }
   };
-
-  // Inicializar procesadores con manejo de errores
-  useEffect(() => {
-    let mounted = true;
-    
-    try {
-      // Crear instancias
-      const processor = new PPGProcessor();
-      const beep = new BeepPlayer();
-      
-      if (mounted) {
-        ppgProcessor.current = processor;
-        beepPlayer.current = beep;
-      }
-
-      // Cleanup
-      return () => {
-        mounted = false;
-        
-        if (animationFrameRef.current) {
-          cancelAnimationFrame(animationFrameRef.current);
-        }
-        
-        try {
-          if (videoRef.current?.srcObject) {
-            const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
-            tracks.forEach(track => track.stop());
-          }
-
-          processor.stop();
-          beep.stop();
-          
-          ppgProcessor.current = null;
-          beepPlayer.current = null;
-        } catch (error) {
-          console.error('Error en cleanup:', error);
-        }
-      };
-    } catch (error) {
-      console.error('Error al inicializar procesadores:', error);
-      return () => {
-        mounted = false;
-      };
-    }
-  }, []);
 
   // Iniciar procesamiento con verificaciones
   const startProcessing = async () => {
@@ -174,10 +137,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
 
       videoRef.current.srcObject = stream;
-      await videoRef.current.play().catch(error => {
-        console.error('Error al reproducir video:', error);
-        throw error;
-      });
+      await videoRef.current.play();
 
       // Configurar canvas
       if (canvasRef.current) {
@@ -190,6 +150,13 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } catch (error) {
       console.error('Error al acceder a la cámara:', error);
       setIsProcessing(false);
+    }
+  };
+
+  const startCalibration = () => {
+    if (ppgProcessor.current && isProcessing) {
+      setIsCalibrating(true);
+      setTimeout(() => setIsCalibrating(false), 5000);
     }
   };
 
@@ -219,22 +186,34 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  // Calibración con verificaciones
-  const calibrate = () => {
-    if (!ppgProcessor.current) {
-      console.error('Procesador no inicializado');
-      return;
-    }
-    
+  // Inicializar procesadores
+  useEffect(() => {
     try {
-      setIsCalibrating(true);
-      ppgProcessor.current.startCalibration();
-      setTimeout(() => setIsCalibrating(false), 5000);
+      ppgProcessor.current = new PPGProcessor();
+      beepPlayer.current = new BeepPlayer();
+
+      return () => {
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+        }
+        
+        if (videoRef.current?.srcObject) {
+          const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+          tracks.forEach(track => track.stop());
+        }
+
+        if (ppgProcessor.current) {
+          ppgProcessor.current.stop();
+        }
+        
+        if (beepPlayer.current) {
+          beepPlayer.current.stop();
+        }
+      };
     } catch (error) {
-      console.error('Error en calibración:', error);
-      setIsCalibrating(false);
+      console.error('Error al inicializar procesadores:', error);
     }
-  };
+  }, []);
 
   return (
     <VitalsContext.Provider
@@ -247,7 +226,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         ppgData,
         startProcessing,
         stopProcessing,
-        calibrate
+        startCalibration
       }}
     >
       <video
