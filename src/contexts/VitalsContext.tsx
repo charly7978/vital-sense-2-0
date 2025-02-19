@@ -1,17 +1,19 @@
-
 import React, { createContext, useContext, useRef, useEffect, useState } from 'react';
 import { PPGProcessor } from '@/lib/PPGProcessor';
 import { BeepPlayer } from '@/lib/BeepPlayer';
-import { PPGData } from '@/types';
+import { PPGData, SignalQuality } from '@/types';
 
 // Definir el tipo para el contexto
 interface VitalsContextType {
   vitals: PPGData | null;
   isProcessing: boolean;
+  isCalibrating: boolean;
+  calibrationProgress: number;
+  signalQuality: SignalQuality;
+  ppgData: Array<{ time: number; value: number }>;
   startProcessing: () => Promise<void>;
   stopProcessing: () => void;
   calibrate: () => void;
-  isCalibrating: boolean;
 }
 
 // Crear el contexto
@@ -39,10 +41,22 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [vitals, setVitals] = useState<PPGData | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCalibrating, setIsCalibrating] = useState(false);
+  const [calibrationProgress, setCalibrationProgress] = useState(0);
+  const [ppgData, setPpgData] = useState<Array<{ time: number; value: number }>>([]);
+  const [signalQuality, setSignalQuality] = useState<SignalQuality>({
+    overall: 0,
+    signal: 0,
+    noise: 0,
+    movement: 0,
+    confidence: 0,
+    score: 0,
+    history: [],
+    level: 'invalid'
+  });
 
   // Procesar frame de video con verificaciones
   const processFrame = () => {
-    if (!isProcessing || !videoRef.current || !canvasRef.current || !ppgProcessor.current) {
+    if (!videoRef.current || !canvasRef.current || !ppgProcessor.current) {
       console.warn('Procesamiento detenido: componentes no inicializados');
       return;
     }
@@ -74,6 +88,16 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       // Procesar frame
       const results = ppgProcessor.current.processFrame(imageData);
       setVitals(results);
+      
+      // Actualizar datos PPG
+      setPpgData(prevData => {
+        const newData = [...prevData, { 
+          time: Date.now(), 
+          value: results.values[results.values.length - 1] || 0 
+        }];
+        if (newData.length > 100) newData.shift();
+        return newData;
+      });
 
       // Reproducir beep si hay pulso detectado
       if (results.bpm > 0 && beepPlayer.current) {
@@ -217,10 +241,13 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       value={{
         vitals,
         isProcessing,
+        isCalibrating,
+        calibrationProgress,
+        signalQuality,
+        ppgData,
         startProcessing,
         stopProcessing,
-        calibrate,
-        isCalibrating
+        calibrate
       }}
     >
       <video
@@ -238,4 +265,3 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 };
 
 export default VitalsProvider;
-

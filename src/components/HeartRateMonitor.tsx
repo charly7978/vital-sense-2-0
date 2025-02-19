@@ -2,81 +2,156 @@
 import React from 'react';
 import { useVitals } from '@/contexts/VitalsContext';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { toast } from '@/components/ui/use-toast';
+import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 
-interface HeartRateMonitorProps {
-  onShowControls: () => void;
-}
-
-const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) => {
-  const { vitals, isProcessing, startProcessing, stopProcessing } = useVitals();
-
-  const handleStart = async () => {
-    try {
-      await startProcessing();
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo acceder a la cámara. Por favor, verifica los permisos.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleStop = () => {
-    stopProcessing();
-    toast({
-      title: "Monitoreo detenido",
-      description: "Se ha detenido el monitoreo del ritmo cardíaco."
-    });
-  };
+const HeartRateMonitor: React.FC = () => {
+  const {
+    vitals,
+    isProcessing,
+    isCalibrating,
+    calibrationProgress,
+    signalQuality,
+    ppgData,
+    startProcessing,
+    stopProcessing,
+    startCalibration
+  } = useVitals();
 
   return (
-    <div className="w-full h-full flex items-center justify-center bg-gradient-to-b from-background/50 to-background p-4">
-      <Card className="w-full max-w-md p-6 space-y-6 shadow-lg border-2">
-        <div className="text-center space-y-2">
-          <h2 className="text-3xl font-bold tracking-tight">
-            {vitals?.bpm ? `${Math.round(vitals.bpm)} BPM` : 'Heart Rate Monitor'}
-          </h2>
-          <p className="text-muted-foreground">
-            {isProcessing ? 'Monitoring...' : 'Ready to start'}
-          </p>
-        </div>
+    <div className="relative h-screen w-screen overflow-hidden bg-black">
+      {/* Cámara Preview */}
+      <div className="absolute inset-0 z-10">
+        <video
+          id="cameraPreview"
+          className="h-full w-full object-cover"
+          playsInline
+        />
+      </div>
 
-        <div className="space-y-4">
-          {isProcessing && (
-            <div className="space-y-2">
-              <Progress 
-                value={vitals?.quality ? vitals.quality * 100 : 0} 
-                className="w-full h-2"
-              />
-              <p className="text-sm text-muted-foreground text-center">
-                Signal Quality: {vitals?.quality ? `${Math.round(vitals.quality * 100)}%` : 'Analyzing...'}
-              </p>
-            </div>
-          )}
-
-          <div className="flex gap-4">
+      {/* Overlay con Mediciones */}
+      <div className="absolute inset-0 z-20 flex flex-col bg-black/50 p-6">
+        {/* Header */}
+        <div className="mb-6 flex justify-between">
+          <h1 className="text-3xl font-bold text-white">
+            BPM Monitor
+          </h1>
+          <div className="space-x-2">
             <Button
-              className="flex-1 text-base font-medium"
-              size="lg"
               variant={isProcessing ? "destructive" : "default"}
-              onClick={isProcessing ? handleStop : handleStart}
+              onClick={isProcessing ? stopProcessing : startProcessing}
             >
-              {isProcessing ? 'Stop' : 'Start'}
+              {isProcessing ? "Stop" : "Start"}
             </Button>
             <Button
               variant="outline"
-              size="lg"
-              onClick={onShowControls}
+              onClick={startCalibration}
+              disabled={!isProcessing || isCalibrating}
             >
-              Settings
+              Calibrate
             </Button>
           </div>
         </div>
-      </Card>
+
+        {/* Main Content */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+          {/* BPM Display */}
+          <div className="md:col-span-4">
+            <Card className="bg-black/70">
+              <CardContent className="p-6">
+                <h2 className="text-lg font-semibold text-white">Heart Rate</h2>
+                <p className="text-4xl font-bold text-primary">
+                  {vitals ? `${Math.round(vitals.bpm)} BPM` : '--'}
+                </p>
+                <div className="mt-4">
+                  <p className="text-sm text-white/70">
+                    Confidence: {vitals ? `${Math.round(vitals.confidence * 100)}%` : '--'}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* PPG Graph */}
+          <div className="md:col-span-8">
+            <Card className="bg-black/70 h-[200px]">
+              <CardContent className="p-6">
+                <h2 className="text-lg font-semibold text-white">PPG Signal</h2>
+                <div className="h-[140px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={ppgData}>
+                      <XAxis dataKey="time" hide />
+                      <YAxis hide />
+                      <Line
+                        type="monotone"
+                        dataKey="value"
+                        stroke="hsl(var(--primary))"
+                        dot={false}
+                        isAnimationActive={false}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Signal Quality Indicators */}
+        <div className="absolute bottom-6 left-6 right-6 flex gap-4">
+          <QualityIndicator
+            label="Signal"
+            value={signalQuality.signal}
+            color="bg-emerald-500"
+          />
+          <QualityIndicator
+            label="Noise"
+            value={1 - signalQuality.noise}
+            color="bg-yellow-500"
+          />
+          <QualityIndicator
+            label="Movement"
+            value={1 - signalQuality.movement}
+            color="bg-red-500"
+          />
+        </div>
+      </div>
+
+      {/* Calibration Overlay */}
+      {isCalibrating && (
+        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/80">
+          <div className="h-20 w-20 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <h2 className="mt-4 text-2xl font-semibold text-white">
+            Calibrating... {Math.round(calibrationProgress * 100)}%
+          </h2>
+          <p className="mt-2 text-white/70">
+            Please hold still
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Componente auxiliar para los indicadores de calidad
+const QualityIndicator = ({ 
+  label, 
+  value, 
+  color 
+}: { 
+  label: string; 
+  value: number; 
+  color: string; 
+}) => {
+  return (
+    <div className="flex-1 rounded bg-black/70 p-4">
+      <p className="text-sm text-white">{label}</p>
+      <Progress 
+        value={value * 100} 
+        className="mt-2 h-1 bg-white/10"
+        indicatorClassName={color}
+      />
     </div>
   );
 };
