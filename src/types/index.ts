@@ -65,8 +65,12 @@ export type {
   FrequencyMetrics,
   SpectralQuality,
   BandPower,
-  PhaseAnalysis
+  PhaseAnalysis,
+  WaveletAnalysis,
+  WaveletTransform,
+  WaveletCoefficients
 } from './analysis';
 
 // Constants
 export { SignalQualityLevel } from './quality';
+

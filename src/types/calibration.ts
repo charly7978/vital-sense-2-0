@@ -8,6 +8,7 @@ export interface CalibrationEntry {
   conditions: SignalConditions;
   raw?: number;
   factor?: number;
+  calibrated?: number;
 }
 
 export interface CalibratedResult {
@@ -26,12 +27,16 @@ export interface CalibrationState {
   calibrationTime: number;
   referenceValues: Float64Type;
   calibrationQuality: number;
+  lastCalibration?: number;
 }
 
 export interface ProcessingConfig {
   mode: 'normal' | 'calibration' | 'debug';
   sampleRate: number;
   bufferSize: number;
+  enabled: boolean;
+  duration: number;
+  reference: Float64Type;
   calibration: {
     enabled: boolean;
     duration: number;

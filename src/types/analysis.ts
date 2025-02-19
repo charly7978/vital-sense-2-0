@@ -1,5 +1,6 @@
 
 import { Float64Type } from './common';
+import { Disposable } from './common';
 
 export interface FrequencyBands {
   vlf: [number, number];
@@ -9,7 +10,7 @@ export interface FrequencyBands {
   cardiac: [number, number];
 }
 
-export interface SpectralAnalysis {
+export interface SpectralAnalysis extends Disposable {
   frequencies: Float64Type;
   magnitudes: Float64Type;
   phases: Float64Type;
@@ -19,6 +20,37 @@ export interface SpectralAnalysis {
     ratios: Float64Type;
     powers: Float64Type;
   };
+}
+
+export interface HarmonicAnalysis extends Disposable {
+  fundamentals: Float64Type;
+  harmonics: Float64Type[];
+  amplitudes: Float64Type;
+  phases: Float64Type;
+  quality: number;
+}
+
+export interface PhaseAnalysis extends Disposable {
+  unwrapped: Float64Type;
+  group: Float64Type;
+  coherence: number;
+  stability: number;
+}
+
+export interface WaveletAnalysis extends Disposable {
+  analyze(signal: Float64Type): WaveletTransform;
+  reconstruct(coeffs: WaveletCoefficients): Float64Type;
+}
+
+export interface WaveletTransform {
+  transform: Float64Type[];
+  inverse: (coeffs: Float64Type[]) => Float64Type;
+}
+
+export interface WaveletCoefficients {
+  approximation: Float64Type;
+  details: Float64Type[];
+  level: number;
 }
 
 export interface FrequencyConfig {
@@ -32,13 +64,17 @@ export interface FrequencyConfig {
     maxHarmonics: number;
     minAmplitude: number;
   };
-}
-
-export interface PhaseAnalysis {
-  unwrapped: Float64Type;
-  group: Float64Type;
-  coherence: number;
-  stability: number;
+  spectral: {
+    method: string;
+    window: string;
+    segments: number;
+    overlap: number;
+  };
+  phase: {
+    unwrapping: string;
+    smoothing: number;
+    coherence: boolean;
+  };
 }
 
 export interface SpectralFeatures {
@@ -53,12 +89,15 @@ export interface SpectralQuality {
   coherence: number;
   stationarity: number;
   harmonicity: number;
+  overall: number;
 }
 
 export interface BandPower {
   total: number;
   bands: { [key: string]: number };
   ratios: { [key: string]: number };
+  normalized: { [key: string]: number };
+  relative: { [key: string]: number };
 }
 
 export interface FrequencyMetrics {
