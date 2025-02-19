@@ -1,113 +1,145 @@
 import {
-  SignalConfig, ProcessingMode, FilterBank,
-  SignalMetrics, ProcessingResult, OptimizationLevel,
-  FrequencyDomain, WaveletTransform, AdaptiveFilter,
-  ParallelProcessor, VectorizedOps, SIMD
+  ProcessorConfig, SignalAnalysis, ProcessingPipeline,
+  SignalValidation, ProcessingMetrics, AnalysisMode,
+  ProcessingState, SignalFeatures, ProcessingQuality,
+  SignalCalibration, ProcessorOptimization
 } from '@/types';
 
+// Importación de procesadores especializados
+import { SignalFilter } from './SignalFilter';
+import { SignalQualityAnalyzer } from './SignalQualityAnalyzer';
+import { FrequencyAnalyzer } from './FrequencyAnalyzer';
+import { WaveletAnalyzer } from './WaveletAnalyzer';
+import { PulseAnalyzer } from './PulseAnalyzer';
+import { MotionCompensator } from './MotionCompensator';
+import { HeartRateEstimator } from './HeartRateEstimator';
+
 /**
- * Procesador avanzado de señales PPG
- * Implementa técnicas de última generación y optimizaciones máximas
+ * Procesador central de señales PPG
+ * Coordina y optimiza todo el pipeline de procesamiento
  * @version 2.0.0
  */
 export class SignalProcessor {
   // Configuración optimizada
-  private readonly config: SignalConfig = {
+  private readonly config: ProcessorConfig = {
     sampleRate: 30,           // Hz
     windowSize: 256,          // Muestras
     overlapSize: 128,         // Solapamiento
-    filterOrder: 64,          // Orden del filtro
-    adaptiveRate: 0.15,       // Tasa adaptativa
-    vectorSize: 8,            // Tamaño SIMD
-    parallelThreads: 4,       // Hilos paralelos
-    optimizationLevel: 'max', // Nivel máximo
+    processingMode: 'real_time', // Modo de procesamiento
     
-    // Bandas de frecuencia optimizadas
-    bands: {
-      veryLow: [0.0, 0.5],   // Hz
-      low: [0.5, 1.5],       // Respiración
-      mid: [1.5, 3.5],       // Cardíaco
-      high: [3.5, 7.5],      // Armónicos
-      veryHigh: [7.5, 15.0]  // Ruido
+    pipeline: {
+      stages: [
+        'filtering',          // Filtrado
+        'quality',            // Calidad
+        'motion',            // Compensación
+        'frequency',         // Análisis frecuencial
+        'wavelet',           // Análisis wavelet
+        'pulse',             // Análisis de pulso
+        'estimation'         // Estimación HR
+      ],
+      parallel: true,        // Procesamiento paralelo
+      optimization: 'max'    // Nivel de optimización
     },
 
-    // Umbrales adaptativos
-    thresholds: {
-      snr: 15.0,             // dB
-      coherence: 0.85,       // 0-1
-      stationarity: 0.75,    // 0-1
-      harmonicity: 0.70      // 0-1
+    validation: {
+      minQuality: 0.7,       // Calidad mínima
+      maxMotion: 0.3,        // Movimiento máximo
+      minConfidence: 0.8,    // Confianza mínima
+      stabilityThreshold: 0.85 // Estabilidad
+    },
+
+    calibration: {
+      mode: 'adaptive',      // Calibración adaptativa
+      interval: 30,          // Segundos
+      reference: 'auto',     // Referencia automática
+      adaptation: 0.1        // Tasa de adaptación
+    },
+
+    optimization: {
+      vectorization: true,   // SIMD
+      threading: true,       // Multi-hilo
+      caching: true,        // Cache de resultados
+      precision: 'high',    // Precisión alta
+      memory: 'optimized'   // Gestión de memoria
     }
   };
 
-  // Procesadores optimizados
-  private readonly parallel: ParallelProcessor;
-  private readonly vectorOps: VectorizedOps;
-  private readonly simd: SIMD;
+  // Procesadores especializados
+  private readonly filter: SignalFilter;
+  private readonly qualityAnalyzer: SignalQualityAnalyzer;
+  private readonly frequencyAnalyzer: FrequencyAnalyzer;
+  private readonly waveletAnalyzer: WaveletAnalyzer;
+  private readonly pulseAnalyzer: PulseAnalyzer;
+  private readonly motionCompensator: MotionCompensator;
+  private readonly heartRateEstimator: HeartRateEstimator;
 
-  // Bancos de filtros avanzados
-  private readonly filterBank: FilterBank;
-  private readonly adaptiveFilters: AdaptiveFilter[];
-  private readonly wavelet: WaveletTransform;
-
-  // Buffers optimizados con memoria pre-allocada
+  // Buffers optimizados
   private readonly buffers = {
-    time: new Float64Array(1024),      // Mayor precisión
-    freq: new Float64Array(1024),
-    wavelets: new Float64Array(1024),
+    input: new Float64Array(1024),
     filtered: new Float64Array(1024),
-    envelope: new Float64Array(1024),
-    derivatives: new Float64Array(1024),
+    processed: new Float64Array(1024),
     features: new Float64Array(256),
-    spectrum: new Float64Array(512)
+    metrics: new Float64Array(128)
   };
 
-  // Cache de procesamiento
-  private readonly cache = new Map<string, Float64Array>();
-  private readonly resultCache = new WeakMap<Float64Array, ProcessingResult>();
+  // Estado del procesador
+  private readonly state: ProcessingState = {
+    calibration: {
+      isCalibrated: false,
+      referenceValues: new Float64Array(30),
+      calibrationTime: 0
+    },
+    processing: {
+      lastValidResult: null,
+      processingTime: 0,
+      stageMetrics: new Map()
+    },
+    quality: {
+      overall: 0,
+      history: [],
+      threshold: this.config.validation.minQuality
+    },
+    optimization: {
+      cache: new Map(),
+      performance: new Map(),
+      resources: new Map()
+    }
+  };
 
   constructor() {
-    // Inicialización optimizada
-    this.initializeProcessors();
-    this.initializeFilters();
-    this.initializeTransforms();
-    this.precomputeTables();
-    this.optimizeMemoryLayout();
+    this.initializeProcessor();
   }
 
   /**
    * Procesamiento principal de señal
-   * Implementa pipeline optimizado multi-etapa
+   * Coordina todo el pipeline de análisis
    */
-  public process(signal: Float64Array): ProcessingResult {
+  public process(signal: Float64Array): SignalAnalysis {
     try {
-      // 1. Validación y pre-procesamiento
-      if (!this.validateSignal(signal)) {
-        throw new Error('Invalid signal input');
+      // 1. Validación inicial
+      if (!this.validateInput(signal)) {
+        throw new Error('Invalid input signal');
       }
 
-      // 2. Cache check
-      const cacheKey = this.generateCacheKey(signal);
-      const cached = this.checkCache(cacheKey);
-      if (cached) return cached;
+      // 2. Preparación de procesamiento
+      const prepared = this.prepareProcessing(signal);
 
-      // 3. Procesamiento paralelo
-      const parallelResults = this.parallel.process(signal, {
-        timeProcess: this.processTimeDomain.bind(this),
-        freqProcess: this.processFrequencyDomain.bind(this),
-        waveletProcess: this.processWaveletDomain.bind(this)
-      });
+      // 3. Ejecución del pipeline
+      const result = this.executePipeline(prepared);
 
-      // 4. Fusión de resultados
-      const fusedResult = this.fuseResults(parallelResults);
+      // 4. Validación de resultados
+      const validated = this.validateResults(result);
 
-      // 5. Post-procesamiento adaptativo
-      const finalResult = this.postProcess(fusedResult);
+      // 5. Calibración si es necesario
+      const calibrated = this.calibrateIfNeeded(validated);
 
-      // 6. Cache update
-      this.updateCache(cacheKey, finalResult);
+      // 6. Optimización de recursos
+      this.optimizeResources();
 
-      return finalResult;
+      // 7. Actualización de estado
+      this.updateState(calibrated);
+
+      return calibrated;
 
     } catch (error) {
       console.error('Error in signal processing:', error);
@@ -116,165 +148,179 @@ export class SignalProcessor {
   }
 
   /**
-   * Procesamiento en dominio temporal
-   * Implementa técnicas avanzadas de filtrado y análisis
+   * Ejecución del pipeline de procesamiento
    */
-  private processTimeDomain(signal: Float64Array): Float64Array {
-    // 1. Filtrado adaptativo
-    const filtered = this.applyAdaptiveFilters(signal);
+  private executePipeline(signal: Float64Array): ProcessingPipeline {
+    const startTime = performance.now();
 
-    // 2. Detección de envolvente
-    const envelope = this.detectEnvelope(filtered);
+    // 1. Filtrado de señal
+    const filtered = this.filter.filter(signal);
 
-    // 3. Análisis de derivadas
-    const derivatives = this.analyzeDerivatives(filtered);
+    // 2. Análisis de calidad
+    const quality = this.qualityAnalyzer.analyze(filtered);
 
-    // 4. Extracción de características
-    const features = this.extractFeatures(filtered, envelope, derivatives);
+    // 3. Compensación de movimiento
+    const compensated = this.motionCompensator.compensate(filtered);
 
-    // 5. Optimización final
-    return this.optimizeOutput(features);
-  }
+    // 4. Análisis de frecuencia
+    const frequency = this.frequencyAnalyzer.analyze(compensated);
 
-  /**
-   * Procesamiento en dominio frecuencial
-   * Implementa análisis espectral avanzado
-   */
-  private processFrequencyDomain(signal: Float64Array): FrequencyDomain {
-    // 1. FFT optimizada
-    const spectrum = this.computeOptimizedFFT(signal);
+    // 5. Análisis wavelet
+    const wavelet = this.waveletAnalyzer.analyze(compensated);
 
-    // 2. Análisis espectral
-    const spectralFeatures = this.analyzeSpectrum(spectrum);
+    // 6. Análisis de pulso
+    const pulse = this.pulseAnalyzer.analyze(compensated);
 
-    // 3. Análisis de coherencia
-    const coherence = this.analyzeCoherence(spectrum);
+    // 7. Estimación de ritmo cardíaco
+    const heartRate = this.heartRateEstimator.estimate({
+      filtered,
+      frequency,
+      wavelet,
+      pulse
+    });
 
-    // 4. Análisis de estacionariedad
-    const stationarity = this.analyzeStationarity(spectrum);
-
-    // 5. Análisis armónico
-    const harmonics = this.analyzeHarmonics(spectrum);
+    const endTime = performance.now();
+    this.updateProcessingMetrics(endTime - startTime);
 
     return {
-      spectrum,
-      features: spectralFeatures,
-      coherence,
-      stationarity,
-      harmonics
+      filtered,
+      quality,
+      compensated,
+      frequency,
+      wavelet,
+      pulse,
+      heartRate
     };
   }
 
   /**
-   * Procesamiento en dominio wavelet
-   * Implementa análisis multi-resolución avanzado
+   * Validación de resultados
    */
-  private processWaveletDomain(signal: Float64Array): WaveletTransform {
-    // 1. Descomposición wavelet
-    const coefficients = this.wavelet.decompose(signal);
+  private validateResults(
+    pipeline: ProcessingPipeline
+  ): SignalValidation {
+    // 1. Validación de calidad
+    const qualityValid = this.validateQuality(
+      pipeline.quality
+    );
 
-    // 2. Análisis de sub-bandas
-    const subbands = this.analyzeSubbands(coefficients);
+    // 2. Validación de movimiento
+    const motionValid = this.validateMotion(
+      pipeline.compensated
+    );
 
-    // 3. Extracción de características
-    const features = this.extractWaveletFeatures(coefficients);
+    // 3. Validación de pulso
+    const pulseValid = this.validatePulse(
+      pipeline.pulse
+    );
 
-    // 4. Reconstrucción selectiva
-    const reconstructed = this.wavelet.reconstruct(coefficients);
+    // 4. Validación de estimación
+    const estimationValid = this.validateEstimation(
+      pipeline.heartRate
+    );
 
-    return {
-      coefficients,
-      subbands,
-      features,
-      reconstructed
-    };
+    // 5. Validación global
+    return this.validateOverall({
+      qualityValid,
+      motionValid,
+      pulseValid,
+      estimationValid
+    });
+  }
+
+  /**
+   * Calibración adaptativa
+   */
+  private calibrateIfNeeded(
+    results: SignalValidation
+  ): SignalCalibration {
+    // 1. Verificación de necesidad
+    if (!this.needsCalibration(results)) {
+      return results;
+    }
+
+    // 2. Actualización de referencia
+    this.updateCalibrationReference(results);
+
+    // 3. Ajuste de parámetros
+    this.adjustProcessingParameters(results);
+
+    // 4. Recalibración de procesadores
+    this.recalibrateProcessors();
+
+    // 5. Validación de calibración
+    return this.validateCalibration(results);
+  }
+
+  /**
+   * Optimización de recursos
+   */
+  private optimizeResources(): void {
+    // 1. Gestión de memoria
+    this.optimizeMemory();
+
+    // 2. Gestión de cache
+    this.optimizeCache();
+
+    // 3. Gestión de rendimiento
+    this.optimizePerformance();
+
+    // 4. Limpieza de recursos
+    this.cleanupResources();
   }
 
   /**
    * Optimizaciones de bajo nivel
    */
-  private computeOptimizedFFT(signal: Float64Array): Float64Array {
-    // 1. Preparación SIMD
-    const vectorized = this.simd.prepare(signal);
-
-    // 2. FFT paralela
-    const transformed = this.parallel.fft(vectorized);
-
-    // 3. Optimización de magnitud
-    return this.vectorOps.magnitude(transformed);
-  }
-
-  private applyAdaptiveFilters(signal: Float64Array): Float64Array {
-    return this.adaptiveFilters.reduce(
-      (filtered, filter) => filter.process(filtered),
-      signal
-    );
-  }
-
-  private detectEnvelope(signal: Float64Array): Float64Array {
-    return this.vectorOps.envelope(signal);
-  }
-
-  private analyzeDerivatives(signal: Float64Array): Float64Array {
-    const derivatives = this.buffers.derivatives;
-    this.vectorOps.derivatives(signal, derivatives);
-    return derivatives;
-  }
-
-  /**
-   * Optimizaciones de memoria
-   */
-  private optimizeMemoryLayout(): void {
-    // 1. Alineación de memoria
-    this.alignBuffers();
-
-    // 2. Pool de memoria
-    this.initializeMemoryPool();
-
-    // 3. Estrategia de cache
-    this.optimizeCacheStrategy();
-  }
-
-  private alignBuffers(): void {
+  private optimizeMemory(): void {
+    // 1. Compactación de buffers
     Object.values(this.buffers).forEach(buffer => {
-      const aligned = new Float64Array(
-        this.simd.align(buffer.length)
-      );
-      aligned.set(buffer);
-      buffer = aligned;
+      if (buffer.length > this.config.windowSize * 2) {
+        const newBuffer = new Float64Array(this.config.windowSize);
+        newBuffer.set(
+          buffer.subarray(buffer.length - this.config.windowSize)
+        );
+        buffer = newBuffer;
+      }
     });
-  }
 
-  private initializeMemoryPool(): void {
-    // Implementación de pool de memoria
-    this.memoryPool = new MemoryPool({
-      blockSize: 1024,
-      maxBlocks: 32,
-      alignment: 16
-    });
-  }
-
-  /**
-   * Utilidades optimizadas
-   */
-  private generateCacheKey(signal: Float64Array): string {
-    return this.vectorOps.hash(signal);
-  }
-
-  private checkCache(key: string): ProcessingResult | null {
-    const cached = this.cache.get(key);
-    return cached ? this.resultCache.get(cached) || null : null;
-  }
-
-  private updateCache(key: string, result: ProcessingResult): void {
-    // Limpieza de cache si necesario
-    if (this.cache.size > 1000) {
-      const oldestKey = this.cache.keys().next().value;
-      this.cache.delete(oldestKey);
+    // 2. Limpieza de cache
+    if (this.state.optimization.cache.size > 100) {
+      const oldestKey = this.state.optimization.cache.keys().next().value;
+      this.state.optimization.cache.delete(oldestKey);
     }
 
-    this.cache.set(key, result.signal);
-    this.resultCache.set(result.signal, result);
+    // 3. Optimización de recursos
+    this.state.optimization.resources.forEach((usage, resource) => {
+      if (usage < 0.3) { // Bajo uso
+        this.releaseResource(resource);
+      }
+    });
+  }
+
+  /**
+   * Gestión de estado
+   */
+  private updateState(results: SignalCalibration): void {
+    // 1. Actualización de calibración
+    this.state.calibration.isCalibrated = results.isCalibrated;
+    this.state.calibration.calibrationTime = Date.now();
+
+    // 2. Actualización de procesamiento
+    if (results.isValid) {
+      this.state.processing.lastValidResult = results;
+    }
+    this.state.processing.processingTime = results.processingTime;
+
+    // 3. Actualización de calidad
+    this.state.quality.overall = results.quality.overall;
+    this.state.quality.history.push(results.quality.overall);
+    if (this.state.quality.history.length > 100) {
+      this.state.quality.history.shift();
+    }
+
+    // 4. Actualización de optimización
+    this.updateOptimizationMetrics(results);
   }
 
   /**
@@ -283,87 +329,31 @@ export class SignalProcessor {
   public dispose(): void {
     try {
       // 1. Limpieza de procesadores
-      this.parallel.dispose();
-      this.vectorOps.dispose();
-      this.simd.dispose();
+      this.filter.dispose();
+      this.qualityAnalyzer.dispose();
+      this.frequencyAnalyzer.dispose();
+      this.waveletAnalyzer.dispose();
+      this.pulseAnalyzer.dispose();
+      this.motionCompensator.dispose();
+      this.heartRateEstimator.dispose();
 
-      // 2. Limpieza de filtros
-      this.filterBank.dispose();
-      this.adaptiveFilters.forEach(f => f.dispose());
-      this.wavelet.dispose();
-
-      // 3. Limpieza de buffers
+      // 2. Limpieza de buffers
       Object.values(this.buffers).forEach(buffer => {
         buffer.fill(0);
       });
 
-      // 4. Limpieza de cache
-      this.cache.clear();
-      this.resultCache = new WeakMap();
+      // 3. Limpieza de estado
+      this.state.calibration.referenceValues.fill(0);
+      this.state.processing.stageMetrics.clear();
+      this.state.optimization.cache.clear();
+      this.state.optimization.performance.clear();
+      this.state.optimization.resources.clear();
 
-      // 5. Liberación de memoria
-      this.memoryPool.dispose();
+      // 4. Limpieza de memoria
+      this.cleanupMemory();
 
     } catch (error) {
       console.error('Error in dispose:', error);
     }
-  }
-}
-
-/**
- * Pool de memoria optimizado
- */
-class MemoryPool {
-  private readonly blocks: Float64Array[];
-  private readonly available: Set<number>;
-  private readonly config: {
-    blockSize: number;
-    maxBlocks: number;
-    alignment: number;
-  };
-
-  constructor(config: {
-    blockSize: number;
-    maxBlocks: number;
-    alignment: number;
-  }) {
-    this.config = config;
-    this.blocks = [];
-    this.available = new Set();
-    this.initialize();
-  }
-
-  private initialize(): void {
-    for (let i = 0; i < this.config.maxBlocks; i++) {
-      const block = new Float64Array(
-        this.config.blockSize + this.config.alignment
-      );
-      this.blocks.push(block);
-      this.available.add(i);
-    }
-  }
-
-  public acquire(): Float64Array {
-    if (this.available.size === 0) {
-      throw new Error('No memory blocks available');
-    }
-
-    const blockId = this.available.values().next().value;
-    this.available.delete(blockId);
-    return this.blocks[blockId];
-  }
-
-  public release(block: Float64Array): void {
-    const blockId = this.blocks.indexOf(block);
-    if (blockId !== -1) {
-      block.fill(0);
-      this.available.add(blockId);
-    }
-  }
-
-  public dispose(): void {
-    this.blocks.forEach(block => block.fill(0));
-    this.blocks.length = 0;
-    this.available.clear();
   }
 }
