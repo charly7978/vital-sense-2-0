@@ -2,6 +2,8 @@
 // IMPORTANTE: NO MODIFICAR FUNCIONALIDAD
 // Este archivo solo contiene definiciones de tipos
 
+import { SignalQualityLevel } from './index';
+
 export interface SignalConditions {
   noiseLevel: number;
   signalStrength: number;
@@ -31,6 +33,8 @@ export interface NoiseAnalysis {
   kurtosis: number;
   variance: number;
   dispose?: () => void;
+  spectralNoise?: any;
+  threshold?: number;
 }
 
 export interface MotionAnalysis {
@@ -39,6 +43,8 @@ export interface MotionAnalysis {
   acceleration: number[];
   features?: any[];
   dispose?: () => void;
+  transform?: any;
+  threshold?: number;
 }
 
 export type QualityLevel = 'excellent' | 'good' | 'fair' | 'poor' | 'invalid';
@@ -50,4 +56,17 @@ export interface SignalFeatures {
   statistical: number[];
   morphological?: number[];
   wavelet?: number[];
+}
+
+export interface SpectralAnalysis {
+  spectrum: Float32Array;
+  frequencies: Float32Array;
+  magnitude: Float32Array;
+  phase: Float32Array;
+}
+
+export interface WaveletAnalysis {
+  coefficients: Float32Array[];
+  scales: number[];
+  features: any[];
 }
