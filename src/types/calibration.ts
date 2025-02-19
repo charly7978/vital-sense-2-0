@@ -27,10 +27,10 @@ export interface CalibrationState {
   calibrationTime: number;
   referenceValues: Float64Type;
   calibrationQuality: number;
-  lastCalibration?: number;
   enabled: boolean;
   duration: number;
   reference: Float64Type;
+  lastCalibration?: number;
 }
 
 export interface ProcessingConfig {
@@ -40,10 +40,26 @@ export interface ProcessingConfig {
   enabled: boolean;
   duration: number;
   reference: Float64Type;
-  calibration: {
+  calibration: CalibrationState;
+  filterOrder?: number;
+  lowCutoff?: number;
+  highCutoff?: number;
+  peakThreshold?: number;
+  minPeakDistance?: number;
+  calibrationDuration?: number;
+  adaptiveThreshold?: boolean;
+  harmonics?: {
     enabled: boolean;
-    duration: number;
-    reference: Float64Type;
+    maxHarmonics: number;
+    minAmplitude: number;
+    tracking?: boolean;
+  };
+  filter?: {
+    enabled: boolean;
+    lowCut: number;
+    highCut: number;
+    order: number;
+    nfft?: number;
   };
 }
 
@@ -52,4 +68,18 @@ export interface SensitivitySettings {
   brightness: number;
   redIntensity: number;
   signalAmplification: number;
+  snr?: number;
+}
+
+export interface CalibrationInterface {
+  isCalibrating: boolean;
+  progress: number;
+  message: string;
+  isCalibrated: boolean;
+  calibrationTime: number;
+  referenceValues: Float64Type;
+  calibrationQuality: number;
+  enabled: boolean;
+  duration: number;
+  reference: Float64Type;
 }

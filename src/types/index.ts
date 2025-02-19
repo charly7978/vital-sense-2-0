@@ -27,20 +27,36 @@ export type {
   CalibrationEntry,
   CalibratedResult,
   ProcessingConfig,
-  SensitivitySettings
+  SensitivitySettings,
+  CalibrationInterface
 } from './calibration';
+
+// Core types
+export type {
+  Metadata,
+  ValidationResult,
+  ProcessingState,
+  SignalProcessor
+} from './core';
+
+// Signal types
+export type {
+  SignalSegment,
+  SignalPoint,
+  SignalMetrics,
+  SignalValidation,
+  SignalFeatures
+} from './signal';
 
 // Vital types
 export type {
   VitalReading,
   PPGData,
   PPGProcessingConfig,
-  ProcessingState,
   VitalSigns,
   BloodPressure,
   ArrhythmiaType,
   SignalConditions,
-  SensitivitySettings
 } from './vitals';
 
 // Artifact types

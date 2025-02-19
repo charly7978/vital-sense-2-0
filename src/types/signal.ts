@@ -28,14 +28,9 @@ export interface SignalValidation extends ValidationResult {
   coverage: number;
 }
 
-export interface SignalConditions {
-  brightness: number;
-  contrast: number;
-  noise: number;
-  stability: number;
-  signalQuality: number;
-  lightLevel: number;
-  movement: number;
-  coverage: number;
-  temperature?: number;
+export interface SignalFeatures {
+  temporal: Float64Type;
+  spectral: Float64Type;
+  statistical: Float64Type;
+  quality: number;
 }

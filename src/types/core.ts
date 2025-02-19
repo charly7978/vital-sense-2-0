@@ -1,7 +1,6 @@
 
 import { Float64Type } from './common';
 import { SignalQuality } from './quality';
-import { NoiseAnalysis, MotionAnalysis } from './artifacts';
 
 export interface Metadata {
   timestamp: number;
@@ -13,14 +12,42 @@ export interface ValidationResult {
   isValid: boolean;
   score: number;
   details: string[];
+  quality?: SignalQuality;
 }
 
-export interface SignalProcessor extends Disposable {
-  process(signal: Float64Type): SignalQuality;
-  analyze(signal: Float64Type): {
-    noise: NoiseAnalysis;
-    motion: MotionAnalysis;
+export interface ProcessingState {
+  isProcessing: boolean;
+  frameCount: number;
+  buffer: Float64Type;
+  timeBuffer: Float64Type;
+  lastTimestamp: number;
+  sampleRate: number;
+  quality: SignalQuality;
+  optimization: {
+    cache: Map<string, any>;
+    performance: Map<string, number>;
+    resources: Map<string, any>;
   };
+  calibration: {
+    isCalibrated: boolean;
+    lastCalibration: number;
+    referenceValues: Float64Type;
+    calibrationQuality: number;
+    enabled: boolean;
+    duration: number;
+    reference: Float64Type;
+  };
+}
+
+export interface SignalProcessor {
+  process(signal: Float64Array): SignalQuality;
+  analyze(signal: Float64Array): { [key: string]: any };
+  dispose(): void;
+  initialize?(): void;
+  validateInput?(input: any): boolean;
+  prepareProcessing?(input: any): any;
+  handleProcessingError?(error: Error): void;
+  updateState?(state: any): void;
 }
 
 export interface Disposable {
