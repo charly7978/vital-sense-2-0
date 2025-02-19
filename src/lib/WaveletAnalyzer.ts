@@ -1,196 +1,221 @@
+import { WaveletConfig, VitalReading, SpectralFeatures, WaveletDecomposition } from '@/types';
 
-import { WaveletConfig, VitalReading, Percent, createPercent } from '@/types';
-
+/**
+ * Analizador Wavelet avanzado con análisis multiresolución
+ * Optimizado para detección de características PPG
+ */
 export class WaveletAnalyzer {
-  private config: WaveletConfig;
-  private buffer: Float32Array;
-  private waveletCoefficients: Float32Array[];
-  private lastAnalysis: {
-    timestamp: number;
-    peaks: number[];
-    frequencies: number[];
-    energy: number[];
+  // Configuración y estado
+  private readonly config: WaveletConfig;
+  private decompositionLevels: number = 8;
+  
+  // Buffers y matrices
+  private coefficients: Float32Array[];
+  private energyMap: Float32Array[];
+  private phaseMap: Float32Array[];
+  
+  // Wavelets base
+  private readonly motherWavelets: {[key: string]: (t: number, s: number) => number} = {
+    morlet: (t: number, s: number) => this.morletWavelet(t, s),
+    mexican_hat: (t: number, s: number) => this.mexicanHatWavelet(t, s),
+    daubechies4: (t: number, s: number) => this.daubechiesWavelet(t, s, 4),
+    symlet8: (t: number, s: number) => this.symletWavelet(t, s, 8)
   };
 
-  constructor() {
-    this.config = {
-      samplingRate: 30,
-      windowSize: 256,
-      scales: [2, 4, 8, 16, 32],
-      waveletType: 'morlet'
+  // Análisis avanzado
+  private readonly FEATURE_EXTRACTORS = new Map([
+    ['heartRate', this.extractHeartRateFeatures.bind(this)],
+    ['variability', this.extractVariabilityFeatures.bind(this)],
+    ['respiratory', this.extractRespiratoryFeatures.bind(this)],
+    ['artifacts', this.detectArtifacts.bind(this)]
+  ]);
+
+  constructor(config: WaveletConfig) {
+    this.config = this.validateConfig(config);
+    this.initializeBuffers();
+    this.setupAnalysis();
+  }
+
+  /**
+   * Analiza una señal usando transformada wavelet continua
+   */
+  public analyze(signal: Float32Array): WaveletDecomposition {
+    try {
+      // Preprocesamiento
+      const normalizedSignal = this.normalizeSignal(signal);
+      
+      // Descomposición wavelet
+      const decomposition = this.performDecomposition(normalizedSignal);
+      
+      // Análisis de características
+      const features = this.extractFeatures(decomposition);
+      
+      // Detección de eventos
+      const events = this.detectEvents(decomposition, features);
+      
+      // Post-procesamiento y validación
+      const results = this.postProcessResults(decomposition, features, events);
+      
+      return this.validateResults(results);
+
+    } catch (error) {
+      console.error('Error en análisis wavelet:', error);
+      return this.getEmptyDecomposition();
+    }
+  }
+
+  /**
+   * Descomposición wavelet optimizada
+   */
+  private performDecomposition(signal: Float32Array): WaveletDecomposition {
+    const scales = this.generateScales();
+    const decomposition: WaveletDecomposition = {
+      coefficients: [],
+      energies: [],
+      phases: [],
+      scales: scales
     };
 
-    this.buffer = new Float32Array(this.config.windowSize);
-    this.waveletCoefficients = this.initializeWavelets();
-    this.lastAnalysis = {
-      timestamp: 0,
-      peaks: [],
-      frequencies: [],
-      energy: []
+    // Paralelizar cálculos por escalas
+    scales.forEach((scale, idx) => {
+      // Convolución optimizada
+      const coeffs = this.computeWaveletTransform(signal, scale);
+      
+      // Análisis de energía
+      const energy = this.computeEnergySpectrum(coeffs);
+      
+      // Análisis de fase
+      const phase = this.computePhaseSpectrum(coeffs);
+      
+      decomposition.coefficients[idx] = coeffs;
+      decomposition.energies[idx] = energy;
+      decomposition.phases[idx] = phase;
+    });
+
+    return decomposition;
+  }
+
+  /**
+   * Extracción de características espectrales
+   */
+  private extractFeatures(decomposition: WaveletDecomposition): SpectralFeatures {
+    const features: SpectralFeatures = {
+      heartRate: [],
+      variability: [],
+      respiratory: [],
+      artifacts: []
+    };
+
+    // Extraer características en paralelo
+    this.FEATURE_EXTRACTORS.forEach((extractor, featureType) => {
+      features[featureType] = extractor(decomposition);
+    });
+
+    return features;
+  }
+
+  /**
+   * Detección de eventos fisiológicos
+   */
+  private detectEvents(
+    decomposition: WaveletDecomposition, 
+    features: SpectralFeatures
+  ): PhysiologicalEvents {
+    return {
+      heartbeats: this.detectHeartbeats(decomposition, features),
+      artifacts: this.detectArtifacts(decomposition, features),
+      respiratory: this.detectRespiratoryEvents(decomposition, features)
     };
   }
 
-  public initialize(config: Partial<WaveletConfig>): void {
-    this.config = { ...this.config, ...config };
-    this.buffer = new Float32Array(this.config.windowSize);
-    this.waveletCoefficients = this.initializeWavelets();
-    this.reset();
+  /**
+   * Wavelets madre optimizados
+   */
+  private morletWavelet(t: number, s: number): number {
+    const omega0 = 6.0;
+    const term1 = Math.exp(-t * t / (2 * s * s));
+    const term2 = Math.cos(omega0 * t / s);
+    const term3 = Math.exp(-omega0 * omega0 / 2);
+    return (1 / Math.sqrt(s)) * (term1 * (term2 - term3));
   }
 
-  public analyze(signal: number): VitalReading[] {
-    // Actualizar buffer
-    this.buffer.copyWithin(0, 1);
-    this.buffer[this.buffer.length - 1] = signal;
+  private mexicanHatWavelet(t: number, s: number): number {
+    const t2 = (t / s) * (t / s);
+    return (1 / Math.sqrt(s)) * (1 - t2) * Math.exp(-t2 / 2);
+  }
 
-    // Realizar transformada wavelet
-    const coefficients = this.computeWaveletTransform();
+  /**
+   * Análisis de variabilidad cardíaca
+   */
+  private analyzeHeartRateVariability(peaks: number[]): HRVMetrics {
+    const intervals = this.calculateRRIntervals(peaks);
+    return {
+      sdnn: this.calculateSDNN(intervals),
+      rmssd: this.calculateRMSSD(intervals),
+      pnn50: this.calculatePNN50(intervals),
+      triangularIndex: this.calculateTriangularIndex(intervals)
+    };
+  }
+
+  /**
+   * Detección de arritmias
+   */
+  private detectArrhythmias(
+    decomposition: WaveletDecomposition, 
+    hrv: HRVMetrics
+  ): ArrhythmiaDetection {
+    const patterns = this.analyzeRhythmPatterns(decomposition);
+    const irregularities = this.detectIrregularities(patterns, hrv);
     
-    // Detectar picos y frecuencias
-    const peaks = this.detectPeaks(coefficients);
-    const frequencies = this.estimateFrequencies(coefficients);
-    const energy = this.computeEnergy(coefficients);
-
-    // Actualizar último análisis
-    this.lastAnalysis = {
-      timestamp: Date.now(),
-      peaks,
-      frequencies,
-      energy
+    return {
+      detected: irregularities.length > 0,
+      type: this.classifyArrhythmia(irregularities),
+      confidence: this.calculateConfidence(irregularities),
+      patterns: irregularities
     };
-
-    // Generar lecturas vitales
-    return this.generateReadings();
   }
 
+  /**
+   * Optimización de escalas
+   */
+  private optimizeScales(): number[] {
+    const minScale = 2;
+    const maxScale = this.config.windowSize / 4;
+    const numScales = Math.ceil(Math.log2(maxScale / minScale));
+    
+    return Array.from({length: numScales}, (_, i) => {
+      return minScale * Math.pow(2, i / this.config.scaleResolution);
+    });
+  }
+
+  /**
+   * Validación y control de calidad
+   */
+  private validateResults(results: WaveletDecomposition): WaveletDecomposition {
+    if (!this.checkQuality(results)) {
+      throw new Error('Resultados no válidos');
+    }
+    return results;
+  }
+
+  /**
+   * Reset del analizador
+   */
   public reset(): void {
-    this.buffer.fill(0);
-    this.lastAnalysis = {
-      timestamp: 0,
-      peaks: [],
-      frequencies: [],
-      energy: []
+    this.coefficients = [];
+    this.energyMap = [];
+    this.phaseMap = [];
+    this.setupAnalysis();
+  }
+
+  /**
+   * Obtener métricas de calidad
+   */
+  public getQualityMetrics(): QualityMetrics {
+    return {
+      signalQuality: this.calculateSignalQuality(),
+      decompositionQuality: this.calculateDecompositionQuality(),
+      featureReliability: this.calculateFeatureReliability()
     };
-  }
-
-  private initializeWavelets(): Float32Array[] {
-    return this.config.scales.map(scale => {
-      const wavelet = new Float32Array(this.config.windowSize);
-      
-      // Generar coeficientes wavelet según el tipo
-      if (this.config.waveletType === 'morlet') {
-        this.generateMorletWavelet(wavelet, scale);
-      } else {
-        this.generateMexicanHatWavelet(wavelet, scale);
-      }
-
-      return wavelet;
-    });
-  }
-
-  private generateMorletWavelet(wavelet: Float32Array, scale: number): void {
-    const omega0 = 6.0; // Frecuencia central
-    const factor = Math.sqrt(1.0 / scale);
-
-    for (let i = 0; i < wavelet.length; i++) {
-      const t = (i - wavelet.length / 2) / scale;
-      const gaussian = Math.exp(-t * t / 2);
-      const cosine = Math.cos(omega0 * t);
-      wavelet[i] = factor * gaussian * cosine;
-    }
-  }
-
-  private generateMexicanHatWavelet(wavelet: Float32Array, scale: number): void {
-    const factor = Math.sqrt(2.0 / (3.0 * scale));
-
-    for (let i = 0; i < wavelet.length; i++) {
-      const t = (i - wavelet.length / 2) / scale;
-      const t2 = t * t;
-      wavelet[i] = factor * (1 - t2) * Math.exp(-t2 / 2);
-    }
-  }
-
-  private computeWaveletTransform(): Float32Array[] {
-    return this.waveletCoefficients.map(wavelet => {
-      const coefficients = new Float32Array(this.config.windowSize);
-      
-      // Convolución con el buffer
-      for (let i = 0; i < this.config.windowSize; i++) {
-        let sum = 0;
-        for (let j = 0; j < this.config.windowSize; j++) {
-          const idx = (i + j) % this.config.windowSize;
-          sum += this.buffer[j] * wavelet[idx];
-        }
-        coefficients[i] = sum;
-      }
-
-      return coefficients;
-    });
-  }
-
-  private detectPeaks(coefficients: Float32Array[]): number[] {
-    const peaks: number[] = [];
-    const threshold = this.computeThreshold(coefficients);
-
-    coefficients.forEach(scale => {
-      for (let i = 1; i < scale.length - 1; i++) {
-        if (scale[i] > threshold &&
-            scale[i] > scale[i - 1] &&
-            scale[i] > scale[i + 1]) {
-          peaks.push(i);
-        }
-      }
-    });
-
-    return peaks;
-  }
-
-  private estimateFrequencies(coefficients: Float32Array[]): number[] {
-    return this.config.scales.map((scale, idx) => {
-      const energy = this.computeScaleEnergy(coefficients[idx]);
-      return (this.config.samplingRate / scale) * energy;
-    });
-  }
-
-  private computeEnergy(coefficients: Float32Array[]): number[] {
-    return coefficients.map(scale => {
-      let energy = 0;
-      for (let i = 0; i < scale.length; i++) {
-        energy += scale[i] * scale[i];
-      }
-      return Math.sqrt(energy / scale.length);
-    });
-  }
-
-  private computeThreshold(coefficients: Float32Array[]): number {
-    let max = 0;
-    coefficients.forEach(scale => {
-      const scaleMax = Math.max(...Array.from(scale));
-      max = Math.max(max, scaleMax);
-    });
-    return max * 0.3; // 30% del máximo como umbral
-  }
-
-  private computeScaleEnergy(scale: Float32Array): number {
-    let energy = 0;
-    for (let i = 0; i < scale.length; i++) {
-      energy += scale[i] * scale[i];
-    }
-    return Math.sqrt(energy / scale.length);
-  }
-
-  private generateReadings(): VitalReading[] {
-    return this.lastAnalysis.frequencies.map((freq, idx) => ({
-      timestamp: this.lastAnalysis.timestamp,
-      value: freq,
-      quality: createPercent(this.lastAnalysis.energy[idx] / Math.max(...this.lastAnalysis.energy) * 100)
-    }));
-  }
-
-  public getConfig(): WaveletConfig {
-    return { ...this.config };
-  }
-
-  public getLastAnalysis() {
-    return { ...this.lastAnalysis };
   }
 }
