@@ -1,455 +1,373 @@
-// src/lib/FingerDetector.ts
+import { 
+  FingerDetection, ROI, ColorProfile, DetectionQuality,
+  MotionVector, PerfusionMetrics, TextureAnalysis,
+  LightConditions, DetectionError, SignalQualityLevel
+} from '@/types';
 
-import { SignalQualityLevel } from '@/types';
-
+/**
+ * Detector avanzado de dedos optimizado para cámaras traseras sin flash
+ * Implementa detección multi-región y análisis de calidad en tiempo real
+ * @version 2.0.0
+ */
 export class FingerDetector {
-  // Umbrales optimizados
-  private readonly thresholds = {
-    minBrightness: 0.3,
-    maxBrightness: 0.95,
-    redRatio: 0.5,
-    greenRatio: 0.3,
-    blueRatio: 0.2,
-    motionThreshold: 0.1,
-    edgeStrength: 0.4,
-    textureVariance: 0.15
+  // Configuración optimizada para baja luz
+  private readonly config = {
+    minCoverage: 0.15,        // Cobertura mínima aceptable
+    maxRegions: 4,            // Máximo de regiones a analizar
+    regionSize: 100,          // Tamaño de región en píxeles
+    historySize: 30,          // Frames de historia (1s @ 30fps)
+    minLight: 50,             // Nivel mínimo de luz
+    maxLight: 240,            // Nivel máximo de luz
+    blockSize: 16,            // Tamaño de bloque para análisis
+    searchWindow: 16          // Ventana de búsqueda para tracking
   };
 
-  // Cache para optimización
-  private lastFrameData?: ImageData;
-  private lastPosition?: { x: number; y: number };
-  private frameCounter = 0;
-  private readonly motionHistory: Array<{ x: number; y: number }> = [];
-  private readonly maxHistoryLength = 30;
+  // Umbrales adaptativos basados en luz
+  private thresholds = {
+    red: { min: 150, max: 255 },
+    green: { min: 20, max: 200 },
+    blue: { min: 20, max: 180 },
+    perfusion: { min: 0.3, max: 0.95 },
+    motion: { max: 0.3 },
+    texture: { min: 0.4 },
+    edge: { min: 0.3 }
+  };
 
-  // Matriz de kernel Sobel para detección de bordes
-  private readonly sobelKernelX = [
-    [-1, 0, 1],
-    [-2, 0, 2],
-    [-1, 0, 1]
-  ];
+  // Estado y tracking
+  private state = {
+    lastDetection: null as FingerDetection | null,
+    detectionHistory: [] as FingerDetection[],
+    stabilityScore: 0,
+    frameCount: 0,
+    lightConditions: 'unknown' as LightConditions,
+    errorCount: 0,
+    lastError: null as DetectionError | null,
+    isCalibrated: false
+  };
 
-  private readonly sobelKernelY = [
-    [-1, -2, -1],
-    [0, 0, 0],
-    [1, 2, 1]
-  ];
+  // Buffers optimizados
+  private readonly buffers = {
+    colorProfiles: [] as ColorProfile[],
+    motionVectors: [] as MotionVector[],
+    texturePatterns: new Float32Array(256),
+    edgeStrengths: new Float32Array(256)
+  };
 
-  public detectFinger(imageData: ImageData): {
-    isPresent: boolean;
-    position?: { x: number; y: number };
-    quality: SignalQualityLevel;
-    confidence: number;
-    coverage: number;
-    metrics: {
-      brightness: number;
-      contrast: number;
-      sharpness: number;
-      stability: number;
-      colorBalance: number;
-    };
-  } {
-    // Incrementar contador de frames
-    this.frameCounter++;
+  // Matrices de kernel para análisis
+  private readonly kernels = {
+    sobel: {
+      x: [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]],
+      y: [[-1, -2, -1], [0, 0, 0], [1, 2, 1]]
+    },
+    gaussian: [
+      [1/16, 2/16, 1/16],
+      [2/16, 4/16, 2/16],
+      [1/16, 2/16, 1/16]
+    ]
+  };
 
-    // Extraer región central
-    const centerRegion = this.extractCenterRegion(imageData);
+  constructor() {
+    this.initialize();
+  }
+
+  /**
+   * Detección principal de dedo
+   */
+  public detect(frame: ImageData): FingerDetection {
+    try {
+      // 1. Análisis de condiciones de luz
+      const light = this.analyzeLightConditions(frame);
+      this.adaptThresholds(light);
+
+      // 2. Pre-procesamiento
+      const processed = this.preprocess(frame);
+
+      // 3. Detección de regiones potenciales
+      const regions = this.findPotentialRegions(processed);
+      if (regions.length === 0) {
+        return this.createEmptyDetection('No se encontraron regiones válidas');
+      }
+
+      // 4. Análisis detallado de cada región
+      const analyzedRegions = regions.map(region => this.analyzeRegion(frame, region));
+
+      // 5. Selección de mejor región
+      const bestRegion = this.selectBestRegion(analyzedRegions);
+
+      // 6. Análisis de calidad
+      const quality = this.assessQuality(frame, bestRegion);
+
+      // 7. Tracking y estabilidad
+      this.updateTracking(bestRegion);
+
+      // 8. Generación de resultado
+      const detection = this.createDetection(bestRegion, quality);
+
+      // 9. Actualización de estado
+      this.updateState(detection);
+
+      return detection;
+
+    } catch (error) {
+      return this.handleDetectionError(error);
+    }
+  }
+
+  /**
+   * Análisis de condiciones de luz
+   */
+  private analyzeLightConditions(frame: ImageData): LightConditions {
+    const luminance = this.calculateAverageLuminance(frame);
     
-    // Análisis completo de la imagen
-    const metrics = this.analyzeImage(centerRegion);
+    if (luminance < this.config.minLight) {
+      this.adaptToLowLight();
+      return 'low';
+    } else if (luminance > this.config.maxLight) {
+      this.adaptToHighLight();
+      return 'high';
+    }
     
-    // Si no hay suficiente luz o la imagen está saturada
-    if (metrics.brightness < this.thresholds.minBrightness || 
-        metrics.brightness > this.thresholds.maxBrightness) {
-      return this.generateEmptyResult(metrics);
+    return 'normal';
+  }
+
+  /**
+   * Pre-procesamiento de frame
+   */
+  private preprocess(frame: ImageData): ImageData {
+    // 1. Reducción de ruido
+    const denoised = this.applyGaussianBlur(frame);
+
+    // 2. Mejora de contraste
+    const enhanced = this.enhanceContrast(denoised);
+
+    // 3. Normalización de color
+    const normalized = this.normalizeColors(enhanced);
+
+    return normalized;
+  }
+
+  /**
+   * Búsqueda de regiones potenciales
+   */
+  private findPotentialRegions(frame: ImageData): ROI[] {
+    const regions: ROI[] = [];
+    const gridSize = Math.floor(Math.sqrt(this.config.maxRegions));
+    const stepX = frame.width / gridSize;
+    const stepY = frame.height / gridSize;
+
+    for (let y = 0; y < frame.height - this.config.regionSize; y += stepY) {
+      for (let x = 0; x < frame.width - this.config.regionSize; x += stepX) {
+        const roi = { x, y, width: this.config.regionSize, height: this.config.regionSize };
+        if (this.isValidRegion(frame, roi)) {
+          regions.push(roi);
+        }
+      }
     }
 
-    // Detección de movimiento si hay frame anterior
-    const motionScore = this.lastFrameData ? 
-      this.detectMotion(centerRegion, this.lastFrameData) : 1;
+    return this.filterBestRegions(regions);
+  }
 
-    // Análisis de textura y bordes
-    const textureScore = this.analyzeTexture(centerRegion);
-    const edgeScore = this.detectEdges(centerRegion);
+  /**
+   * Análisis detallado de región
+   */
+  private analyzeRegion(frame: ImageData, roi: ROI): RegionAnalysis {
+    // 1. Análisis de color
+    const colorProfile = this.analyzeColor(frame, roi);
 
-    // Análisis de color para piel
-    const skinLikelihood = this.analyzeSkinColor(centerRegion);
+    // 2. Análisis de textura
+    const textureAnalysis = this.analyzeTexture(frame, roi);
 
-    // Calcular posición óptima
-    const position = this.findOptimalPosition(centerRegion, skinLikelihood);
+    // 3. Detección de bordes
+    const edgeAnalysis = this.detectEdges(frame, roi);
 
-    // Actualizar historial de movimiento
-    this.updateMotionHistory(position);
+    // 4. Análisis de movimiento
+    const motionAnalysis = this.analyzeMotion(roi);
 
-    // Calcular estabilidad de la posición
-    const stability = this.calculateStability();
+    // 5. Análisis de perfusión
+    const perfusion = this.analyzePerfusion(frame, roi);
 
-    // Calcular confianza general
-    const confidence = this.calculateConfidence({
-      skinLikelihood,
-      motionScore,
-      textureScore,
-      edgeScore,
-      stability,
-      metrics
+    return {
+      roi,
+      colorProfile,
+      textureAnalysis,
+      edgeAnalysis,
+      motionAnalysis,
+      perfusion,
+      score: this.calculateRegionScore({
+        colorProfile,
+        textureAnalysis,
+        edgeAnalysis,
+        motionAnalysis,
+        perfusion
+      })
+    };
+  }
+
+  /**
+   * Análisis de color avanzado
+   */
+  private analyzeColor(frame: ImageData, roi: ROI): ColorProfile {
+    const pixels = this.extractROIPixels(frame, roi);
+    const channels = this.separateChannels(pixels);
+    
+    return {
+      mean: this.calculateChannelMeans(channels),
+      std: this.calculateChannelStd(channels),
+      ratios: this.calculateChannelRatios(channels),
+      histogram: this.calculateColorHistogram(channels),
+      skinLikelihood: this.calculateSkinLikelihood(channels)
+    };
+  }
+
+  /**
+   * Análisis de textura
+   */
+  private analyzeTexture(frame: ImageData, roi: ROI): TextureAnalysis {
+    // 1. Cálculo de GLCM
+    const glcm = this.calculateGLCM(frame, roi);
+
+    // 2. Características de Haralick
+    const haralick = this.calculateHaralickFeatures(glcm);
+
+    // 3. Patrones binarios locales
+    const lbp = this.calculateLBP(frame, roi);
+
+    // 4. Análisis de gradiente
+    const gradient = this.analyzeGradient(frame, roi);
+
+    return {
+      contrast: haralick.contrast,
+      correlation: haralick.correlation,
+      energy: haralick.energy,
+      homogeneity: haralick.homogeneity,
+      lbpPattern: lbp,
+      gradientMagnitude: gradient.magnitude,
+      gradientDirection: gradient.direction
+    };
+  }
+
+  /**
+   * Análisis de calidad
+   */
+  private assessQuality(frame: ImageData, region: RegionAnalysis): DetectionQuality {
+    const metrics = {
+      colorQuality: this.assessColorQuality(region.colorProfile),
+      textureQuality: this.assessTextureQuality(region.textureAnalysis),
+      motionQuality: this.assessMotionQuality(region.motionAnalysis),
+      perfusionQuality: this.assessPerfusionQuality(region.perfusion),
+      stabilityQuality: this.state.stabilityScore
+    };
+
+    const weights = this.calculateQualityWeights(metrics);
+    const overallQuality = this.calculateOverallQuality(metrics, weights);
+
+    return {
+      metrics,
+      weights,
+      overall: overallQuality,
+      level: this.determineQualityLevel(overallQuality)
+    };
+  }
+
+  /**
+   * Tracking y estabilidad
+   */
+  private updateTracking(region: RegionAnalysis): void {
+    if (this.state.lastDetection) {
+      const motion = this.calculateMotion(
+        region.roi,
+        this.state.lastDetection.roi
+      );
+
+      this.buffers.motionVectors.push(motion);
+      if (this.buffers.motionVectors.length > this.config.historySize) {
+        this.buffers.motionVectors.shift();
+      }
+
+      this.state.stabilityScore = this.calculateStabilityScore(
+        this.buffers.motionVectors
+      );
+    }
+  }
+
+  /**
+   * Métodos de utilidad
+   */
+  private calculateAverageLuminance(frame: ImageData): number {
+    let sum = 0;
+    for (let i = 0; i < frame.data.length; i += 4) {
+      sum += (frame.data[i] * 0.299 + 
+              frame.data[i + 1] * 0.587 + 
+              frame.data[i + 2] * 0.114);
+    }
+    return sum / (frame.data.length / 4);
+  }
+
+  private isValidRegion(frame: ImageData, roi: ROI): boolean {
+    return roi.x >= 0 && 
+           roi.y >= 0 && 
+           roi.x + roi.width <= frame.width &&
+           roi.y + roi.height <= frame.height;
+  }
+
+  private calculateStabilityScore(motions: MotionVector[]): number {
+    if (motions.length < 2) return 1;
+
+    const totalMotion = motions.reduce((sum, motion) => 
+      sum + Math.sqrt(motion.dx * motion.dx + motion.dy * motion.dy), 0);
+
+    return Math.max(0, 1 - totalMotion / (motions.length * 10));
+  }
+
+  /**
+   * Manejo de errores
+   */
+  private handleDetectionError(error: any): FingerDetection {
+    this.state.errorCount++;
+    this.state.lastError = {
+      message: error.message,
+      timestamp: Date.now(),
+      frame: this.state.frameCount
+    };
+
+    console.error('Error en detección:', {
+      error,
+      state: this.state,
+      thresholds: this.thresholds
     });
 
-    // Determinar calidad de la señal
-    const quality = this.determineQuality(confidence);
+    return this.createEmptyDetection(error.message);
+  }
 
-    // Calcular cobertura
-    const coverage = this.calculateCoverage(centerRegion);
-
-    // Actualizar cache
-    this.lastFrameData = centerRegion;
-    this.lastPosition = position;
-
+  /**
+   * Métodos públicos adicionales
+   */
+  public getMetrics(): DetectionMetrics {
     return {
-      isPresent: confidence > 0.6,
-      position,
-      quality,
-      confidence,
-      coverage,
-      metrics: {
-        ...metrics,
-        stability,
-        colorBalance: skinLikelihood
-      }
+      frameCount: this.state.frameCount,
+      errorRate: this.state.errorCount / this.state.frameCount,
+      stability: this.state.stabilityScore,
+      lightConditions: this.state.lightConditions,
+      isCalibrated: this.state.isCalibrated
     };
   }
 
-  private extractCenterRegion(imageData: ImageData): ImageData {
-    const width = imageData.width;
-    const height = imageData.height;
-    const centerX = Math.floor(width / 2);
-    const centerY = Math.floor(height / 2);
-    const regionSize = Math.floor(Math.min(width, height) * 0.3);
-
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d')!;
-    canvas.width = regionSize;
-    canvas.height = regionSize;
-
-    const tempCanvas = document.createElement('canvas');
-    const tempCtx = tempCanvas.getContext('2d')!;
-    tempCanvas.width = width;
-    tempCanvas.height = height;
-    tempCtx.putImageData(imageData, 0, 0);
-
-    ctx.drawImage(
-      tempCanvas,
-      centerX - regionSize/2,
-      centerY - regionSize/2,
-      regionSize,
-      regionSize,
-      0, 0, regionSize, regionSize
-    );
-
-    return ctx.getImageData(0, 0, regionSize, regionSize);
-  }
-
-  private analyzeImage(imageData: ImageData): {
-    brightness: number;
-    contrast: number;
-    sharpness: number;
-  } {
-    let minIntensity = 255;
-    let maxIntensity = 0;
-    let totalIntensity = 0;
-    let variance = 0;
-
-    // Primer paso: calcular intensidad media
-    for (let i = 0; i < imageData.data.length; i += 4) {
-      const intensity = (imageData.data[i] + imageData.data[i+1] + imageData.data[i+2]) / 3;
-      minIntensity = Math.min(minIntensity, intensity);
-      maxIntensity = Math.max(maxIntensity, intensity);
-      totalIntensity += intensity;
-    }
-
-    const meanIntensity = totalIntensity / (imageData.data.length / 4);
-
-    // Segundo paso: calcular varianza
-    for (let i = 0; i < imageData.data.length; i += 4) {
-      const intensity = (imageData.data[i] + imageData.data[i+1] + imageData.data[i+2]) / 3;
-      variance += Math.pow(intensity - meanIntensity, 2);
-    }
-
-    return {
-      brightness: meanIntensity / 255,
-      contrast: (maxIntensity - minIntensity) / 255,
-      sharpness: Math.sqrt(variance / (imageData.data.length / 4)) / 255
+  public reset(): void {
+    this.state = {
+      lastDetection: null,
+      detectionHistory: [],
+      stabilityScore: 0,
+      frameCount: 0,
+      lightConditions: 'unknown',
+      errorCount: 0,
+      lastError: null,
+      isCalibrated: false
     };
+    this.resetBuffers();
   }
 
-  private detectMotion(current: ImageData, previous: ImageData): number {
-    let totalDiff = 0;
-    const length = Math.min(current.data.length, previous.data.length);
-
-    for (let i = 0; i < length; i += 4) {
-      const diff = Math.abs(current.data[i] - previous.data[i]);
-      totalDiff += diff;
-    }
-
-    return 1 - Math.min(1, totalDiff / (length * 255));
-  }
-
-  private analyzeTexture(imageData: ImageData): number {
-    const grayScale = this.toGrayscale(imageData);
-    let totalVariance = 0;
-
-    for (let y = 1; y < imageData.height - 1; y++) {
-      for (let x = 1; x < imageData.width - 1; x++) {
-        const neighborhood = this.getNeighborhood(grayScale, x, y);
-        const variance = this.calculateVariance(neighborhood);
-        totalVariance += variance;
-      }
-    }
-
-    return Math.min(1, totalVariance / (imageData.width * imageData.height));
-  }
-
-  private detectEdges(imageData: ImageData): number {
-    const grayScale = this.toGrayscale(imageData);
-    let totalGradient = 0;
-
-    for (let y = 1; y < imageData.height - 1; y++) {
-      for (let x = 1; x < imageData.width - 1; x++) {
-        const gradientX = this.applyKernel(grayScale, x, y, this.sobelKernelX);
-        const gradientY = this.applyKernel(grayScale, x, y, this.sobelKernelY);
-        const gradient = Math.sqrt(gradientX * gradientX + gradientY * gradientY);
-        totalGradient += gradient;
-      }
-    }
-
-    return Math.min(1, totalGradient / (imageData.width * imageData.height * 255));
-  }
-
-  private analyzeSkinColor(imageData: ImageData): number {
-    let skinPixels = 0;
-    const totalPixels = imageData.width * imageData.height;
-
-    for (let i = 0; i < imageData.data.length; i += 4) {
-      const r = imageData.data[i];
-      const g = imageData.data[i + 1];
-      const b = imageData.data[i + 2];
-
-      // Reglas de detección de piel mejoradas
-      if (this.isSkinColor(r, g, b)) {
-        skinPixels++;
-      }
-    }
-
-    return skinPixels / totalPixels;
-  }
-
-  private isSkinColor(r: number, g: number, b: number): boolean {
-    // Reglas YCbCr para detección de piel
-    const y = 0.299 * r + 0.587 * g + 0.114 * b;
-    const cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
-    const cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
-
-    return (cr <= 173 && cr >= 133 && 
-            cb <= 127 && cb >= 77 && 
-            y > 80);
-  }
-
-  private findOptimalPosition(
-    imageData: ImageData,
-    skinLikelihood: number
-  ): { x: number; y: number } {
-    let maxQuality = 0;
-    let bestX = imageData.width / 2;
-    let bestY = imageData.height / 2;
-
-    // Búsqueda en grid para la mejor posición
-    const gridSize = 5;
-    const stepX = imageData.width / gridSize;
-    const stepY = imageData.height / gridSize;
-
-    for (let y = stepY/2; y < imageData.height; y += stepY) {
-      for (let x = stepX/2; x < imageData.width; x += stepX) {
-        const quality = this.evaluatePosition(imageData, x, y);
-        if (quality > maxQuality) {
-          maxQuality = quality;
-          bestX = x;
-          bestY = y;
-        }
-      }
-    }
-
-    return { x: bestX, y: bestY };
-  }
-
-  private evaluatePosition(
-    imageData: ImageData,
-    x: number,
-    y: number
-  ): number {
-    const radius = 10;
-    let quality = 0;
-    let count = 0;
-
-    for (let dy = -radius; dy <= radius; dy++) {
-      for (let dx = -radius; dx <= radius; dx++) {
-        const px = Math.floor(x + dx);
-        const py = Math.floor(y + dy);
-
-        if (px >= 0 && px < imageData.width && 
-            py >= 0 && py < imageData.height) {
-          const idx = (py * imageData.width + px) * 4;
-          const r = imageData.data[idx];
-          const g = imageData.data[idx + 1];
-          const b = imageData.data[idx + 2];
-
-          if (this.isSkinColor(r, g, b)) {
-            quality += 1;
-          }
-          count++;
-        }
-      }
-    }
-
-    return count > 0 ? quality / count : 0;
-  }
-
-  private updateMotionHistory(position: { x: number; y: number }): void {
-    this.motionHistory.push(position);
-    if (this.motionHistory.length > this.maxHistoryLength) {
-      this.motionHistory.shift();
-    }
-  }
-
-  private calculateStability(): number {
-    if (this.motionHistory.length < 2) return 1;
-
-    let totalMovement = 0;
-    for (let i = 1; i < this.motionHistory.length; i++) {
-      const dx = this.motionHistory[i].x - this.motionHistory[i-1].x;
-      const dy = this.motionHistory[i].y - this.motionHistory[i-1].y;
-      totalMovement += Math.sqrt(dx*dx + dy*dy);
-    }
-
-    const averageMovement = totalMovement / (this.motionHistory.length - 1);
-    return Math.max(0, 1 - averageMovement / 50);
-  }
-
-  private calculateConfidence(params: {
-    skinLikelihood: number;
-    motionScore: number;
-    textureScore: number;
-    edgeScore: number;
-    stability: number;
-    metrics: { brightness: number; contrast: number; sharpness: number; }
-  }): number {
-    const weights = {
-      skinLikelihood: 0.3,
-      motionScore: 0.15,
-      textureScore: 0.15,
-      edgeScore: 0.1,
-      stability: 0.2,
-      brightness: 0.1
-    };
-
-    return (
-      weights.skinLikelihood * params.skinLikelihood +
-      weights.motionScore * params.motionScore +
-      weights.textureScore * params.textureScore +
-      weights.edgeScore * params.edgeScore +
-      weights.stability * params.stability +
-      weights.brightness * (1 - Math.abs(params.metrics.brightness - 0.5) * 2)
-    );
-  }
-
-  private determineQuality(confidence: number): SignalQualityLevel {
-    if (confidence > 0.8) return SignalQualityLevel.Excellent;
-    if (confidence > 0.6) return SignalQualityLevel.Good;
-    if (confidence > 0.4) return SignalQualityLevel.Fair;
-    if (confidence > 0.2) return SignalQualityLevel.Poor;
-    return SignalQualityLevel.Invalid;
-  }
-
-  private calculateCoverage(imageData: ImageData): number {
-    let coveredPixels = 0;
-    const totalPixels = imageData.width * imageData.height;
-
-    for (let i = 0; i < imageData.data.length; i += 4) {
-      if (this.isSkinColor(
-        imageData.data[i],
-        imageData.data[i + 1],
-        imageData.data[i + 2]
-      )) {
-        coveredPixels++;
-      }
-    }
-
-    return coveredPixels / totalPixels;
-  }
-
-  // Métodos auxiliares
-  private toGrayscale(imageData: ImageData): number[][] {
-    const gray: number[][] = Array(imageData.height)
-      .fill(0)
-      .map(() => Array(imageData.width).fill(0));
-
-    for (let y = 0; y < imageData.height; y++) {
-      for (let x = 0; x < imageData.width; x++) {
-        const idx = (y * imageData.width + x) * 4;
-        gray[y][x] = (
-          imageData.data[idx] * 0.299 +
-          imageData.data[idx + 1] * 0.587 +
-          imageData.data[idx + 2] * 0.114
-        ) / 255;
-      }
-    }
-
-    return gray;
-  }
-
-  private getNeighborhood(gray: number[][], x: number, y: number): number[] {
-    const neighborhood = [];
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        neighborhood.push(gray[y + dy][x + dx]);
-      }
-    }
-    return neighborhood;
-  }
-
-  private calculateVariance(values: number[]): number {
-    const mean = values.reduce((a, b) => a + b, 0) / values.length;
-    return values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / values.length;
-  }
-
-  private applyKernel(
-    gray: number[][],
-    x: number,
-    y: number,
-    kernel: number[][]
-  ): number {
-    let sum = 0;
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        sum += gray[y + dy][x + dx] * kernel[dy + 1][dx + 1];
-      }
-    }
-    return sum;
-  }
-
-  private generateEmptyResult(metrics: {
-    brightness: number;
-    contrast: number;
-    sharpness: number;
-  }) {
-    return {
-      isPresent: false,
-      quality: SignalQualityLevel.Invalid,
-      confidence: 0,
-      coverage: 0,
-      metrics: {
-        ...metrics,
-        stability: 0,
-        colorBalance: 0
-      }
-    };
+  public dispose(): void {
+    this.reset();
+    this.clearBuffers();
   }
 }
