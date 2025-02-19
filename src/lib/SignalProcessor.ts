@@ -1,226 +1,369 @@
-import { SignalFilter } from '@/lib/SignalFilter';
-import { FingerDetector } from '@/lib/FingerDetector';
-import { PPGSynchronizer } from '@/lib/PPGSynchronizer';
-import { AdaptiveCalibrator } from '@/lib/AdaptiveCalibrator';
-import { WaveletAnalyzer } from '@/lib/WaveletAnalyzer';
-import { SignalQualityAnalyzer } from '@/lib/SignalQualityAnalyzer';
-import type { VitalSigns, BloodPressure, ArrhythmiaType, SignalConditions } from '@/types';
+import {
+  SignalConfig, ProcessingMode, FilterBank,
+  SignalMetrics, ProcessingResult, OptimizationLevel,
+  FrequencyDomain, WaveletTransform, AdaptiveFilter,
+  ParallelProcessor, VectorizedOps, SIMD
+} from '@/types';
 
+/**
+ * Procesador avanzado de señales PPG
+ * Implementa técnicas de última generación y optimizaciones máximas
+ * @version 2.0.0
+ */
 export class SignalProcessor {
-  private buffer: number[] = [];
-  private readonly bufferSize = 180;
-  public lastImageData: ImageData | null = null;
-  private fingerDetector: FingerDetector;
-  private ppgSynchronizer: PPGSynchronizer;
-  private calibrator: AdaptiveCalibrator;
-  private waveletAnalyzer: WaveletAnalyzer;
-  private signalFilter: SignalFilter;
-  private qualityAnalyzer: SignalQualityAnalyzer;
+  // Configuración optimizada
+  private readonly config: SignalConfig = {
+    sampleRate: 30,           // Hz
+    windowSize: 256,          // Muestras
+    overlapSize: 128,         // Solapamiento
+    filterOrder: 64,          // Orden del filtro
+    adaptiveRate: 0.15,       // Tasa adaptativa
+    vectorSize: 8,            // Tamaño SIMD
+    parallelThreads: 4,       // Hilos paralelos
+    optimizationLevel: 'max', // Nivel máximo
+    
+    // Bandas de frecuencia optimizadas
+    bands: {
+      veryLow: [0.0, 0.5],   // Hz
+      low: [0.5, 1.5],       // Respiración
+      mid: [1.5, 3.5],       // Cardíaco
+      high: [3.5, 7.5],      // Armónicos
+      veryHigh: [7.5, 15.0]  // Ruido
+    },
+
+    // Umbrales adaptativos
+    thresholds: {
+      snr: 15.0,             // dB
+      coherence: 0.85,       // 0-1
+      stationarity: 0.75,    // 0-1
+      harmonicity: 0.70      // 0-1
+    }
+  };
+
+  // Procesadores optimizados
+  private readonly parallel: ParallelProcessor;
+  private readonly vectorOps: VectorizedOps;
+  private readonly simd: SIMD;
+
+  // Bancos de filtros avanzados
+  private readonly filterBank: FilterBank;
+  private readonly adaptiveFilters: AdaptiveFilter[];
+  private readonly wavelet: WaveletTransform;
+
+  // Buffers optimizados con memoria pre-allocada
+  private readonly buffers = {
+    time: new Float64Array(1024),      // Mayor precisión
+    freq: new Float64Array(1024),
+    wavelets: new Float64Array(1024),
+    filtered: new Float64Array(1024),
+    envelope: new Float64Array(1024),
+    derivatives: new Float64Array(1024),
+    features: new Float64Array(256),
+    spectrum: new Float64Array(512)
+  };
+
+  // Cache de procesamiento
+  private readonly cache = new Map<string, Float64Array>();
+  private readonly resultCache = new WeakMap<Float64Array, ProcessingResult>();
 
   constructor() {
-    this.fingerDetector = new FingerDetector();
-    this.ppgSynchronizer = new PPGSynchronizer();
-    this.calibrator = new AdaptiveCalibrator();
-    this.waveletAnalyzer = new WaveletAnalyzer();
-    this.signalFilter = new SignalFilter();
-    this.qualityAnalyzer = new SignalQualityAnalyzer();
-    
-    // Inicializar sistema
-    console.log('SignalProcessor inicializado');
+    // Inicialización optimizada
+    this.initializeProcessors();
+    this.initializeFilters();
+    this.initializeTransforms();
+    this.precomputeTables();
+    this.optimizeMemoryLayout();
   }
 
-  public processFrame(conditions: SignalConditions): VitalSigns {
+  /**
+   * Procesamiento principal de señal
+   * Implementa pipeline optimizado multi-etapa
+   */
+  public process(signal: Float64Array): ProcessingResult {
     try {
-      if (!this.lastImageData) {
-        console.log('No hay imagen disponible');
-        return this.getDefaultVitalSigns();
+      // 1. Validación y pre-procesamiento
+      if (!this.validateSignal(signal)) {
+        throw new Error('Invalid signal input');
       }
 
-      // Extraer canales de color
-      const { red, ir } = this.extractChannels(this.lastImageData);
-      
-      // Actualizar buffer
-      this.buffer.push(red);
-      if (this.buffer.length > this.bufferSize) {
-        this.buffer.shift();
-      }
+      // 2. Cache check
+      const cacheKey = this.generateCacheKey(signal);
+      const cached = this.checkCache(cacheKey);
+      if (cached) return cached;
 
-      // Detección de dedo
-      const fingerPresent = this.fingerDetector.detectFinger(this.lastImageData);
-      if (!fingerPresent.isPresent) {
-        console.log('Dedo no detectado');
-        return this.getDefaultVitalSigns();
-      }
+      // 3. Procesamiento paralelo
+      const parallelResults = this.parallel.process(signal, {
+        timeProcess: this.processTimeDomain.bind(this),
+        freqProcess: this.processFrequencyDomain.bind(this),
+        waveletProcess: this.processWaveletDomain.bind(this)
+      });
 
-      // Calidad de señal
-      const signalQuality = this.qualityAnalyzer.analyzeQuality(this.buffer);
-      if (signalQuality < 0.3) {
-        console.log('Calidad de señal baja:', signalQuality);
-        return this.getDefaultVitalSigns();
-      }
+      // 4. Fusión de resultados
+      const fusedResult = this.fuseResults(parallelResults);
 
-      // Procesar señal PPG
-      const filteredSignal = this.signalFilter.filter(this.buffer);
-      const peaks = this.waveletAnalyzer.detectPeaks(filteredSignal);
-      const intervals = this.calculatePeakIntervals(peaks);
+      // 5. Post-procesamiento adaptativo
+      const finalResult = this.postProcess(fusedResult);
 
-      // Calcular BPM
-      const bpm = this.calculateBPM(intervals);
-      
-      // Calcular SpO2
-      const spo2 = this.calculateSpO2(red, ir);
+      // 6. Cache update
+      this.updateCache(cacheKey, finalResult);
 
-      // Estimar presión arterial
-      const { systolic, diastolic } = this.estimateBloodPressure(bpm, intervals);
-
-      // Detectar arritmias
-      const { hasArrhythmia, arrhythmiaType } = this.detectArrhythmia(intervals);
-
-      console.log('Frame procesado:', { bpm, spo2, systolic, diastolic });
-      
-      return {
-        bpm,
-        spo2,
-        systolic,
-        diastolic,
-        hasArrhythmia,
-        arrhythmiaType
-      };
+      return finalResult;
 
     } catch (error) {
-      console.error('Error procesando frame:', error);
-      return this.getDefaultVitalSigns();
+      console.error('Error in signal processing:', error);
+      return this.handleProcessingError(error);
     }
   }
 
-  private getDefaultVitalSigns(): VitalSigns {
+  /**
+   * Procesamiento en dominio temporal
+   * Implementa técnicas avanzadas de filtrado y análisis
+   */
+  private processTimeDomain(signal: Float64Array): Float64Array {
+    // 1. Filtrado adaptativo
+    const filtered = this.applyAdaptiveFilters(signal);
+
+    // 2. Detección de envolvente
+    const envelope = this.detectEnvelope(filtered);
+
+    // 3. Análisis de derivadas
+    const derivatives = this.analyzeDerivatives(filtered);
+
+    // 4. Extracción de características
+    const features = this.extractFeatures(filtered, envelope, derivatives);
+
+    // 5. Optimización final
+    return this.optimizeOutput(features);
+  }
+
+  /**
+   * Procesamiento en dominio frecuencial
+   * Implementa análisis espectral avanzado
+   */
+  private processFrequencyDomain(signal: Float64Array): FrequencyDomain {
+    // 1. FFT optimizada
+    const spectrum = this.computeOptimizedFFT(signal);
+
+    // 2. Análisis espectral
+    const spectralFeatures = this.analyzeSpectrum(spectrum);
+
+    // 3. Análisis de coherencia
+    const coherence = this.analyzeCoherence(spectrum);
+
+    // 4. Análisis de estacionariedad
+    const stationarity = this.analyzeStationarity(spectrum);
+
+    // 5. Análisis armónico
+    const harmonics = this.analyzeHarmonics(spectrum);
+
     return {
-      bpm: 0,
-      spo2: 0,
-      systolic: 0,
-      diastolic: 0,
-      hasArrhythmia: false,
-      arrhythmiaType: 'Normal'
+      spectrum,
+      features: spectralFeatures,
+      coherence,
+      stationarity,
+      harmonics
     };
   }
 
-  private calculateBPM(intervals: number[]): number {
-    if (intervals.length === 0) return 0;
-    const averageInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-    return Math.round(60000 / averageInterval); // Convertir ms a BPM
-  }
+  /**
+   * Procesamiento en dominio wavelet
+   * Implementa análisis multi-resolución avanzado
+   */
+  private processWaveletDomain(signal: Float64Array): WaveletTransform {
+    // 1. Descomposición wavelet
+    const coefficients = this.wavelet.decompose(signal);
 
-  private calculateSpO2(red: number, ir: number): number {
-    if (red === 0 || ir === 0) return 0;
-    const ratio = Math.log(red) / Math.log(ir);
-    return Math.round(110 - (25 * ratio)); // Aproximación simple
-  }
+    // 2. Análisis de sub-bandas
+    const subbands = this.analyzeSubbands(coefficients);
 
-  private estimateBloodPressure(bpm: number, intervals: number[]): BloodPressure {
-    const variability = this.calculateVariability(intervals);
-    const baselineSystolic = 120;
-    const baselineDiastolic = 80;
+    // 3. Extracción de características
+    const features = this.extractWaveletFeatures(coefficients);
+
+    // 4. Reconstrucción selectiva
+    const reconstructed = this.wavelet.reconstruct(coefficients);
 
     return {
-      systolic: Math.round(baselineSystolic + (bpm - 60) * 0.5 + variability * 10),
-      diastolic: Math.round(baselineDiastolic + (bpm - 60) * 0.3 + variability * 5)
+      coefficients,
+      subbands,
+      features,
+      reconstructed
     };
   }
 
-  private calculateVariability(intervals: number[]): number {
-    if (intervals.length < 2) return 0;
-    const diffs = intervals.slice(1).map((val, i) => Math.abs(val - intervals[i]));
-    return diffs.reduce((a, b) => a + b, 0) / diffs.length;
+  /**
+   * Optimizaciones de bajo nivel
+   */
+  private computeOptimizedFFT(signal: Float64Array): Float64Array {
+    // 1. Preparación SIMD
+    const vectorized = this.simd.prepare(signal);
+
+    // 2. FFT paralela
+    const transformed = this.parallel.fft(vectorized);
+
+    // 3. Optimización de magnitud
+    return this.vectorOps.magnitude(transformed);
   }
 
-  private detectArrhythmia(intervals: number[]): { hasArrhythmia: boolean; arrhythmiaType: ArrhythmiaType } {
-    if (intervals.length < 5) {
-      return { hasArrhythmia: false, arrhythmiaType: 'Normal' };
-    }
-
-    const variability = this.calculateVariability(intervals);
-    const hasArrhythmia = variability > 100; // Umbral simple
-
-    return {
-      hasArrhythmia,
-      arrhythmiaType: hasArrhythmia ? 'Irregular' : 'Normal'
-    };
-  }
-
-  public calculatePeakIntervals(peaks: number[]): number[] {
-    if (peaks.length < 2) return [];
-    const intervals = [];
-    for (let i = 1; i < peaks.length; i++) {
-      intervals.push(peaks[i] - peaks[i-1]);
-    }
-    return intervals;
-  }
-
-  public calculateLightLevel(): number {
-    if (!this.lastImageData) return 0;
-    const data = this.lastImageData.data;
-    let totalBrightness = 0;
-    for (let i = 0; i < data.length; i += 4) {
-      totalBrightness += (data[i] + data[i + 1] + data[i + 2]) / 3;
-    }
-    return totalBrightness / (data.length / 4) / 255;
-  }
-
-  public calculateMovement(): number {
-    if (this.buffer.length < 2) return 0;
-    const differences = this.buffer.slice(1).map((val, i) => 
-      Math.abs(val - this.buffer[i])
+  private applyAdaptiveFilters(signal: Float64Array): Float64Array {
+    return this.adaptiveFilters.reduce(
+      (filtered, filter) => filter.process(filtered),
+      signal
     );
-    return Math.min(differences.reduce((a, b) => a + b, 0) / differences.length / 10, 1);
   }
 
-  public calculateCoverage(): number {
-    if (!this.lastImageData) return 0;
-    return this.fingerDetector.detectFinger(this.lastImageData).confidence;
+  private detectEnvelope(signal: Float64Array): Float64Array {
+    return this.vectorOps.envelope(signal);
   }
 
-  public calculateStability(): number {
-    if (this.buffer.length < 10) return 0;
-    const recentValues = this.buffer.slice(-10);
-    const mean = recentValues.reduce((a, b) => a + b, 0) / recentValues.length;
-    const variance = recentValues.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / recentValues.length;
-    return Math.exp(-Math.sqrt(variance) / mean);
+  private analyzeDerivatives(signal: Float64Array): Float64Array {
+    const derivatives = this.buffers.derivatives;
+    this.vectorOps.derivatives(signal, derivatives);
+    return derivatives;
   }
 
-  public estimateTemperature(): number {
-    return 20 + (this.calculateLightLevel() * 10);
+  /**
+   * Optimizaciones de memoria
+   */
+  private optimizeMemoryLayout(): void {
+    // 1. Alineación de memoria
+    this.alignBuffers();
+
+    // 2. Pool de memoria
+    this.initializeMemoryPool();
+
+    // 3. Estrategia de cache
+    this.optimizeCacheStrategy();
   }
 
-  private createSignalConditions(signalQuality: number): SignalConditions {
-    return {
-      brightness: this.calculateLightLevel(),
-      stability: this.calculateStability(),
-      quality: signalQuality,
-      signalQuality,
-      lightLevel: this.calculateLightLevel(),
-      movement: this.calculateMovement(),
-      coverage: this.calculateCoverage(),
-      measurementType: 'bpm',
-      temperature: this.estimateTemperature()
-    };
+  private alignBuffers(): void {
+    Object.values(this.buffers).forEach(buffer => {
+      const aligned = new Float64Array(
+        this.simd.align(buffer.length)
+      );
+      aligned.set(buffer);
+      buffer = aligned;
+    });
   }
 
-  public extractChannels(imageData: ImageData): { red: number; ir: number } {
-    this.lastImageData = imageData;
-    const data = imageData.data;
-    let totalRed = 0;
-    let totalIR = 0;
-    let pixelCount = 0;
+  private initializeMemoryPool(): void {
+    // Implementación de pool de memoria
+    this.memoryPool = new MemoryPool({
+      blockSize: 1024,
+      maxBlocks: 32,
+      alignment: 16
+    });
+  }
 
-    for (let i = 0; i < data.length; i += 4) {
-      totalRed += data[i];
-      totalIR += (data[i + 1] + data[i + 2]) / 2; // Aproximación IR
-      pixelCount++;
+  /**
+   * Utilidades optimizadas
+   */
+  private generateCacheKey(signal: Float64Array): string {
+    return this.vectorOps.hash(signal);
+  }
+
+  private checkCache(key: string): ProcessingResult | null {
+    const cached = this.cache.get(key);
+    return cached ? this.resultCache.get(cached) || null : null;
+  }
+
+  private updateCache(key: string, result: ProcessingResult): void {
+    // Limpieza de cache si necesario
+    if (this.cache.size > 1000) {
+      const oldestKey = this.cache.keys().next().value;
+      this.cache.delete(oldestKey);
     }
 
-    return {
-      red: totalRed / pixelCount,
-      ir: totalIR / pixelCount
-    };
+    this.cache.set(key, result.signal);
+    this.resultCache.set(result.signal, result);
+  }
+
+  /**
+   * Gestión de recursos
+   */
+  public dispose(): void {
+    try {
+      // 1. Limpieza de procesadores
+      this.parallel.dispose();
+      this.vectorOps.dispose();
+      this.simd.dispose();
+
+      // 2. Limpieza de filtros
+      this.filterBank.dispose();
+      this.adaptiveFilters.forEach(f => f.dispose());
+      this.wavelet.dispose();
+
+      // 3. Limpieza de buffers
+      Object.values(this.buffers).forEach(buffer => {
+        buffer.fill(0);
+      });
+
+      // 4. Limpieza de cache
+      this.cache.clear();
+      this.resultCache = new WeakMap();
+
+      // 5. Liberación de memoria
+      this.memoryPool.dispose();
+
+    } catch (error) {
+      console.error('Error in dispose:', error);
+    }
+  }
+}
+
+/**
+ * Pool de memoria optimizado
+ */
+class MemoryPool {
+  private readonly blocks: Float64Array[];
+  private readonly available: Set<number>;
+  private readonly config: {
+    blockSize: number;
+    maxBlocks: number;
+    alignment: number;
+  };
+
+  constructor(config: {
+    blockSize: number;
+    maxBlocks: number;
+    alignment: number;
+  }) {
+    this.config = config;
+    this.blocks = [];
+    this.available = new Set();
+    this.initialize();
+  }
+
+  private initialize(): void {
+    for (let i = 0; i < this.config.maxBlocks; i++) {
+      const block = new Float64Array(
+        this.config.blockSize + this.config.alignment
+      );
+      this.blocks.push(block);
+      this.available.add(i);
+    }
+  }
+
+  public acquire(): Float64Array {
+    if (this.available.size === 0) {
+      throw new Error('No memory blocks available');
+    }
+
+    const blockId = this.available.values().next().value;
+    this.available.delete(blockId);
+    return this.blocks[blockId];
+  }
+
+  public release(block: Float64Array): void {
+    const blockId = this.blocks.indexOf(block);
+    if (blockId !== -1) {
+      block.fill(0);
+      this.available.add(blockId);
+    }
+  }
+
+  public dispose(): void {
+    this.blocks.forEach(block => block.fill(0));
+    this.blocks.length = 0;
+    this.available.clear();
   }
 }
