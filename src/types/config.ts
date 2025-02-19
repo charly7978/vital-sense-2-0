@@ -17,6 +17,16 @@ export interface ProcessingConfig {
   adaptiveThreshold: boolean;
 }
 
+export interface CalibrationState {
+  isCalibrating: boolean;
+  progress: number;
+  message: string;
+  isCalibrated: boolean;
+  calibrationTime: number;
+  referenceValues: Float64Array;
+  calibrationQuality: number;
+}
+
 export interface SensitivitySettings {
   brightness: number;
   redIntensity: number;

@@ -1,5 +1,5 @@
 
-// Basic enums
+// Enums básicos
 export const SignalQualityLevel = {
   Excellent: 'excellent',
   Good: 'good',
@@ -10,15 +10,15 @@ export const SignalQualityLevel = {
 
 export type SignalQualityLevelType = typeof SignalQualityLevel[keyof typeof SignalQualityLevel];
 
-// Basic numeric types
-export type Float64Array = number[];
+// Tipos numéricos básicos
+export type Float64 = number[];
 
-// Basic types
+// Tipos básicos
 export type ProcessingMode = 'normal' | 'calibration' | 'debug';
 export type ColorSpace = 'rgb' | 'yuv' | 'hsv';
 export type MeasurementType = 'ppg' | 'bp' | 'spo2' | 'resp';
 
-// Basic interfaces
+// Interfaces básicas
 export interface BasicMetrics {
   timestamp: number;
   value: number;
@@ -32,7 +32,7 @@ export interface ROI {
   height: number;
 }
 
-// Media interfaces
+// Interfaces de medios
 export interface MediaTrackConstraintsExtended extends MediaTrackConstraints {
   width?: { ideal: number };
   height?: { ideal: number };
