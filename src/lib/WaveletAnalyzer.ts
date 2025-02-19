@@ -14,8 +14,16 @@ export class WaveletAnalyzer {
     mexican_hat: (t: number, s: number) => this.mexicanHatWavelet(t, s)
   };
 
-  constructor(config: WaveletConfig) {
-    this.config = config;
+  constructor(config?: Partial<WaveletConfig>) {
+    // Default configuration
+    const defaultConfig: WaveletConfig = {
+      samplingRate: 30,
+      windowSize: 256,
+      scales: [2, 4, 8, 16, 32],
+      waveletType: 'morlet'
+    };
+
+    this.config = { ...defaultConfig, ...config };
     this.coefficients = [];
     this.energyMap = [];
     this.phaseMap = [];
@@ -23,9 +31,15 @@ export class WaveletAnalyzer {
   }
 
   private setupAnalysis(): void {
-    this.coefficients = new Array(this.decompositionLevels).fill(null).map(() => new Float32Array(this.config.windowSize));
-    this.energyMap = new Array(this.decompositionLevels).fill(null).map(() => new Float32Array(this.config.windowSize));
-    this.phaseMap = new Array(this.decompositionLevels).fill(null).map(() => new Float32Array(this.config.windowSize));
+    this.coefficients = new Array(this.decompositionLevels)
+      .fill(null)
+      .map(() => new Float32Array(this.config.windowSize));
+    this.energyMap = new Array(this.decompositionLevels)
+      .fill(null)
+      .map(() => new Float32Array(this.config.windowSize));
+    this.phaseMap = new Array(this.decompositionLevels)
+      .fill(null)
+      .map(() => new Float32Array(this.config.windowSize));
   }
 
   public analyze(signal: Float32Array): WaveletDecomposition {
@@ -102,7 +116,8 @@ export class WaveletAnalyzer {
   private computePhaseSpectrum(coefficients: Float32Array): Float32Array {
     const phase = new Float32Array(coefficients.length);
     for (let i = 0; i < coefficients.length; i++) {
-      phase[i] = Math.atan2(Math.imag(coefficients[i]), Math.real(coefficients[i]));
+      // Fixed Math.imag and Math.real by using correct approach for real signals
+      phase[i] = Math.atan2(0, coefficients[i]); // For real signals, imaginary part is 0
     }
     return phase;
   }

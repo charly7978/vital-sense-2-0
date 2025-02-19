@@ -1,4 +1,3 @@
-
 import { PPGData, ProcessingMode, SensitivitySettings } from '@/types';
 import { WaveletAnalyzer } from './WaveletAnalyzer';
 import { SignalQualityAnalyzer } from './SignalQualityAnalyzer';
@@ -44,7 +43,12 @@ export class PPGProcessor {
 
   constructor() {
     // Inicializar componentes
-    this.waveletAnalyzer = new WaveletAnalyzer();
+    this.waveletAnalyzer = new WaveletAnalyzer({
+      samplingRate: this.config.frameRate,
+      windowSize: this.config.bufferSize,
+      scales: [2, 4, 8, 16, 32],
+      waveletType: 'morlet'
+    });
     this.qualityAnalyzer = new SignalQualityAnalyzer();
     this.signalFilter = new SignalFilter();
     this.fingerDetector = new FingerDetector();
@@ -60,7 +64,9 @@ export class PPGProcessor {
   private initializeComponents(): void {
     this.waveletAnalyzer.initialize({
       samplingRate: this.config.frameRate,
-      windowSize: this.config.bufferSize
+      windowSize: this.config.bufferSize,
+      scales: [2, 4, 8, 16, 32],
+      waveletType: 'morlet'
     });
 
     this.signalFilter.initialize({
