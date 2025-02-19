@@ -1,77 +1,71 @@
 
+import { Float64Type } from './common';
 import { SignalQuality } from './quality';
-import { MeasurementType } from './base';
 
-export interface SensitivitySettings {
-  brightness: number;
-  redIntensity: number;
-  signalAmplification: number;
-  noiseReduction: number;
-  peakDetection: number;
-  heartbeatThreshold: number;
-  responseTime: number;
-  signalStability: number;
-}
-
-export interface CalibrationState {
-  isCalibrating: boolean;
-  progress: number;
-  message: string;
-  isCalibrated?: boolean;
-  calibrationTime?: number;
-  lastCalibration?: number;
-  referenceValues?: Float64Array;
-  calibrationQuality?: number;
-}
-
-export interface ProcessingConfig {
-  mode: 'normal' | 'calibration' | 'debug';
-  sampleRate?: number;
-  sensitivity: SensitivitySettings;
-  calibration: CalibrationState;
-  bufferSize: number;
-  filterOrder: number;
-  lowCutoff: number;
-  highCutoff: number;
-  peakThreshold: number;
-  minPeakDistance: number;
-  calibrationDuration: number;
-  adaptiveThreshold: boolean;
-}
-
-export interface ProcessingState {
-  isProcessing: boolean;
-  frameCount: number;
-  buffer: Float64Array;
-  timeBuffer: Float64Array;
-  lastTimestamp: number;
+export interface ProcessorConfig {
   sampleRate: number;
-  calibration: CalibrationState;
-  quality: SignalQuality;
+  bufferSize: number;
+  windowSize: number;
   optimization: {
-    cache: Map<string, any>;
-    performance: Map<string, number>;
-    resources: Map<string, number>;
+    vectorized: boolean;
+    parallel: boolean;
+    precision: 'single' | 'double';
   };
 }
 
-export interface VitalReading {
-  timestamp: number;
-  value: number;
-  quality: number;
-  type: MeasurementType;
-}
-
-export interface PPGData {
-  timestamp: number;
-  values: number[];
-  bpm: number;
-  confidence: number;
-}
-
-export interface ProcessorMetrics {
-  snr: number;
-  bpm: number;
+export interface SignalAnalysis {
+  features: SignalFeatures;
   quality: SignalQuality;
-  timestamp: number;
+  metrics: ProcessingMetrics;
 }
+
+export interface ProcessingPipeline {
+  stages: string[];
+  config: Record<string, any>;
+  callbacks: Record<string, Function>;
+}
+
+export interface SignalValidation {
+  isValid: boolean;
+  confidence: number;
+  metrics: ValidationMetrics;
+}
+
+export interface ProcessingMetrics {
+  latency: number;
+  throughput: number;
+  quality: number;
+}
+
+export type AnalysisMode = 'realtime' | 'batch' | 'streaming';
+
+export interface SignalFeatures {
+  temporal: Float64Type;
+  spectral: Float64Type;
+  statistical: Float64Type; 
+}
+
+export interface ProcessingQuality {
+  signal: number;
+  processing: number;
+  overall: number;
+}
+
+export interface SignalCalibration {
+  isCalibrated: boolean;
+  referenceValues: Float64Type;
+  calibrationTime: number;
+}
+
+export interface ProcessorOptimization {
+  cacheEnabled: boolean;
+  vectorizationEnabled: boolean;
+  parallelizationEnabled: boolean;
+}
+
+export interface ValidationMetrics {
+  accuracy: number;
+  precision: number;
+  recall: number;
+}
+

@@ -1,35 +1,42 @@
 
+import { Float64Type } from './common';
+
 export interface WaveletCoefficients {
-  approximation: Float64Array;
-  details: Float64Array[];
+  approximation: Float64Type;
+  details: Float64Type[];
+  level: number;
 }
 
-export interface SubbandFeatures {
-  energy: number[];
-  entropy: number[];
-  variance: number[];
-}
-
-export interface WaveletTransform extends WaveletCoefficients {
-  features: SubbandFeatures;
+export interface WaveletTransform {
+  transform: (signal: Float64Type) => WaveletCoefficients;
+  inverse: (coefficients: WaveletCoefficients) => Float64Type;
 }
 
 export interface WaveletBasis {
   name: string;
-  coefficients: Float64Array;
+  filter: Float64Type;
+  scaling: Float64Type;
 }
 
 export interface WaveletPacket {
-  coefficients: WaveletCoefficients;
-  features: SubbandFeatures;
+  nodes: WaveletCoefficients[];
+  tree: number[][];
+  depth: number;
 }
 
 export interface ScaleSpace {
-  scales: Float64Array[];
-  frequencies: number[];
+  scales: Float64Type[];
+  coefficients: Float64Type[][];
 }
 
-export interface OptimizedDWT {
-  transform: (signal: Float64Array) => WaveletTransform;
-  inverse: (coeffs: WaveletCoefficients) => Float64Array;
+export interface SubbandFeatures {
+  energy: Float64Type;
+  entropy: Float64Type;
+  variance: Float64Type;
 }
+
+export interface OptimizedDWT extends WaveletTransform {
+  packed: boolean;
+  vectorized: boolean;
+}
+
