@@ -9,6 +9,7 @@ export interface CalibrationEntry {
   values: number[];
   conditions: SignalConditions;
   factor: number;
+  raw?: number[];
 }
 
 export interface CalibratedResult {
@@ -25,4 +26,6 @@ export interface CalibrationState {
   calibrationTime?: number;
   referenceValues?: Float64Array;
   calibrationQuality?: number;
+  lastCalibration?: number;
+  duration?: number;
 }

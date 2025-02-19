@@ -20,26 +20,34 @@ export interface SignalQuality {
   confidence: number;
   overall: number;
   history: Array<number>;
+  dispose?: () => void;
 }
 
 export interface NoiseAnalysis {
-  snr: number; 
+  snr: number;
   distribution: number[];
   spectrum: number[];
   entropy: number;
   kurtosis: number;
   variance: number;
+  dispose?: () => void;
 }
 
 export interface MotionAnalysis {
   displacement: number[];
   velocity: number[];
   acceleration: number[];
+  features?: any[];
+  dispose?: () => void;
 }
+
+export type QualityLevel = 'excellent' | 'good' | 'fair' | 'poor' | 'invalid';
 
 // NO MODIFICAR: Mantener compatibilidad con implementaciones existentes
 export interface SignalFeatures {
   temporal: number[];
   spectral: number[];
   statistical: number[];
+  morphological?: number[];
+  wavelet?: number[];
 }
