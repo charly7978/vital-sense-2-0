@@ -1,156 +1,137 @@
 
-import React from 'react';
+import React, { useState } from 'react';
+import { Settings } from 'lucide-react';
+import CameraView from './CameraView';
+import VitalChart from './VitalChart';
+import VitalSignsDisplay from './vitals/VitalSignsDisplay';
+import SignalQualityIndicator from './vitals/SignalQualityIndicator';
+import MeasurementControls from './vitals/MeasurementControls';
+import CalibrationPanel from './CalibrationPanel';
 import { useVitals } from '@/contexts/VitalsContext';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts';
+import { Button } from "@/components/ui/button";
 
-const HeartRateMonitor = () => {
-  const {
-    vitals,
-    isProcessing,
-    isCalibrating,
-    calibrationProgress,
-    signalQuality,
-    ppgData,
-    startProcessing,
-    stopProcessing,
-    startCalibration
+interface HeartRateMonitorProps {
+  onShowControls: () => void;
+}
+
+const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) => {
+  const [currentView, setCurrentView] = useState<'monitor' | 'calibration'>('monitor');
+  const { 
+    bpm, 
+    spo2, 
+    systolic, 
+    diastolic, 
+    hasArrhythmia, 
+    arrhythmiaType,
+    readings,
+    isStarted,
+    measurementProgress,
+    measurementQuality,
+    toggleMeasurement,
+    processFrame,
+    sensitivitySettings,
+    updateSensitivitySettings
   } = useVitals();
 
+  const showFingerIndicator = isStarted && measurementQuality < 0.2;
+
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-black">
-      {/* Cámara Preview */}
-      <div className="absolute inset-0 z-10">
-        <video
-          id="cameraPreview"
-          className="h-full w-full object-cover"
-          playsInline
-        />
+    <div className="relative h-screen w-screen overflow-hidden">
+      <div className="absolute inset-0 z-0">
+        <CameraView onFrame={processFrame} isActive={isStarted} />
       </div>
 
-      {/* Overlay con Mediciones */}
-      <div className="absolute inset-0 z-20 flex flex-col bg-black/50 p-6">
-        {/* Header */}
-        <div className="mb-6 flex justify-between">
-          <h1 className="text-3xl font-bold text-white">
-            BPM Monitor
-          </h1>
-          <div className="space-x-2">
-            <Button
-              variant={isProcessing ? "destructive" : "default"}
-              onClick={isProcessing ? stopProcessing : startProcessing}
-            >
-              {isProcessing ? "Stop" : "Start"}
-            </Button>
-            <Button
-              variant="outline"
-              onClick={startCalibration}
-              disabled={!isProcessing || isCalibrating}
-            >
-              Calibrate
-            </Button>
-          </div>
-        </div>
+      <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/60 z-10" />
 
-        {/* Main Content */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-          {/* BPM Display */}
-          <div className="md:col-span-4">
-            <Card className="bg-black/70">
-              <CardContent className="p-6">
-                <h2 className="text-lg font-semibold text-white">Heart Rate</h2>
-                <p className="text-4xl font-bold text-primary">
-                  {vitals?.bpm ? `${Math.round(vitals.bpm)} BPM` : '--'}
-                </p>
-                <div className="mt-4">
-                  <p className="text-sm text-white/70">
-                    Quality: {Math.round(signalQuality.overall * 100)}%
-                  </p>
+      <div className="absolute inset-0 z-20">
+        <div className="h-full w-full relative">
+          {/* Vista del Monitor */}
+          <div className={`absolute inset-0 transition-transform duration-500 ${currentView === 'monitor' ? 'translate-x-0' : '-translate-x-full'}`}>
+            <div className="h-full w-full p-3 flex flex-col">
+              <div className="space-y-2">
+                {isStarted && (
+                  <div className="bg-black/30 backdrop-blur-md rounded-lg p-2 border border-white/10">
+                    <SignalQualityIndicator
+                      isStarted={isStarted}
+                      measurementQuality={measurementQuality}
+                      measurementProgress={measurementProgress}
+                    />
+                  </div>
+                )}
+                
+                {showFingerIndicator && (
+                  <div className="px-3 py-2 bg-yellow-500/10 border border-yellow-500/20 backdrop-blur-md rounded-lg">
+                    <div className="flex items-center justify-center space-x-2">
+                      <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"/>
+                      <p className="text-yellow-300 text-xs">
+                        Coloque su dedo sobre el lente de la cámara
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-3 space-y-2">
+                <div className="bg-black/30 backdrop-blur-md rounded-lg p-2.5 border border-white/10">
+                  <VitalSignsDisplay
+                    bpm={bpm}
+                    spo2={spo2}
+                    systolic={systolic}
+                    diastolic={diastolic}
+                    hasArrhythmia={hasArrhythmia}
+                    arrhythmiaType={arrhythmiaType}
+                  />
                 </div>
-              </CardContent>
-            </Card>
-          </div>
 
-          {/* PPG Graph */}
-          <div className="md:col-span-8">
-            <Card className="bg-black/70 h-[200px]">
-              <CardContent className="p-6">
-                <h2 className="text-lg font-semibold text-white">PPG Signal</h2>
-                <div className="h-[140px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={ppgData}>
-                      <XAxis dataKey="time" hide />
-                      <YAxis hide />
-                      <Line
-                        type="monotone"
-                        dataKey="value"
-                        stroke="hsl(var(--primary))"
-                        dot={false}
-                        isAnimationActive={false}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
+                <div className="rounded-lg p-2">
+                  <h3 className="text-xs font-medium mb-1 text-gray-100">PPG en Tiempo Real</h3>
+                  <div className="h-[50px]">
+                    <VitalChart data={readings} color="#ea384c" />
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
-        </div>
 
-        {/* Signal Quality Indicators */}
-        <div className="absolute bottom-6 left-6 right-6 flex gap-4">
-          <QualityIndicator
-            label="Signal"
-            value={signalQuality.overall}
-            className="bg-emerald-500"
-          />
-          <QualityIndicator
-            label="Quality"
-            value={signalQuality.score}
-            className="bg-yellow-500"
-          />
-          <QualityIndicator
-            label="Stability"
-            value={signalQuality.confidence}
-            className="bg-red-500"
-          />
+          {/* Vista de Calibración */}
+          <div className={`absolute inset-0 transition-transform duration-500 ${currentView === 'calibration' ? 'translate-x-0' : 'translate-x-full'}`}>
+            <div className="h-full w-full p-3 pb-32">
+              <CalibrationPanel 
+                settings={sensitivitySettings}
+                onUpdateSettings={updateSensitivitySettings}
+              />
+            </div>
+          </div>
+
+          {/* Controles fijos en la parte inferior */}
+          <div className="absolute bottom-6 left-0 right-0 px-4 z-30">
+            <div className="flex gap-2 justify-center mb-4">
+              <Button
+                variant={currentView === 'monitor' ? 'default' : 'secondary'}
+                className="h-8 flex-1 max-w-32 text-sm"
+                onClick={() => setCurrentView('monitor')}
+              >
+                Monitor
+              </Button>
+              <Button
+                variant={currentView === 'calibration' ? 'default' : 'secondary'}
+                className="h-8 flex-1 max-w-32 gap-2 text-sm"
+                onClick={() => setCurrentView('calibration')}
+              >
+                <Settings className="w-3.5 h-3.5" />
+                Calibración
+              </Button>
+            </div>
+
+            <div className="w-40 mx-auto">
+              <MeasurementControls
+                isStarted={isStarted}
+                onToggleMeasurement={toggleMeasurement}
+              />
+            </div>
+          </div>
         </div>
       </div>
-
-      {/* Calibration Overlay */}
-      {isCalibrating && (
-        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/80">
-          <div className="h-20 w-20 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <h2 className="mt-4 text-2xl font-semibold text-white">
-            Calibrating... {Math.round(calibrationProgress * 100)}%
-          </h2>
-          <p className="mt-2 text-white/70">
-            Please hold still
-          </p>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Componente auxiliar para los indicadores de calidad
-const QualityIndicator = ({ 
-  label, 
-  value, 
-  className 
-}: { 
-  label: string; 
-  value: number; 
-  className: string; 
-}) => {
-  return (
-    <div className="flex-1 rounded bg-black/70 p-4">
-      <p className="text-sm text-white">{label}</p>
-      <Progress 
-        value={value * 100} 
-        className={`mt-2 h-1 bg-white/10 ${className}`}
-      />
     </div>
   );
 };

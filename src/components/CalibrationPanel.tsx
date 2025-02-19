@@ -2,40 +2,27 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
-import { Gauge, Scale, Sparkles, Heart, Zap, Activity, Sun, Palette } from 'lucide-react';
-import type { SensitivitySettings } from '@/types';
-
-// Valores por defecto
-const DEFAULT_SETTINGS: SensitivitySettings = {
-  brightness: 1.0,
-  redIntensity: 1.0,
-  signalAmplification: 1.0,
-  noiseReduction: 1.0,
-  peakDetection: 1.0,
-  heartbeatThreshold: 0.5,
-  responseTime: 1.0,
-  signalStability: 0.5
-};
+import { Scale, Sparkles, Heart, Zap, Activity, Sun } from 'lucide-react';
+import type { SensitivitySettings } from '@/utils/types';
 
 interface CalibrationPanelProps {
-  settings: Partial<SensitivitySettings>;
+  settings: SensitivitySettings;
   onUpdateSettings: (settings: SensitivitySettings) => void;
 }
 
 const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
-  settings = {},
+  settings,
   onUpdateSettings
 }) => {
   const handleSettingChange = (key: keyof SensitivitySettings) => (value: number[]) => {
     onUpdateSettings({
-      ...DEFAULT_SETTINGS,
       ...settings,
       [key]: value[0]
     });
   };
 
-  const getValue = (key: keyof SensitivitySettings) => {
-    return settings[key] ?? DEFAULT_SETTINGS[key];
+  const getValue = (key: keyof SensitivitySettings, defaultValue: number = 1) => {
+    return settings[key] ?? defaultValue;
   };
 
   return (
@@ -72,58 +59,6 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
               />
               <p className="mt-1 text-xs text-gray-500">
                 Ajusta el brillo de la imagen capturada
-              </p>
-            </div>
-
-            {/* Intensidad de Rojo */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <Palette className="w-4 h-4 text-red-400" />
-                  <label className="text-sm font-medium text-white">
-                    Intensidad de Rojo
-                  </label>
-                </div>
-                <span className="text-xs text-gray-400">
-                  {getValue('redIntensity').toFixed(2)}x
-                </span>
-              </div>
-              <Slider
-                value={[getValue('redIntensity')]}
-                min={0.1}
-                max={2}
-                step={0.1}
-                onValueChange={handleSettingChange('redIntensity')}
-                className="[&_[role=slider]]:bg-red-400"
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Ajusta la sensibilidad al color rojo
-              </p>
-            </div>
-
-            {/* Amplificación de Señal */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <Gauge className="w-4 h-4 text-purple-400" />
-                  <label className="text-sm font-medium text-white">
-                    Amplificación de Señal
-                  </label>
-                </div>
-                <span className="text-xs text-gray-400">
-                  {getValue('signalAmplification').toFixed(2)}x
-                </span>
-              </div>
-              <Slider
-                value={[getValue('signalAmplification')]}
-                min={1}
-                max={3}
-                step={0.1}
-                onValueChange={handleSettingChange('signalAmplification')}
-                className="[&_[role=slider]]:bg-purple-400"
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Controla la intensidad de la señal PPG
               </p>
             </div>
 

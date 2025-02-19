@@ -1,253 +1,177 @@
-
-import React, { createContext, useContext, useRef, useState, useEffect } from 'react';
-import { PPGProcessor } from '@/lib/PPGProcessor';
-import { BeepPlayer } from '@/lib/BeepPlayer';
-import { SignalQuality, SignalQualityLevel, PPGData } from '@/types';
-import { config } from '@/config';
+import React, { createContext, useContext, useState, useCallback } from 'react';
+import { BeepPlayer } from '../utils/audioUtils';
+import { PPGProcessor } from '../utils/ppgProcessor';
+import { useToast } from "@/hooks/use-toast";
+import type { VitalReading, SensitivitySettings } from '../utils/types';
 
 interface VitalsContextType {
-  vitals: {
-    bpm: number;
-    confidence: number;
-    timestamp: number;
-  } | null;
+  bpm: number;
+  spo2: number;
+  systolic: number;
+  diastolic: number;
+  hasArrhythmia: boolean;
+  arrhythmiaType: string;
+  readings: VitalReading[];
   isProcessing: boolean;
-  isCalibrating: boolean;
-  calibrationProgress: number;
-  signalQuality: SignalQuality;
-  ppgData: Array<{ time: number; value: number }>;
-  startProcessing: () => Promise<void>;
-  stopProcessing: () => void;
-  startCalibration: () => void;
+  isStarted: boolean;
+  measurementProgress: number;
+  measurementQuality: number;
+  sensitivitySettings: SensitivitySettings;
+  toggleMeasurement: () => void;
+  processFrame: (imageData: ImageData) => void;
+  updateSensitivitySettings: (settings: SensitivitySettings) => void;
 }
 
-const defaultSignalQuality: SignalQuality = {
-  level: SignalQualityLevel.Invalid,
-  score: 0,
-  confidence: 0,
-  overall: 0,
-  history: []
-};
+const VitalsContext = createContext<VitalsContextType | undefined>(undefined);
 
-const VitalsContext = createContext<VitalsContextType | null>(null);
+const beepPlayer = new BeepPlayer();
+const ppgProcessor = new PPGProcessor();
 
-export function VitalsProvider({ children }: { children: React.ReactNode }) {
-  // Estados
-  const [vitals, setVitals] = useState<VitalsContextType['vitals']>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isCalibrating, setIsCalibrating] = useState(false);
-  const [calibrationProgress, setCalibrationProgress] = useState(0);
-  const [signalQuality, setSignalQuality] = useState<SignalQuality>(defaultSignalQuality);
-  const [ppgData, setPpgData] = useState<Array<{ time: number; value: number }>>([]);
+const MEASUREMENT_DURATION = 30;
 
-  // Referencias
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const ppgProcessor = useRef<PPGProcessor | null>(null);
-  const beepPlayer = useRef<BeepPlayer | null>(null);
-  const animationFrameRef = useRef<number>(0);
-  const streamRef = useRef<MediaStream | null>(null);
+export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [bpm, setBpm] = useState<number>(0);
+  const [spo2, setSpo2] = useState<number>(0);
+  const [systolic, setSystolic] = useState<number>(0);
+  const [diastolic, setDiastolic] = useState<number>(0);
+  const [hasArrhythmia, setHasArrhythmia] = useState<boolean>(false);
+  const [arrhythmiaType, setArrhythmiaType] = useState<string>('Normal');
+  const [readings, setReadings] = useState<VitalReading[]>([]);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [isStarted, setIsStarted] = useState<boolean>(false);
+  const [measurementProgress, setMeasurementProgress] = useState(0);
+  const [measurementQuality, setMeasurementQuality] = useState(0);
+  const [measurementStartTime, setMeasurementStartTime] = useState<number | null>(null);
+  const [sensitivitySettings, setSensitivitySettings] = useState<SensitivitySettings>({
+    signalAmplification: 1.5,
+    noiseReduction: 1.2,
+    peakDetection: 1.3,
+    heartbeatThreshold: 0.5,
+    responseTime: 1.0,
+    signalStability: 0.5,
+    brightness: 1.0,
+    redIntensity: 1.0
+  });
 
-  // Inicialización
-  useEffect(() => {
-    ppgProcessor.current = new PPGProcessor();
-    beepPlayer.current = new BeepPlayer();
+  const { toast } = useToast();
 
-    return () => {
-      stopProcessing();
-      if (beepPlayer.current) {
-        beepPlayer.current.stop();
-      }
-    };
+  const resetMeasurements = useCallback(() => {
+    setBpm(0);
+    setSpo2(0);
+    setSystolic(0);
+    setDiastolic(0);
+    setHasArrhythmia(false);
+    setArrhythmiaType('Normal');
+    setReadings([]);
+    setMeasurementProgress(0);
   }, []);
 
-  // Procesamiento de frames
-  const processFrame = () => {
-    if (!isProcessing || !videoRef.current || !canvasRef.current || !ppgProcessor.current) {
-      return;
-    }
+  const updateSensitivitySettings = useCallback((newSettings: SensitivitySettings) => {
+    setSensitivitySettings(newSettings);
+    ppgProcessor.updateSensitivitySettings(newSettings);
+  }, []);
+
+  const processFrame = useCallback(async (imageData: ImageData) => {
+    if (!isStarted) return;
 
     try {
-      const context = canvasRef.current.getContext('2d');
-      if (!context) return;
-
-      // Dibujar frame
-      context.drawImage(
-        videoRef.current,
-        0,
-        0,
-        canvasRef.current.width,
-        canvasRef.current.height
-      );
-
-      // Procesar imagen
-      const imageData = context.getImageData(
-        0,
-        0,
-        canvasRef.current.width,
-        canvasRef.current.height
-      );
-
-      // Procesar PPG
-      const result = ppgProcessor.current.processFrame(imageData);
+      const vitals = await ppgProcessor.processFrame(imageData);
       
-      // Actualizar estados
-      updateVitals(result);
-      updateSignalQuality();
-      updatePPGData(result);
+      if (vitals) {
+        if (vitals.isPeak) {
+          console.log('Pico detectado - Reproduciendo beep');
+          await beepPlayer.playBeep('heartbeat', vitals.signalQuality);
+        }
 
-      // Reproducir beep si es necesario
-      if (result.confidence > 0.5) {
-        beepPlayer.current?.play(440 + result.bpm, 50);
+        if (vitals.bpm > 0) setBpm(vitals.bpm);
+        if (vitals.spo2 > 0) setSpo2(vitals.spo2);
+        if (vitals.systolic > 0 && vitals.diastolic > 0) {
+          setSystolic(vitals.systolic);
+          setDiastolic(vitals.diastolic);
+        }
+        
+        setHasArrhythmia(vitals.hasArrhythmia);
+        setArrhythmiaType(vitals.arrhythmiaType);
+        setReadings(ppgProcessor.getReadings());
+        setMeasurementQuality(vitals.signalQuality);
       }
-
-      // Continuar procesamiento
-      animationFrameRef.current = requestAnimationFrame(processFrame);
     } catch (error) {
-      console.error('Error processing frame:', error);
-      stopProcessing();
-    }
-  };
-
-  // Actualización de datos
-  const updateVitals = (result: PPGData) => {
-    setVitals({
-      bpm: result.bpm,
-      confidence: result.confidence,
-      timestamp: result.timestamp
-    });
-  };
-
-  const updateSignalQuality = () => {
-    if (ppgProcessor.current) {
-      setSignalQuality(ppgProcessor.current.getQuality());
-    }
-  };
-
-  const updatePPGData = (result: PPGData) => {
-    setPpgData(prevData => {
-      const newData = [
-        ...prevData,
-        {
-          time: result.timestamp,
-          value: result.values[result.values.length - 1]
-        }
-      ];
-      
-      // Mantener solo los últimos 100 puntos
-      return newData.length > 100 ? newData.slice(-100) : newData;
-    });
-  };
-
-  // Control de la cámara
-  const startProcessing = async () => {
-    if (!videoRef.current) return;
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'environment',
-          width: { ideal: 640 },
-          height: { ideal: 480 }
-        }
+      console.error('Error procesando frame:', error);
+      toast({
+        variant: "destructive",
+        title: "Error en el procesamiento",
+        description: "Error al procesar la imagen de la cámara."
       });
-
-      streamRef.current = stream;
-      videoRef.current.srcObject = stream;
-      await videoRef.current.play();
-
-      // Configurar canvas
-      if (canvasRef.current) {
-        canvasRef.current.width = videoRef.current.videoWidth;
-        canvasRef.current.height = videoRef.current.videoHeight;
-      }
-
-      setIsProcessing(true);
-      processFrame();
-    } catch (error) {
-      console.error('Error accessing camera:', error);
-      setIsProcessing(false);
     }
-  };
+  }, [isStarted, toast]);
 
-  const stopProcessing = () => {
-    setIsProcessing(false);
-    
-    // Detener cámara
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
+  const toggleMeasurement = useCallback(() => {
+    if (isStarted) {
+      setIsStarted(false);
+      setMeasurementStartTime(null);
+      resetMeasurements();
+    } else {
+      resetMeasurements();
+      setIsStarted(true);
+      setMeasurementStartTime(Date.now());
+      toast({
+        title: "Iniciando medición",
+        description: "Por favor, mantenga su dedo frente a la cámara."
+      });
     }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
+  }, [isStarted, toast, resetMeasurements]);
 
-    // Detener procesamiento
-    if (ppgProcessor.current) {
-      ppgProcessor.current.stop();
-    }
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-    }
+  React.useEffect(() => {
+    let interval: NodeJS.Timeout;
 
-    // Resetear estados
-    setVitals(null);
-    setSignalQuality(defaultSignalQuality);
-    setPpgData([]);
-  };
+    if (isStarted && measurementStartTime) {
+      interval = setInterval(() => {
+        const elapsed = (Date.now() - measurementStartTime) / 1000;
+        const progress = Math.min((elapsed / MEASUREMENT_DURATION) * 100, 100);
+        setMeasurementProgress(progress);
 
-  // Calibración
-  const startCalibration = () => {
-    if (ppgProcessor.current && isProcessing) {
-      setIsCalibrating(true);
-      ppgProcessor.current.startCalibration();
-
-      const checkCalibration = () => {
-        if (ppgProcessor.current) {
-          const progress = ppgProcessor.current.getCalibrationProgress();
-          setCalibrationProgress(progress);
-
-          if (progress < 1) {
-            requestAnimationFrame(checkCalibration);
-          } else {
-            setIsCalibrating(false);
-          }
+        if (elapsed >= MEASUREMENT_DURATION) {
+          setIsStarted(false);
+          toast({
+            title: "Medición completada",
+            description: "La medición se ha completado exitosamente."
+          });
         }
-      };
-
-      checkCalibration();
+      }, 100);
     }
-  };
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [isStarted, measurementStartTime, toast]);
 
   const value = {
-    vitals,
+    bpm,
+    spo2,
+    systolic,
+    diastolic,
+    hasArrhythmia,
+    arrhythmiaType,
+    readings,
     isProcessing,
-    isCalibrating,
-    calibrationProgress,
-    signalQuality,
-    ppgData,
-    startProcessing,
-    stopProcessing,
-    startCalibration
+    isStarted,
+    measurementProgress,
+    measurementQuality,
+    sensitivitySettings,
+    toggleMeasurement,
+    processFrame,
+    updateSensitivitySettings
   };
 
-  return (
-    <VitalsContext.Provider value={value}>
-      <div style={{ display: 'none' }}>
-        <video ref={videoRef} playsInline />
-        <canvas ref={canvasRef} />
-      </div>
-      {children}
-    </VitalsContext.Provider>
-  );
-}
+  return <VitalsContext.Provider value={value}>{children}</VitalsContext.Provider>;
+};
 
 export const useVitals = () => {
   const context = useContext(VitalsContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useVitals must be used within a VitalsProvider');
   }
   return context;
 };
-
-export default VitalsProvider;

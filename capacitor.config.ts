@@ -16,9 +16,6 @@ const config: CapacitorConfig = {
       "android.permission.FLASHLIGHT"
     ]
   },
-  ios: {
-    limitsNavigationsToAppBoundDomains: true
-  },
   plugins: {
     Camera: {
       ios: {

@@ -24,7 +24,7 @@ const BPCalibrationForm = () => {
     setIsSubmitting(true);
 
     try {
-      const calibrationData = {
+      const calibrationData: BPCalibrationData = {
         systolic_reference: systolic,
         diastolic_reference: diastolic,
         age,
@@ -38,7 +38,7 @@ const BPCalibrationForm = () => {
       };
 
       const { error } = await supabase
-        .from('user_calibration')  // Cambiado a user_calibration
+        .from('blood_pressure_calibration')
         .insert([calibrationData]);
 
       if (error) throw error;
@@ -166,4 +166,3 @@ const BPCalibrationForm = () => {
 };
 
 export default BPCalibrationForm;
-

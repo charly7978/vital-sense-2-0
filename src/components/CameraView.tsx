@@ -1,72 +1,97 @@
-import React, { useRef, useEffect } from 'react';
-import { MediaTrackConstraintsExtended } from '@/types';
+
+import React, { useRef, useEffect, useState } from "react";
+import Webcam from "react-webcam";
+import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface CameraViewProps {
-  onFrame: (frame: ImageData) => void;
-  enabled: boolean;
+  onFrame: (imageData: ImageData) => void;
+  isActive: boolean;
+  onMeasurementEnd?: () => void;
 }
 
-const CameraView: React.FC<CameraViewProps> = ({ onFrame, enabled }) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+declare global {
+  interface MediaTrackConstraintSet {
+    torch?: boolean;
+  }
+}
 
-  const constraints: MediaStreamConstraints = {
-    video: {
-      width: { ideal: 1280 },
-      height: { ideal: 720 },
-      facingMode: "user",
-      frameRate: 30
-    } as unknown as MediaTrackConstraints
+const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasurementEnd }) => {
+  const webcamRef = useRef<Webcam>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const { toast } = useToast();
+  const [isMeasuring, setIsMeasuring] = useState(false);
+  const isMobile = useIsMobile();
+  const isAndroid = /android/i.test(navigator.userAgent);
+
+  const getDeviceConstraints = () => ({
+    width: { ideal: 1280 },
+    height: { ideal: 720 },
+    facingMode: isAndroid ? "environment" : "user",
+    advanced: isAndroid ? [{ torch: isMeasuring }] : undefined,
+  });
+
+  const processFrame = () => {
+    if (!isActive || !webcamRef.current?.video || !canvasRef.current) {
+      return;
+    }
+
+    const video = webcamRef.current.video;
+    const canvas = canvasRef.current;
+    const context = canvas.getContext('2d');
+
+    if (!context || video.readyState !== video.HAVE_ENOUGH_DATA) {
+      animationFrameRef.current = requestAnimationFrame(processFrame);
+      return;
+    }
+
+    try {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0);
+
+      // Aplicar un ligero oscurecimiento a la imagen
+      context.fillStyle = 'rgba(0, 0, 0, 0.2)'; // Capa semitransparente negra
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      
+      const frameData = context.getImageData(0, 0, canvas.width, canvas.height);
+      
+      if (frameData && frameData.data.length > 0) {
+        onFrame(frameData);
+      }
+    } catch (error) {
+      console.error("Error al procesar frame:", error);
+      if (isActive) {
+        toast({
+          variant: "destructive",
+          title: "Error de cámara",
+          description: "Hubo un problema al procesar la imagen de la cámara."
+        });
+      }
+    }
+
+    if (isActive) {
+      animationFrameRef.current = requestAnimationFrame(processFrame);
+    }
+  };
+
+  const stopCamera = () => {
+    if (webcamRef.current?.video?.srcObject) {
+      const tracks = (webcamRef.current.video.srcObject as MediaStream).getTracks();
+      tracks.forEach(track => track.stop());
+    }
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    setIsMeasuring(false);
   };
 
   useEffect(() => {
-    let stream: MediaStream | null = null;
-
-    async function startCamera() {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia(constraints);
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.onloadedmetadata = () => {
-            videoRef.current?.play();
-          };
-        }
-      } catch (error) {
-        console.error("Error accessing camera:", error);
-      }
-    }
-
-    function stopCamera() {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-        if (videoRef.current) {
-          videoRef.current.srcObject = null;
-        }
-      }
-    }
-
-    async function captureFrame() {
-      if (videoRef.current && canvasRef.current && enabled) {
-        const video = videoRef.current;
-        const canvas = canvasRef.current;
-        const context = canvas.getContext('2d');
-
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-
-        context?.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const frame = context?.getImageData(0, 0, canvas.width, canvas.height);
-
-        if (frame) {
-          onFrame(frame);
-        }
-        requestAnimationFrame(captureFrame);
-      }
-    }
-
-    if (enabled) {
-      startCamera();
-      captureFrame();
+    if (isActive) {
+      setIsMeasuring(true);
+      processFrame();
     } else {
       stopCamera();
     }
@@ -74,13 +99,25 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, enabled }) => {
     return () => {
       stopCamera();
     };
-  }, [onFrame, enabled]);
+  }, [isActive]);
+
+  if (!isActive) {
+    return null;
+  }
 
   return (
-    <>
-      <video ref={videoRef} style={{ display: 'none' }} />
-      <canvas ref={canvasRef} style={{ display: 'none' }} />
-    </>
+    <div className="relative w-full h-full">
+      <Webcam
+        ref={webcamRef}
+        audio={false}
+        videoConstraints={getDeviceConstraints()}
+        className="absolute inset-0 w-full h-full object-cover"
+      />
+      <canvas 
+        ref={canvasRef} 
+        style={{ display: 'none' }}
+      />
+    </div>
   );
 };
 
