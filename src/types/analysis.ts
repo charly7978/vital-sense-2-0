@@ -1,20 +1,19 @@
+import { Float64Type } from './common';
 
-import { Float64Type, Disposable } from './common';
-
-export interface SpectralAnalysis extends Disposable {
-  spectrum: Float64Type;
+export interface SpectralAnalysis {
   frequencies: Float64Type;
-  magnitude: Float64Type;
-  phase: Float64Type;
-  bands?: FrequencyBands;
+  magnitudes: Float64Type;
+  phases: Float64Type;
+  features: SpectralFeatures;
+  quality: number;
 }
 
-export interface WaveletAnalysis extends Disposable {
-  coefficients: WaveletCoefficients;
-  features: SubbandFeatures;
-  levels: number;
-  bases: WaveletBasis[];
-  space: ScaleSpace;
+export interface WaveletAnalysis {
+  coefficients: Float64Type[][];
+  scales: Float64Type;
+  features: any;
+  quality: number;
+  analyze: (signal: Float64Type) => void;
 }
 
 export interface FrequencyBands {
@@ -22,100 +21,68 @@ export interface FrequencyBands {
   lf: [number, number];
   hf: [number, number];
   total: [number, number];
-  respiratory?: [number, number];
-  cardiac?: [number, number];
-  mains?: [number, number];
-  noise?: [number, number];
-  ratios?: {
-    lfHf: number;
-    vlfTotal: number;
-  };
-  normalized?: {
-    vlf: number;
-    lf: number;
-    hf: number;
-  };
-  relative?: {
-    vlf: number;
-    lf: number;
-    hf: number;
-  };
 }
 
 export interface SpectralFeatures {
-  mainFrequency: number;
-  harmonics: number[];
+  meanFrequency: number;
+  peakFrequency: number;
   bandwidth: number;
-  energy: Float64Type;
+  spectralCentroid: number;
+  spectralSpread: number;
+  spectralKurtosis: number;
+  spectralSkewness: number;
+  spectralRolloff: number;
 }
 
 export interface WaveletCoefficients {
-  approximation: Float64Type;
-  details: Float64Type[];
+  detailCoefficients: Float64Type[];
+  approximationCoefficients: Float64Type;
 }
 
 export interface SubbandFeatures {
-  energy: Float64Type;
-  entropy: Float64Type;
-  variance: Float64Type;
+  energy: number;
+  entropy: number;
+  mean: number;
+  variance: number;
 }
 
-export interface NoiseAnalysis extends Disposable {
+export interface NoiseAnalysis {
   snr: number;
   distribution: Float64Type;
   spectrum: Float64Type;
   entropy: number;
   kurtosis: number;
   variance: number;
-  overall?: number;
-  spectralNoise?: number;
-  threshold?: number;
-  waveletNoise?: number;
-  impulseNoise?: number;
-  baselineNoise?: number;
 }
 
-export interface MotionAnalysis extends Disposable {
-  displacement: Float64Type;
-  velocity: Float64Type;
-  acceleration: Float64Type;
-  features?: Float64Type[];
-  detection?: number;
-  threshold?: number;
+export interface MotionAnalysis {
+  velocity: number;
+  acceleration: number;
+  displacement: number;
 }
 
 export interface WaveletTransform {
-  coefficients: WaveletCoefficients;
-  bases: WaveletBasis[];
-  space: ScaleSpace;
+  transform: (signal: Float64Type) => WaveletCoefficients;
+  inverseTransform: (coefficients: WaveletCoefficients) => Float64Type;
 }
 
 export interface WaveletBasis {
-  scale: number;
-  translation: number;
-  coefficients: Float64Type;
-  filters?: Float64Type[];
+  name: string;
+  description: string;
+   MotherWavelet: (t: number) => number;
 }
 
 export interface WaveletPacket {
-  level: number;
-  index: number;
-  coefficients: Float64Type;
-  tree?: any;
-  initialize: () => void;
-  decomposeAll: () => void;
-  selectBestBasis: () => void;
-  dispose?: () => void;
+  decompose: (signal: Float64Type, level: number) => WaveletCoefficients[];
+  reconstruct: (coefficients: WaveletCoefficients[]) => Float64Type;
 }
 
 export interface ScaleSpace {
-  scales: Float64Type;
-  coefficients: Float64Type[][];
-  energies?: Float64Type;
+  generate: (signal: Float64Type, scales: number) => Float64Type[];
+  analyze: (scaleSpace: Float64Type[]) => any;
 }
 
 export interface OptimizedDWT {
-  forward: (signal: Float64Type) => WaveletTransform;
-  inverse: (transform: WaveletTransform) => Float64Type;
-  dispose?: () => void;
+  transform: (signal: Float64Type) => WaveletCoefficients;
+  inverseTransform: (coefficients: WaveletCoefficients) => Float64Type;
 }

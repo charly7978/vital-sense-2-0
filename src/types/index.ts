@@ -1,4 +1,3 @@
-
 // Base numeric types
 export type { Float64Type, Float32Type } from './common';
 
@@ -22,38 +21,25 @@ export type {
   SpectralAnalysis,
   WaveletAnalysis,
   FrequencyBands,
-  SpectralFeatures,
-  WaveletCoefficients,
-  SubbandFeatures,
-  NoiseAnalysis,
-  MotionAnalysis,
-  WaveletTransform,
-  WaveletBasis,
-  WaveletPacket,
-  ScaleSpace,
-  OptimizedDWT
+  SpectralFeatures
 } from './analysis';
 
 // Signal processing types
 export type {
   SignalConditions,
-  SignalFeatures,
-  TemporalFeatures,
-  StatisticalFeatures,
-  ArtifactConfig,
-  ArtifactDetection,
-  ArtifactFeatures,
-  ArtifactMetrics,
-  ArtifactClassification,
-  SignalSegmentation,
+  CalibrationEntry,
+  CalibratedResult,
+  BeatConfig,
+  BeatDetection,
+  BeatFeatures,
+  BeatQuality,
+  BeatMetrics,
   TemplateMatching,
-  ArtifactValidation,
-  BPConfig,
-  BPEstimation,
-  WaveformAnalysis,
-  WaveformFeatures,
+  PeakAnalysis,
   WaveformQuality,
-  QualityMetrics
+  QualityMetrics,
+  BeatMorphology,
+  BeatValidation
 } from './signal-processing';
 
 // Configuration types

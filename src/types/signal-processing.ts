@@ -1,143 +1,148 @@
 
-import { Float64Type, Disposable } from './common';
 import { SignalQuality } from './quality';
-import { SpectralFeatures } from './analysis';
+import { Float64Type } from './common';
+import { FrequencyBands, SpectralFeatures } from './analysis';
 
-export interface SignalConditions extends Disposable {
-  isValid: boolean;
-  quality: SignalQuality;
-  noise: number;
-  artifacts: number;
-  features: SignalFeatures;
+export interface SignalConditions {
+  signalQuality: number;
+  lightLevel: number;
+  movement: number;
+  coverage: number;
+  temperature: number;
+  stability: number;
+  measurementType: string;
 }
 
-export interface SignalFeatures {
-  temporal: TemporalFeatures;
-  spectral: SpectralFeatures;
-  statistical: StatisticalFeatures;
+export interface CalibrationEntry {
+  raw: number;
+  calibrated: number;
+  conditions: SignalConditions;
+  factor: number;
+  timestamp: number;
 }
 
-export interface TemporalFeatures {
-  mean: number;
-  variance: number;
-  skewness: number;
-  kurtosis: number;
-  peaks: Float64Type;
-  valleys: Float64Type;
+export interface CalibratedResult {
+  value: number;
+  confidence: number;
+  factor: number;
 }
 
-export interface StatisticalFeatures {
-  entropy: number;
-  complexity: number;
-  stationarity: number;
-  linearity: number;
-}
-
-export interface ArtifactConfig {
-  threshold: number;
+export interface BeatConfig {
+  sampleRate: number;
   windowSize: number;
-  minQuality: number;
-  features: string[];
+  peak: {
+    method: string;
+    enhancement: {
+      enabled: boolean;
+      window: number;
+      order: number;
+    };
+    threshold: {
+      initial: number;
+      adaptation: number;
+      minValue: number;
+      maxValue: number;
+    };
+  };
+  beat: {
+    minInterval: number;
+    maxInterval: number;
+    template: {
+      size: number;
+      count: number;
+      update: string;
+    };
+    morphology: {
+      features: string[];
+      normalization: boolean;
+    };
+  };
   validation: {
-    temporal: boolean;
-    spectral: boolean;
-    statistical: boolean;
+    minQuality: number;
+    maxVariability: number;
+    physiological: {
+      minRate: number;
+      maxRate: number;
+      maxChange: number;
+    };
+  };
+  optimization: {
+    vectorization: boolean;
+    parallelization: boolean;
+    precision: string;
+    cacheSize: number;
+    adaptiveWindow: boolean;
   };
 }
 
-export interface ArtifactDetection {
-  isArtifact: boolean;
+export interface BeatDetection {
+  beats: BeatFeatures[];
+  features: any; // Replace with proper type when needed
+  quality: BeatQuality;
+  metrics: BeatMetrics;
+}
+
+export interface BeatFeatures {
+  peak: number;
+  segment: Float64Type;
+  morphology: any; // Replace with proper type when needed
+  template: any; // Replace with proper type when needed
+  interval: number;
+  quality: BeatQuality;
+}
+
+export interface BeatQuality {
+  overall: number;
+  artifacts: number;
+  noise: number;
   confidence: number;
-  type: string;
-  features: ArtifactFeatures;
-  metrics: ArtifactMetrics;
-  dispose?: () => void;
 }
 
-export interface ArtifactFeatures {
-  temporal: TemporalFeatures;
-  spectral: SpectralFeatures;
-  statistical: StatisticalFeatures;
-}
-
-export interface ArtifactMetrics {
-  quality: number;
-  severity: number;
-  duration: number;
-  frequency: number;
-}
-
-export interface ArtifactClassification {
-  type: string;
-  confidence: number;
-  features: ArtifactFeatures;
-}
-
-export interface SignalSegmentation {
-  segments: Float64Type[];
-  boundaries: Float64Type;
-  features: SignalFeatures[];
+export interface BeatMetrics {
+  rate: number;
+  regularity: number;
+  variability: number;
 }
 
 export interface TemplateMatching {
-  templates: Float64Type[];
-  scores: Float64Type;
-  bestMatch: number;
-  features: SignalFeatures;
-  dispose?: () => void;
+  score: number;
+  template: Float64Type;
+  features: any; // Replace with proper type when needed
 }
 
-export interface ArtifactValidation {
-  isValid: boolean;
-  confidence: number;
-  metrics: ArtifactMetrics;
-  dispose?: () => void;
-}
-
-export interface BPConfig {
-  sampleRate: number;
-  windowSize: number;
-  calibrationDuration: number;
-  features: string[];
-  validation: {
-    temporal: boolean;
-    waveform: boolean;
-    statistical: boolean;
-  };
-}
-
-export interface BPEstimation {
-  systolic: number;
-  diastolic: number;
-  mean: number;
-  confidence: number;
-  quality: SignalQuality;
-}
-
-export interface WaveformAnalysis {
-  features: WaveformFeatures;
-  quality: WaveformQuality;
-  dispose?: () => void;
-}
-
-export interface WaveformFeatures {
-  amplitude: number;
-  duration: number;
-  area: number;
-  slope: number;
+export interface PeakAnalysis {
+  locations: number[];
+  amplitudes: Float64Type;
+  intervals: Float64Type;
+  features: any; // Replace with proper type when needed
 }
 
 export interface WaveformQuality {
   score: number;
   confidence: number;
-  metrics: QualityMetrics;
+  metrics: any; // Replace with proper type when needed
 }
 
 export interface QualityMetrics {
   snr: number;
-  stability: number;
   artifacts: number;
-  noise?: number;
-  frequency?: number;
-  amplitude?: number;
+  stability: number;
+  overall: number;
+  confidence: number;
 }
+
+export interface BeatMorphology {
+  width: number;
+  amplitude: number;
+  slope: number;
+  area: number;
+  symmetry: number;
+}
+
+export interface BeatValidation {
+  isValid: boolean;
+  confidence: number;
+  metrics: BeatMetrics;
+}
+
+// Add more interfaces as needed
