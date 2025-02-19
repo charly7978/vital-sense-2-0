@@ -48,6 +48,14 @@ export interface ProcessingState {
   };
 }
 
+export interface PPGProcessingConfig extends ProcessingConfig {
+  filterCoefficients?: Float64Array;
+  mode: 'normal' | 'calibration' | 'debug';
+  sampleRate: number;
+  sensitivity: SensitivitySettings;
+  calibration: CalibrationState;
+}
+
 export interface ProcessorMetrics {
   fps: number;
   cpuTime: number;

@@ -1,69 +1,40 @@
 import { 
+  PPGData, 
+  PPGProcessingConfig,
+  ProcessingState,
   SignalQuality,
   SignalQualityLevel,
-  PPGData,
-  ProcessingConfig,
-  ProcessingState,
-  ProcessorMetrics 
+  NoiseAnalysis,
+  MotionAnalysis
 } from '@/types';
+import { config } from '@/config';
 
 export class PPGProcessor {
-  private config: ProcessingConfig;
+  private config: PPGProcessingConfig;
   private state: ProcessingState;
-  private components: {
-    filter: {
-      coefficients: Float64Array;
-      state: Float64Array;
-    };
-    detector: {
-      threshold: number;
-      minPeakDistance: number;
-      peaks: number[];
-      valleys: number[];
-    };
-    analyzer: {
-      fftSize: number;
-      spectrum: Float64Array;
-      phase: Float64Array;
-      magnitude: Float64Array;
-    };
-  };
-
+  private frameBuffer: Float64Array;
+  private timeBuffer: Float64Array;
+  private signalBuffer: Float64Array;
+  private fftBuffer: Float64Array;
+  private peakBuffer: number[];
+  private lastBPM: number = 0;
+  
   constructor() {
-    // Configuración inicial
     this.config = {
       mode: 'normal',
+      sampleRate: config.processing.sampleRate,
+      sensitivity: config.sensitivity,
+      calibration: config.calibration,
       bufferSize: 512,
-      sampleRate: 30,
       filterOrder: 32,
       lowCutoff: 0.5,
       highCutoff: 4.0,
       peakThreshold: 0.3,
       minPeakDistance: 0.3,
       calibrationDuration: 5000,
-      adaptiveThreshold: true,
-      sensitivity: {
-        brightness: 1.0,
-        redIntensity: 1.0,
-        signalAmplification: 1.0,
-        noiseReduction: 1.0,
-        peakDetection: 1.0,
-        heartbeatThreshold: 1.0,
-        responseTime: 1.0,
-        signalStability: 1.0
-      },
-      calibration: {
-        isCalibrating: false,
-        progress: 0,
-        message: '',
-        isCalibrated: false,
-        calibrationTime: 0,
-        referenceValues: new Float64Array(),
-        calibrationQuality: 0
-      }
+      adaptiveThreshold: true
     };
 
-    // Estado inicial
     this.state = {
       isProcessing: false,
       frameCount: 0,
@@ -71,24 +42,13 @@ export class PPGProcessor {
       timeBuffer: new Float64Array(this.config.bufferSize),
       lastTimestamp: 0,
       sampleRate: this.config.sampleRate,
-      calibration: {
-        isCalibrating: false,
-        progress: 0,
-        message: '',
-        isCalibrated: false,
-        calibrationTime: 0,
-        referenceValues: new Float64Array(),
-        calibrationQuality: 0
-      },
+      calibration: { ...config.calibration },
       quality: {
         level: SignalQualityLevel.Invalid,
         score: 0,
         confidence: 0,
         overall: 0,
-        history: [],
-        signal: 0,
-        noise: 0,
-        movement: 0
+        history: []
       },
       optimization: {
         cache: new Map(),
@@ -97,45 +57,45 @@ export class PPGProcessor {
       }
     };
 
-    // Componentes de procesamiento
-    this.components = {
-      filter: {
-        coefficients: this.designFilter(),
-        state: new Float64Array(this.config.filterOrder)
-      },
-      detector: {
-        threshold: this.config.peakThreshold,
-        minPeakDistance: this.config.minPeakDistance,
-        peaks: [],
-        valleys: []
-      },
-      analyzer: {
-        fftSize: 512,
-        spectrum: new Float64Array(256),
-        phase: new Float64Array(256),
-        magnitude: new Float64Array(256)
-      }
-    };
-
+    this.frameBuffer = new Float64Array(this.config.bufferSize);
+    this.timeBuffer = new Float64Array(this.config.bufferSize);
+    this.signalBuffer = new Float64Array(this.config.bufferSize);
+    this.fftBuffer = new Float64Array(this.config.bufferSize);
+    this.peakBuffer = [];
+    
     this.initialize();
   }
 
   private initialize(): void {
-    this.state.isProcessing = true;
-    this.updateFilterCoefficients();
-    this.resetBuffers();
+    try {
+      this.state.isProcessing = true;
+      this.resetBuffers();
+      this.initializeFilters();
+    } catch (error) {
+      console.error('Error initializing PPGProcessor:', error);
+      throw error;
+    }
   }
 
   private resetBuffers(): void {
-    this.state.buffer.fill(0);
-    this.state.timeBuffer.fill(0);
-    this.components.detector.peaks = [];
-    this.components.detector.valleys = [];
+    this.frameBuffer.fill(0);
+    this.timeBuffer.fill(0);
+    this.signalBuffer.fill(0);
+    this.fftBuffer.fill(0);
+    this.peakBuffer = [];
     this.state.frameCount = 0;
+    this.lastBPM = 0;
+  }
+
+  private initializeFilters(): void {
+    const coefficients = this.designFilter();
+    this.config = {
+      ...this.config,
+      filterCoefficients: coefficients
+    };
   }
 
   private designFilter(): Float64Array {
-    // Diseño de filtro FIR paso banda
     const coefficients = new Float64Array(this.config.filterOrder);
     const omega1 = 2 * Math.PI * this.config.lowCutoff / this.state.sampleRate;
     const omega2 = 2 * Math.PI * this.config.highCutoff / this.state.sampleRate;
@@ -147,16 +107,10 @@ export class PPGProcessor {
         const k = n - this.config.filterOrder / 2;
         coefficients[n] = (Math.sin(omega2 * k) - Math.sin(omega1 * k)) / (Math.PI * k);
       }
-      // Aplicar ventana Hamming
       coefficients[n] *= 0.54 - 0.46 * Math.cos(2 * Math.PI * n / this.config.filterOrder);
     }
     
     return coefficients;
-  }
-
-  private updateFilterCoefficients(): void {
-    this.components.filter.coefficients = this.designFilter();
-    this.components.filter.state.fill(0);
   }
 
   public processFrame(imageData: ImageData): PPGData {
@@ -165,34 +119,30 @@ export class PPGProcessor {
         throw new Error('Processor not initialized');
       }
 
-      const signal = this.extractPPGSignal(imageData);
-      this.updateBuffers(signal);
-      const filteredSignal = this.filterSignal(this.state.buffer);
-      this.detectPeaks(filteredSignal);
-      const bpm = this.calculateBPM();
-      const quality = this.assessQuality(filteredSignal);
+      const timestamp = Date.now();
+      const rawSignal = this.extractPPGSignal(imageData);
+      
+      this.updateBuffers(rawSignal, timestamp);
+      const filteredSignal = this.filterSignal(this.signalBuffer);
+      const peaks = this.detectPeaks(filteredSignal);
+      const bpm = this.calculateBPM(peaks, timestamp);
+      const quality = this.analyzeSignalQuality(filteredSignal);
+      
+      this.updateState(quality);
 
       if (this.state.calibration.isCalibrating) {
-        this.updateCalibration(signal);
+        this.updateCalibration(rawSignal);
       }
 
-      this.performSpectralAnalysis(filteredSignal);
-
       return {
-        bpm: Math.round(bpm),
-        confidence: quality.overall,
-        timestamp: Date.now(),
-        values: Array.from(filteredSignal)
+        timestamp,
+        values: Array.from(filteredSignal),
+        bpm,
+        confidence: quality.confidence
       };
-
     } catch (error) {
       console.error('Error processing frame:', error);
-      return {
-        bpm: 0,
-        confidence: 0,
-        timestamp: Date.now(),
-        values: []
-      };
+      throw error;
     }
   }
 
@@ -200,316 +150,317 @@ export class PPGProcessor {
     let redSum = 0;
     let greenSum = 0;
     let pixelCount = 0;
-
+    
     for (let i = 0; i < imageData.data.length; i += 4) {
-      redSum += imageData.data[i];
+      redSum += imageData.data[i] * this.config.sensitivity.redIntensity;
       greenSum += imageData.data[i + 1];
       pixelCount++;
     }
 
-    // Usar principalmente el canal verde con algo de información del rojo
-    return (greenSum * 0.7 + redSum * 0.3) / pixelCount;
+    const redMean = redSum / pixelCount;
+    const greenMean = greenSum / pixelCount;
+    const signal = (redMean - greenMean) * this.config.sensitivity.signalAmplification;
+    
+    return signal;
   }
 
-  private updateBuffers(signal: number): void {
-    // Desplazar buffer
-    this.state.buffer.copyWithin(0, 1);
-    this.state.timeBuffer.copyWithin(0, 1);
-
-    // Añadir nueva muestra
-    const timestamp = Date.now();
-    this.state.buffer[this.state.buffer.length - 1] = signal;
-    this.state.timeBuffer[this.state.timeBuffer.length - 1] = timestamp;
-
-    // Actualizar tasa de muestreo
-    if (this.state.lastTimestamp) {
-      const dt = timestamp - this.state.lastTimestamp;
-      this.state.sampleRate = 1000 / dt;
+  private updateBuffers(signal: number, timestamp: number): void {
+    // Shift buffers
+    for (let i = 0; i < this.config.bufferSize - 1; i++) {
+      this.signalBuffer[i] = this.signalBuffer[i + 1];
+      this.timeBuffer[i] = this.timeBuffer[i + 1];
     }
-    this.state.lastTimestamp = timestamp;
+
+    // Add new values
+    this.signalBuffer[this.config.bufferSize - 1] = signal;
+    this.timeBuffer[this.config.bufferSize - 1] = timestamp;
     this.state.frameCount++;
   }
 
   private filterSignal(signal: Float64Array): Float64Array {
     const filtered = new Float64Array(signal.length);
-    const { coefficients, state } = this.components.filter;
-
-    // Filtrado FIR con estado
-    for (let n = 0; n < signal.length; n++) {
-      let y = 0;
-      // Desplazar estado
-      state.copyWithin(1, 0);
-      state[0] = signal[n];
-
-      // Aplicar coeficientes
-      for (let k = 0; k < coefficients.length; k++) {
-        y += coefficients[k] * state[k];
+    const coeffs = this.config.filterCoefficients as Float64Array;
+    
+    for (let i = 0; i < signal.length; i++) {
+      let sum = 0;
+      for (let j = 0; j < coeffs.length; j++) {
+        if (i - j >= 0) {
+          sum += coeffs[j] * signal[i - j];
+        }
       }
-      filtered[n] = y;
+      filtered[i] = sum;
     }
-
+    
     return filtered;
   }
 
-  private detectPeaks(signal: Float64Array): void {
-    const { threshold, minPeakDistance } = this.components.detector;
+  private detectPeaks(signal: Float64Array): number[] {
     const peaks: number[] = [];
-    const valleys: number[] = [];
+    const minDistance = this.config.minPeakDistance * this.state.sampleRate;
+    const threshold = this.calculateAdaptiveThreshold(signal);
 
-    // Detección de picos y valles
     for (let i = 1; i < signal.length - 1; i++) {
-      if (signal[i] > signal[i-1] && signal[i] > signal[i+1] && 
-          signal[i] > threshold * Math.max(...signal)) {
-        peaks.push(i);
-      }
-      if (signal[i] < signal[i-1] && signal[i] < signal[i+1] && 
-          signal[i] < -threshold * Math.max(...signal)) {
-        valleys.push(i);
-      }
-    }
-
-    // Filtrar picos muy cercanos
-    this.components.detector.peaks = this.filterClosePeaks(peaks, minPeakDistance);
-    this.components.detector.valleys = this.filterClosePeaks(valleys, minPeakDistance);
-  }
-
-  private filterClosePeaks(peaks: number[], minDistance: number): number[] {
-    const filtered: number[] = [];
-    let lastPeak = -minDistance * this.state.sampleRate;
-
-    for (const peak of peaks) {
-      if (peak - lastPeak >= minDistance * this.state.sampleRate) {
-        filtered.push(peak);
-        lastPeak = peak;
+      if (signal[i] > signal[i - 1] && 
+          signal[i] > signal[i + 1] && 
+          signal[i] > threshold) {
+        
+        if (peaks.length === 0 || (i - peaks[peaks.length - 1]) >= minDistance) {
+          peaks.push(i);
+        }
       }
     }
 
-    return filtered;
+    this.peakBuffer = peaks;
+    return peaks;
   }
 
-  private calculateBPM(): number {
-    const { peaks } = this.components.detector;
-    if (peaks.length < 2) return 0;
+  private calculateAdaptiveThreshold(signal: Float64Array): number {
+    if (!this.config.adaptiveThreshold) {
+      return this.config.peakThreshold;
+    }
 
-    // Calcular intervalos entre picos
+    const mean = signal.reduce((a, b) => a + b) / signal.length;
+    const std = Math.sqrt(
+      signal.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / signal.length
+    );
+
+    return mean + std * this.config.peakThreshold;
+  }
+
+  private calculateBPM(peaks: number[], timestamp: number): number {
+    if (peaks.length < 2) {
+      return this.lastBPM;
+    }
+
     const intervals: number[] = [];
     for (let i = 1; i < peaks.length; i++) {
-      const interval = (this.state.timeBuffer[peaks[i]] - 
-                       this.state.timeBuffer[peaks[i-1]]) / 1000;
-      intervals.push(interval);
+      const interval = this.timeBuffer[peaks[i]] - this.timeBuffer[peaks[i - 1]];
+      if (interval > 0) {
+        intervals.push(interval);
+      }
     }
 
-    // Calcular BPM promedio
-    const avgInterval = intervals.reduce((a, b) => a + b) / intervals.length;
-    const bpm = 60 / avgInterval;
-
-    // Limitar rango válido de BPM
-    return Math.min(Math.max(bpm, 40), 200);
-  }
-
-  private performSpectralAnalysis(signal: Float64Array): void {
-    const { fftSize } = this.components.analyzer;
-    
-    // Aplicar ventana Hanning
-    const windowed = new Float64Array(fftSize);
-    for (let i = 0; i < signal.length; i++) {
-      windowed[i] = signal[i] * (0.5 - 0.5 * Math.cos(2 * Math.PI * i / (signal.length - 1)));
+    if (intervals.length === 0) {
+      return this.lastBPM;
     }
 
-    // Calcular FFT (implementación simplificada)
-    const { magnitude, phase } = this.computeFFT(windowed);
+    // Calculate median interval
+    intervals.sort((a, b) => a - b);
+    const medianInterval = intervals[Math.floor(intervals.length / 2)];
     
-    this.components.analyzer.magnitude = magnitude;
-    this.components.analyzer.phase = phase;
+    // Convert to BPM
+    const bpm = 60000 / medianInterval;
+    
+    // Apply smoothing
+    this.lastBPM = this.lastBPM * 0.7 + bpm * 0.3;
+    
+    return Math.round(this.lastBPM);
   }
 
-  private computeFFT(signal: Float64Array): { magnitude: Float64Array; phase: Float64Array } {
+  private analyzeSignalQuality(signal: Float64Array): SignalQuality {
+    const noise = this.analyzeNoise(signal);
+    const motion = this.analyzeMotion(signal);
+    
+    const snrScore = Math.min(Math.max(noise.snr / 10, 0), 1);
+    const motionScore = 1 - Math.min(motion.displacement[0], 1);
+    
+    const quality: SignalQuality = {
+      level: this.determineQualityLevel(snrScore, motionScore),
+      score: (snrScore + motionScore) / 2,
+      confidence: snrScore * motionScore,
+      overall: (snrScore * 0.6 + motionScore * 0.4),
+      history: [...this.state.quality.history, snrScore]
+    };
+
+    // Keep only last 30 quality scores
+    if (quality.history.length > 30) {
+      quality.history.shift();
+    }
+
+    return quality;
+  }
+
+  private analyzeNoise(signal: Float64Array): NoiseAnalysis {
+    const { magnitude, phase } = this.computeFFT(signal);
+    const mean = signal.reduce((a, b) => a + b) / signal.length;
+    const variance = signal.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / signal.length;
+    
+    // Calculate signal and noise power
+    const signalPower = magnitude.reduce((a, b) => a + b * b, 0);
+    const noisePower = variance - signalPower;
+    const snr = signalPower / (noisePower + 1e-10);
+
+    return {
+      snr,
+      distribution: Array.from(magnitude),
+      spectrum: Array.from(phase),
+      entropy: this.calculateEntropy(magnitude),
+      kurtosis: this.calculateKurtosis(signal, mean, Math.sqrt(variance)),
+      variance
+    };
+  }
+
+  private analyzeMotion(signal: Float64Array): MotionAnalysis {
+    const displacement: number[] = [];
+    const velocity: number[] = [];
+    const acceleration: number[] = [];
+
+    for (let i = 1; i < signal.length; i++) {
+      displacement.push(Math.abs(signal[i] - signal[i - 1]));
+      if (i > 1) {
+        const v = displacement[i - 1] - displacement[i - 2];
+        velocity.push(v);
+        if (i > 2) {
+          acceleration.push(v - velocity[velocity.length - 2]);
+        }
+      }
+    }
+
+    return {
+      displacement,
+      velocity,
+      acceleration
+    };
+  }
+
+  private computeFFT(signal: Float64Array): { magnitude: Float64Array, phase: Float64Array } {
     const n = signal.length;
-    const magnitude = new Float64Array(n/2);
-    const phase = new Float64Array(n/2);
+    const magnitude = new Float64Array(n / 2);
+    const phase = new Float64Array(n / 2);
 
-    // FFT simplificada (en producción usar una biblioteca FFT optimizada)
-    for (let k = 0; k < n/2; k++) {
-      let re = 0, im = 0;
+    // Implementación básica de FFT
+    for (let k = 0; k < n / 2; k++) {
+      let re = 0;
+      let im = 0;
+      
       for (let t = 0; t < n; t++) {
-        const angle = 2 * Math.PI * t * k / n;
+        const angle = (2 * Math.PI * t * k) / n;
         re += signal[t] * Math.cos(angle);
         im -= signal[t] * Math.sin(angle);
       }
-      magnitude[k] = Math.sqrt(re*re + im*im);
+      
+      magnitude[k] = Math.sqrt(re * re + im * im) / n;
       phase[k] = Math.atan2(im, re);
     }
 
     return { magnitude, phase };
   }
 
-  private assessQuality(signal: Float64Array): SignalQuality {
-    // Calcular SNR
-    const signalPower = this.calculateSignalPower(signal);
-    const noisePower = this.calculateNoisePower(signal);
-    const snr = signalPower / (noisePower + 1e-10);
-
-    // Detectar movimiento
-    const movement = this.detectMovement(signal);
-
-    // Calcular calidad general
-    const quality: SignalQuality = {
-      level: SignalQualityLevel.Invalid,
-      score: 0,
-      confidence: 0,
-      overall: 0,
-      signal: Math.min(Math.max(snr / 10, 0), 1),
-      noise: Math.min(Math.max(1 - noisePower / signalPower, 0), 1),
-      movement: Math.min(Math.max(1 - movement, 0), 1),
-      history: []
-    };
-
-    // Calidad general ponderada
-    quality.overall = (quality.signal * 0.4 + 
-                      quality.noise * 0.3 + 
-                      quality.movement * 0.3);
-
-    this.state.quality = quality;
-    return quality;
-  }
-
-  private calculateSignalPower(signal: Float64Array): number {
-    return signal.reduce((sum, x) => sum + x * x, 0) / signal.length;
-  }
-
-  private calculateNoisePower(signal: Float64Array): number {
-    const trend = this.estimateTrend(signal);
-    return signal.reduce((sum, x, i) => sum + Math.pow(x - trend[i], 2), 0) / signal.length;
-  }
-
-  private estimateTrend(signal: Float64Array): Float64Array {
-    const trend = new Float64Array(signal.length);
-    const windowSize = Math.floor(signal.length / 4);
-
-    for (let i = 0; i < signal.length; i++) {
-      let sum = 0;
-      let count = 0;
-      for (let j = Math.max(0, i - windowSize); j < Math.min(signal.length, i + windowSize); j++) {
-        sum += signal[j];
-        count++;
+  private calculateEntropy(distribution: Float64Array): number {
+    const sum = distribution.reduce((a, b) => a + b, 0);
+    let entropy = 0;
+    
+    for (const value of distribution) {
+      const p = value / sum;
+      if (p > 0) {
+        entropy -= p * Math.log2(p);
       }
-      trend[i] = sum / count;
     }
-
-    return trend;
+    
+    return entropy;
   }
 
-  private detectMovement(signal: Float64Array): number {
-    const diff = new Float64Array(signal.length - 1);
-    for (let i = 0; i < diff.length; i++) {
-      diff[i] = signal[i + 1] - signal[i];
-    }
-    return Math.sqrt(diff.reduce((sum, x) => sum + x * x, 0) / diff.length);
+  private calculateKurtosis(signal: Float64Array, mean: number, std: number): number {
+    if (std === 0) return 0;
+    
+    const n = signal.length;
+    const m4 = signal.reduce((a, b) => a + Math.pow(b - mean, 4), 0) / n;
+    return m4 / Math.pow(std, 4) - 3;
+  }
+
+  private determineQualityLevel(snr: number, motion: number): SignalQualityLevel {
+    const score = snr * 0.6 + motion * 0.4;
+    
+    if (score > 0.8) return SignalQualityLevel.Excellent;
+    if (score > 0.6) return SignalQualityLevel.Good;
+    if (score > 0.4) return SignalQualityLevel.Fair;
+    if (score > 0.2) return SignalQualityLevel.Poor;
+    return SignalQualityLevel.Invalid;
+  }
+
+  private updateState(quality: SignalQuality): void {
+    this.state.quality = quality;
   }
 
   public startCalibration(): void {
     this.state.calibration = {
-      isCalibrated: false,
       isCalibrating: true,
       progress: 0,
-      message: '',
-      referenceValues: new Float64Array(this.config.bufferSize),
-      calibrationQuality: 0,
-      calibrationTime: 0
+      message: 'Calibrating...',
+      isCalibrated: false,
+      calibrationTime: Date.now(),
+      referenceValues: new Float64Array(this.config.bufferSize)
     };
-
-    // Detener calibración después del tiempo configurado
-    setTimeout(() => {
-      this.finalizeCalibration();
-    }, this.config.calibrationDuration);
   }
 
   private updateCalibration(signal: number): void {
     if (!this.state.calibration.isCalibrating) return;
 
-    const { referenceValues } = this.state.calibration;
-    const progress = this.state.frameCount / (this.config.calibrationDuration / 1000 * this.state.sampleRate);
+    const { calibrationTime, referenceValues } = this.state.calibration;
+    const elapsed = Date.now() - calibrationTime!;
+    const progress = Math.min(elapsed / this.config.calibrationDuration, 1);
 
-    referenceValues[this.state.frameCount % referenceValues.length] = signal;
-    this.state.calibration.progress = Math.min(progress, 1);
+    if (referenceValues) {
+      referenceValues[this.state.frameCount % referenceValues.length] = signal;
+    }
+
+    this.state.calibration.progress = progress;
+
+    if (progress >= 1) {
+      this.finalizeCalibration();
+    }
   }
 
   private finalizeCalibration(): void {
-    if (!this.state.calibration.isCalibrating) return;
+    if (!this.state.calibration.referenceValues) return;
 
-    const { referenceValues } = this.state.calibration;
-    
-    // Calcular estadísticas de calibración
-    const mean = referenceValues.reduce((a, b) => a + b) / referenceValues.length;
+    const values = this.state.calibration.referenceValues;
+    const mean = values.reduce((a, b) => a + b) / values.length;
     const std = Math.sqrt(
-      referenceValues.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / referenceValues.length
+      values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / values.length
     );
 
-    // Actualizar umbrales basados en la calibración
-    this.components.detector.threshold = std * 2;
-    
-    // Finalizar calibración
-    this.state.calibration.isCalibrating = false;
-    this.state.calibration.isCalibrated = true;
-    this.state.calibration.calibrationQuality = this.calculateCalibrationQuality();
+    // Ajustar sensibilidad basado en la calibración
+    this.config.sensitivity = {
+      ...this.config.sensitivity,
+      signalAmplification: 1.0 / std,
+      peakDetection: mean + 2 * std
+    };
+
+    this.state.calibration = {
+      ...this.state.calibration,
+      isCalibrating: false,
+      isCalibrated: true,
+      message: 'Calibration complete',
+      calibrationQuality: this.calculateCalibrationQuality(values)
+    };
   }
 
-  private calculateCalibrationQuality(): number {
-    const { referenceValues } = this.state.calibration;
-    const filtered = this.filterSignal(referenceValues);
-    const quality = this.assessQuality(filtered);
-    return quality.overall;
+  private calculateCalibrationQuality(values: Float64Array): number {
+    const filtered = this.filterSignal(values);
+    const { snr } = this.analyzeNoise(filtered);
+    return Math.min(Math.max(snr / 10, 0), 1);
   }
 
   public stop(): void {
     this.state.isProcessing = false;
-    this.cleanupResources();
     this.resetBuffers();
     this.state.calibration.isCalibrating = false;
   }
 
-  private cleanupResources(): void {
-    try {
-      // Limpiar buffers
-      this.state.buffer = new Float64Array(this.config.bufferSize);
-      this.state.timeBuffer = new Float64Array(this.config.bufferSize);
-      
-      // Limpiar componentes
-      this.components.filter.state.fill(0);
-      this.components.detector.peaks = [];
-      this.components.detector.valleys = [];
-      this.components.analyzer.spectrum.fill(0);
-      this.components.analyzer.phase.fill(0);
-      this.components.analyzer.magnitude.fill(0);
-      
-      // Resetear métricas y estados
-      this.state.frameCount = 0;
-      this.state.lastTimestamp = 0;
-      
-      // Limpiar calibración
-      this.state.calibration = {
-        isCalibrated: false,
-        isCalibrating: false,
-        progress: 0,
-        message: '',
-        referenceValues: new Float64Array(),
-        calibrationQuality: 0,
-        calibrationTime: 0
-      };
-      
-      // Limpiar calidad
-      this.state.quality = {
-        overall: 0,
-        signal: 0,
-        noise: 0,
-        movement: 0,
-        confidence: 0,
-        score: 0,
-        history: [],
-        level: SignalQualityLevel.Invalid
-      };
-    } catch (error) {
-      console.error('Error cleaning up resources:', error);
-    }
+  public getQuality(): SignalQuality {
+    return this.state.quality;
+  }
+
+  public getCalibrationProgress(): number {
+    return this.state.calibration.progress;
+  }
+
+  public isCalibrating(): boolean {
+    return this.state.calibration.isCalibrating;
+  }
+
+  public isCalibrated(): boolean {
+    return this.state.calibration.isCalibrated || false;
   }
 }
