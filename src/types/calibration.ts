@@ -41,6 +41,13 @@ export interface ProcessingConfig {
   duration: number;
   reference: Float64Type;
   calibration: CalibrationState;
+  filter: {
+    enabled: boolean;
+    lowCut: number;
+    highCut: number;
+    order: number;
+    nfft?: number;
+  };
   filterOrder?: number;
   lowCutoff?: number;
   highCutoff?: number;
@@ -53,13 +60,6 @@ export interface ProcessingConfig {
     maxHarmonics: number;
     minAmplitude: number;
     tracking?: boolean;
-  };
-  filter?: {
-    enabled: boolean;
-    lowCut: number;
-    highCut: number;
-    order: number;
-    nfft?: number;
   };
 }
 
@@ -75,6 +75,3 @@ export interface SensitivitySettings {
   snr?: number;
 }
 
-export interface CalibrationInterface extends CalibrationState {
-  dispose(): void;
-}

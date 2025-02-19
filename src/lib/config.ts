@@ -1,7 +1,6 @@
 
 import { SensitivitySettings, CalibrationState } from '../types/calibration';
 import { ProcessingMode } from '../types/common';
-import { Float64Array } from '@tensorflow/tfjs';
 
 export const defaultSensitivitySettings: SensitivitySettings = {
   brightness: 1.0,
@@ -34,5 +33,12 @@ export const defaultConfig = {
   sampleRate: 30,
   bufferSize: 256,
   sensitivity: defaultSensitivitySettings,
-  calibration: defaultCalibrationState
+  calibration: defaultCalibrationState,
+  filter: {
+    enabled: true,
+    lowCut: 0.5,
+    highCut: 4.0,
+    order: 4
+  }
 };
+

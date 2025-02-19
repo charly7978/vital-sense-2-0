@@ -1,10 +1,11 @@
+
 import { Float64Type } from './common';
 import { SignalQuality } from './quality';
 import { ValidationResult } from './core';
 import { SpectralAnalysis, WaveletAnalysis } from './analysis';
 
 // Base analyzer interface
-export interface BaseAnalyzer {
+export interface AnalyzerBase {
   initialize(): void;
   dispose(): void;
   validateInput(input: Float64Type): boolean;
@@ -52,6 +53,25 @@ export interface BeatConfig {
       maxChange: number;
     };
   };
+  optimization?: {
+    vectorization: boolean;
+    parallelization: boolean;
+    precision: 'single' | 'double';
+    cacheSize: number;
+    adaptiveWindow: boolean;
+  };
+}
+
+export interface BeatState {
+  lastBeat: BeatDetection | null;
+  beatHistory: BeatDetection[];
+  templateHistory: Float64Array[];
+  qualityHistory: number[];
+  threshold: {
+    value: number;
+    history: number[];
+    adaptation: number;
+  };
 }
 
 export interface BeatDetection {
@@ -60,6 +80,9 @@ export interface BeatDetection {
   confidence: number;
   quality: SignalQuality;
   features: BeatFeatures;
+  beats?: BeatFeatures[];
+  metrics?: BeatMetrics;
+  validation?: BeatValidation;
 }
 
 export interface BeatFeatures {
@@ -81,6 +104,7 @@ export interface BeatQuality extends SignalQuality {
   morphology: number;
   timing: number;
   physiological: number;
+  artifacts?: number;
 }
 
 export interface BeatValidation extends ValidationResult {
@@ -128,45 +152,6 @@ export interface PeakEnhancement {
   coefficients: Float64Type;
 }
 
-// Signal processor types
-export interface ProcessorOptimization {
-  cache: Map<string, any>;
-  performance: Map<string, number>;
-  resources: Map<string, any>;
-}
-
-export interface SignalCalibration {
-  reference: Float64Type;
-  calibrated: boolean;
-  timestamp: number;
-  factors: Map<string, number>;
-}
-
-export interface ProcessingQuality extends SignalQuality {
-  temporal: number;
-  spectral: number;
-  morphological: number;
-}
-
-// Blood pressure types
-export interface BPConfig {
-  sampleRate: number;
-  calibrationDuration: number;
-  referenceReadings: number[];
-  validation: {
-    minQuality: number;
-    maxVariability: number;
-  };
-}
-
-export interface BPEstimation {
-  systolic: number;
-  diastolic: number;
-  mean: number;
-  confidence: number;
-  quality: SignalQuality;
-}
-
 // Frequency analysis types
 export interface FrequencyResponse {
   magnitude: Float64Type;
@@ -186,11 +171,40 @@ export interface SpectralDensity {
   bandwidth: number;
 }
 
+export interface FrequencyConfig {
+  method: string;
+  window: string;
+  segments: number;
+  overlap: number;
+  nfft?: number;
+  averaging?: string;
+}
+
+export interface FrequencyBands {
+  vlf: [number, number];
+  lf: [number, number];
+  hf: [number, number];
+  total: [number, number];
+  cardiac: [number, number];
+}
+
 // Motion analysis types
 export interface MotionConfig {
   windowSize: number;
   overlap: number;
   threshold: number;
+  blockSize?: number;
+  maxFeatures?: number;
+  minDistance?: number;
+  tracking?: {
+    method: string;
+    maxIterations: number;
+    epsilon: number;
+  };
+  stabilization?: {
+    mode: string;
+    smoothing: number;
+  };
 }
 
 export interface CompensationMode {
@@ -203,7 +217,7 @@ export interface StabilizationMatrix {
   quality: number;
 }
 
-// Additional analyzer types
+// Wavelet analysis types
 export interface WaveletBasis {
   name: string;
   coefficients: Float64Type;
@@ -233,40 +247,12 @@ export interface OptimizedDWT {
     high: Float64Type;
   };
   mode: 'periodic' | 'symmetric';
+  forward?: (signal: Float64Type) => WaveletCoefficients;
 }
 
-export interface BeatState {
-  lastBeat: BeatDetection | null;
-  beatHistory: BeatDetection[];
-  templateHistory: Float64Array[];
-  qualityHistory: number[];
-  threshold: {
-    value: number;
-    history: number[];
-    adaptation: number;
-  };
+export interface WaveletCoefficients {
+  approximation: Float64Type;
+  details: Float64Type[];
+  level: number;
 }
 
-export interface ProcessorState {
-  isProcessing: boolean;
-  frameCount: number;
-  buffer: Float64Array;
-  timeBuffer: Float64Array;
-  lastTimestamp: number;
-  sampleRate: number;
-  calibration: CalibrationState;
-  quality: SignalQuality;
-  optimization: {
-    cache: Map<string, any>;
-    performance: Map<string, number>;
-    resources: Map<string, any>;
-  };
-}
-
-export interface AnalyzerBase {
-  initialize(): void;
-  dispose(): void;
-  validateInput(input: Float64Array): boolean;
-  handleError(error: Error): void;
-  updateState(state: any): void;
-}

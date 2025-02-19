@@ -1,15 +1,28 @@
-
 import { Float64Type } from './common';
 import { SignalQuality } from './quality';
-import { SpectralAnalysis, PhaseAnalysis } from './analysis';
-import { Disposable } from './common';
+import { ValidationResult } from './core';
 
 export interface ArtifactConfig {
-  temporal: {
+  enabled: boolean;
+  threshold: number;
+  window: number;
+  motion: {
     enabled: boolean;
     threshold: number;
     window: number;
     features: string[];
+    fusion: string;
+  };
+  noise: {
+    enabled: boolean;
+    methods: string[];
+    thresholds: Record<string, number>;
+  };
+  wavelet: {
+    type: string;
+    levels: number;
+    threshold: string;
+    denoising: string;
   };
   spectral: {
     enabled: boolean;
@@ -19,24 +32,11 @@ export interface ArtifactConfig {
     overlap: number;
     bands: number[][];
   };
-  statistical: {
-    enabled: boolean;
-    metrics: string[];
-    threshold: number;
+  classification: {
+    method: string;
+    models: string[];
+    weights: Record<string, number>;
   };
-  noise: {
-    enabled: boolean;
-    methods: string[];
-    thresholds: Record<string, number>;
-  };
-  motion: {
-    enabled: boolean;
-    threshold: number;
-    window: number;
-  };
-  minQuality: number;
-  windowSize: number;
-  overlapSize: number;
   validation: {
     minQuality: number;
     maxArtifacts: number;
@@ -45,68 +45,93 @@ export interface ArtifactConfig {
   };
 }
 
-export interface NoiseAnalysis extends Disposable {
-  snr: number;
-  distribution: Float64Type;
-  spectrum: Float64Type; 
-  entropy: number;
-  kurtosis: number;
-  variance: number;
-  spectralNoise?: number;
-}
-
-export interface MotionAnalysis extends Disposable {
-  displacement: number;
-  velocity: number;
-  acceleration: number;
-  features: Float64Type;
-  quality: number;
-  detection?: {
-    isMotion: boolean;
-    confidence: number;
-  };
+export interface ArtifactDetection {
+  isArtifact: boolean;
+  confidence: number;
+  type: string;
+  severity: number;
+  quality: SignalQuality;
+  features?: ArtifactFeatures;
+  segments?: SignalSegmentation;
+  metrics?: ArtifactMetrics;
+  timestamp?: number;
 }
 
 export interface ArtifactFeatures {
   temporal: Float64Type;
-  spectral: Float64Type;
   statistical: Float64Type;
+  spectral?: Float64Type;
+  wavelet?: Float64Type;
+  motion?: Float64Type;
+  noise?: Float64Type;
+  quality: number;
 }
 
-export interface ArtifactDetection extends Disposable {
-  isArtifact: boolean;
-  confidence: number;
-  features: ArtifactFeatures;
-  quality: SignalQuality;
-  type: string;
+export interface MotionAnalysis {
+  features: number[];
+  threshold: number;
+  detection: boolean;
+  acceleration?: Float64Type;
+  jerk?: Float64Type;
+  displacement?: Float64Type;
+  energy?: Float64Type;
+}
+
+export interface NoiseAnalysis {
+  snr: number;
+  distribution: Float64Type;
+  spectrum: Float64Type;
+  entropy: number;
+  kurtosis: number;
+  variance: number;
+  spectralNoise?: number;
+  isNoisy?: boolean;
+  dispose(): void;
 }
 
 export interface SignalSegmentation {
   segments: Float64Type[];
-  timestamps: number[];
+  boundaries: number[];
   quality: number[];
+  timestamps?: number[];
+  features?: ArtifactFeatures[];
 }
 
 export interface ArtifactMetrics {
-  noise: NoiseAnalysis;
-  motion: MotionAnalysis;
-  spectral: SpectralAnalysis;
-  phase: PhaseAnalysis;
+  noiseLevel: number;
+  motionIndex: number;
+  signalQuality: number;
+  confidence: number;
+  temporal?: number;
+  spectral?: number;
+  wavelet?: number;
+  overall?: number;
 }
 
-export interface TemplateMatching extends Disposable {
-  match(signal: Float64Type): number;
-  update(template: Float64Type): void;
-  getDistance(): number;
+export interface TemplateMatching {
+  similarity: number;
+  offset: number;
+  scale: number;
+  quality: number;
+  template?: Float64Type;
+  correlation?: Float64Type;
+  distance?: number;
 }
 
-export interface ArtifactValidation extends Disposable {
-  validate(detection: ArtifactDetection): boolean;
-  getConfidence(): number;
+export interface ArtifactValidation extends ValidationResult {
+  motion: boolean;
+  noise: boolean;
+  spectral: boolean;
+  wavelet?: boolean;
+  template?: boolean;
+  physiological?: boolean;
 }
 
 export interface ArtifactClassification {
   type: string;
   confidence: number;
-  features: ArtifactFeatures;
+  severity: number;
+  features?: ArtifactFeatures;
+  probability?: number;
+  metrics?: ArtifactMetrics;
 }
