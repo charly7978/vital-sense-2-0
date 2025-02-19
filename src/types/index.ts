@@ -214,6 +214,12 @@ export interface SignalConditions {
   noiseLevel: number;
   signalStrength: number;
   stability: number;
+  signalQuality: number;
+  lightLevel: number;
+  movement: number;
+  coverage: number;
+  temperature: number;
+  measurementType: string;
 }
 
 export interface CalibrationEntry {

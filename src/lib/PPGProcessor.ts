@@ -1,4 +1,3 @@
-
 import { 
   PPGData, ProcessingMode, SensitivitySettings, 
   FingerDetection, DeviceInfo, CalibrationState,
@@ -60,7 +59,13 @@ export class PPGProcessor {
     startTime: 0,
     lastHeartRate: 0,
     stability: 0,
-    confidence: 0
+    confidence: 0,
+    isCalibrating: false,
+    calibration: {
+      isCalibrating: false,
+      progress: 0,
+      message: ''
+    }
   };
 
   // Métricas y análisis
@@ -156,7 +161,13 @@ export class PPGProcessor {
       startTime: 0,
       lastHeartRate: 0,
       stability: 0,
-      confidence: 0
+      confidence: 0,
+      isCalibrating: false,
+      calibration: {
+        isCalibrating: false,
+        progress: 0,
+        message: ''
+      }
     };
     
     this.emit('error', { 
@@ -397,6 +408,19 @@ export class PPGProcessor {
   }
 
   /**
+   * Inicia el proceso de calibración
+   */
+  public startCalibration(): void {
+    this.processingState.isCalibrating = true;
+    this.processingState.calibration = {
+      isCalibrating: true,
+      progress: 0,
+      message: 'Starting calibration...'
+    };
+    this.calibrate();
+  }
+
+  /**
    * Análisis de calidad multi-métrica
    */
   private assessQuality(params: QualityParams): SignalQualityLevel {
@@ -561,7 +585,13 @@ export class PPGProcessor {
       startTime: 0,
       lastHeartRate: 0,
       stability: 0,
-      confidence: 0
+      confidence: 0,
+      isCalibrating: false,
+      calibration: {
+        isCalibrating: false,
+        progress: 0,
+        message: ''
+      }
     };
   }
 }
