@@ -8,6 +8,10 @@ export interface FrequencyBands {
   hf: [number, number];
   total: [number, number];
   cardiac: [number, number];
+  noise?: [number, number];
+  ratios?: { [key: string]: number };
+  normalized?: { [key: string]: number };
+  relative?: { [key: string]: number };
 }
 
 export interface SpectralAnalysis extends Disposable {
@@ -20,6 +24,10 @@ export interface SpectralAnalysis extends Disposable {
     ratios: Float64Type;
     powers: Float64Type;
   };
+  spectrum?: {
+    power: Float64Type;
+    frequency: Float64Type;
+  };
 }
 
 export interface HarmonicAnalysis extends Disposable {
@@ -30,6 +38,7 @@ export interface HarmonicAnalysis extends Disposable {
   quality: number;
   ratios: Float64Type;
   powers: Float64Type;
+  maxOrder?: number;
 }
 
 export interface PhaseAnalysis extends Disposable {
@@ -37,12 +46,15 @@ export interface PhaseAnalysis extends Disposable {
   group: Float64Type;
   coherence: number;
   stability: number;
+  phase?: Float64Type;
+  groupDelay?: boolean;
 }
 
 export interface WaveletAnalysis extends Disposable {
   analyze(signal: Float64Type): WaveletTransform;
   reconstruct(coeffs: WaveletCoefficients): Float64Type;
   coefficients: Float64Type[];
+  features?: Float64Type[];
 }
 
 export interface WaveletTransform {
@@ -62,11 +74,18 @@ export interface FrequencyConfig {
   overlapSize: number;
   samplingRate: number;
   method: 'fft' | 'welch' | 'periodogram';
+  window: string;
+  segments: number;
+  overlap: number;
+  nfft?: number;
+  averaging?: string;
   bands: FrequencyBands;
   harmonics: {
     enabled: boolean;
     maxHarmonics: number;
     minAmplitude: number;
+    maxOrder?: number;
+    tracking?: boolean;
   };
   spectral: {
     method: string;
@@ -78,6 +97,7 @@ export interface FrequencyConfig {
     unwrapping: string;
     smoothing: number;
     coherence: boolean;
+    groupDelay?: boolean;
   };
 }
 
