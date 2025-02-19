@@ -13,6 +13,15 @@ export interface Disposable {
   dispose(): void;
 }
 
+export interface MediaTrackConstraintsExtended extends MediaTrackConstraints {
+  width?: { ideal: number };
+  height?: { ideal: number };
+  facingMode?: 'user' | 'environment';
+  frameRate?: { ideal: number };
+  exposureMode?: 'auto' | 'manual';
+  advanced?: MediaTrackConstraintSet[];
+}
+
 // Basic interfaces with dispose capability
 export interface BasicMetrics extends Disposable {
   timestamp: number;
@@ -22,17 +31,7 @@ export interface BasicMetrics extends Disposable {
 
 export interface ROI {
   x: number;
-  y: number;
   width: number;
+  y: number;
   height: number;
 }
-
-// Media interfaces
-export interface MediaTrackConstraintsExtended extends MediaTrackConstraints {
-  width?: { ideal: number };
-  height?: { ideal: number };
-  facingMode?: 'user' | 'environment';
-  frameRate?: { ideal: number };
-  advanced?: MediaTrackConstraintSet[];
-}
-

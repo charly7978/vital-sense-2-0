@@ -1,7 +1,6 @@
 
-// Export only what's needed and avoid duplicates
+// Export common types
 export type {
-  // Common types
   Float64Type,
   Float32Type,
   ProcessingMode,
@@ -10,7 +9,8 @@ export type {
   SignalQualityLevelType,
   Disposable,
   BasicMetrics,
-  ROI
+  ROI,
+  MediaTrackConstraintsExtended
 } from './common';
 
 // Quality types
@@ -26,47 +26,20 @@ export type {
   SensitivitySettings
 } from './config';
 
-// Artifact types
-export type {
-  ArtifactConfig,
-  ArtifactDetection,
-  ArtifactFeatures,
-  ArtifactMetrics,
-  MotionAnalysis,
-  NoiseAnalysis,
-  ArtifactValidation,
-  ArtifactClassification,
-  SignalSegmentation
-} from './artifacts';
-
-// Analysis types
-export type {
-  IntervalAnalysis,
-  SpectralAnalysis,
-  FrequencyAnalysis,
-  PhaseAnalysis,
-  FrequencyBands,
-  ComplexArray,
-  WaveformQuality,
-  // Wavelet types
-  WaveletCoefficients,
-  WaveletTransform,
-  WaveletBasis,
-  WaveletPacket,
-  ScaleSpace,
-  SubbandFeatures,
-  OptimizedDWT,
-  WaveletAnalysis
-} from './analysis';
-
 // Vital types
 export type {
   VitalReading,
   PPGData,
   PPGProcessingConfig,
-  ProcessingState
+  ProcessingState,
+  VitalSigns,
+  BloodPressure,
+  ArrhythmiaType,
+  SignalConditions
 } from './vitals';
 
-// Only export constants normally
+// Constants
 export { SignalQualityLevel } from './quality';
 
+// Re-export all analysis types
+export * from './analysis';
