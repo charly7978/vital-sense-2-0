@@ -3,10 +3,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { toast } from '@/components/ui/use-toast';
-import { 
-  MediaTrackConstraintsExtended, 
-  ExtendedMediaTrackCapabilities 
-} from '@/types';
+import { MediaTrackConstraintsExtended } from '@/types';
 
 interface CameraViewProps {
   onImageCapture: (imageData: ImageData) => void;
@@ -28,7 +25,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onImageCapture }) => {
           width: { ideal: 640 },
           height: { ideal: 480 },
           frameRate: { ideal: 30 },
-          facingMode: { ideal: 'environment' }
+          facingMode: 'environment'
         }
       };
 
@@ -39,7 +36,6 @@ const CameraView: React.FC<CameraViewProps> = ({ onImageCapture }) => {
         await videoRef.current.play();
         setHasPermission(true);
         
-        // Configure canvas size
         if (canvasRef.current) {
           canvasRef.current.width = videoRef.current.videoWidth;
           canvasRef.current.height = videoRef.current.videoHeight;
