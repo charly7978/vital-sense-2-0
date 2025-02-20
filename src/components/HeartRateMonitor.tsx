@@ -95,12 +95,14 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
           </div>
 
           {/* Vista de Calibración */}
-          <div className={`absolute inset-0 transition-transform duration-500 ${currentView === 'calibration' ? 'translate-x-0' : 'translate-x-full'}`}>
-            <div className="h-full w-full p-3 pb-32">
-              <CalibrationPanel 
-                settings={sensitivitySettings}
-                onUpdateSettings={updateSensitivitySettings}
-              />
+          <div className={`absolute inset-0 transition-transform duration-500 overflow-y-auto ${currentView === 'calibration' ? 'translate-x-0' : 'translate-x-full'}`}>
+            <div className="min-h-screen w-full">
+              <div className="pt-4 pb-32">
+                <CalibrationPanel 
+                  settings={sensitivitySettings}
+                  onUpdateSettings={updateSensitivitySettings}
+                />
+              </div>
             </div>
           </div>
 

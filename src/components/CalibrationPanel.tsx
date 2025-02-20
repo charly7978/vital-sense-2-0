@@ -26,19 +26,19 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-4">
+    <div className="max-w-3xl mx-auto mt-4">
       <Card className="bg-black/30 backdrop-blur-md border-white/10">
-        <CardHeader>
-          <CardTitle className="text-white">Calibración de Captación de Pulso</CardTitle>
-          <CardDescription className="text-gray-400">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-white text-lg">Calibración de Captación de Pulso</CardTitle>
+          <CardDescription className="text-gray-400 text-sm">
             Ajuste los parámetros para optimizar la detección de latidos
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-4">
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-1 gap-3">
             {/* Sensibilidad de Captación */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
+            <div className="bg-black/20 p-2 rounded-lg">
+              <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-2">
                   <Target className="w-4 h-4 text-blue-400" />
                   <label className="text-sm font-medium text-white">
@@ -57,14 +57,11 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
                 onValueChange={handleSettingChange('signalAmplification')}
                 className="[&_[role=slider]]:bg-blue-400"
               />
-              <p className="mt-1 text-xs text-gray-500">
-                Ajusta la sensibilidad general del sensor
-              </p>
             </div>
 
             {/* Precisión de Pulso */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
+            <div className="bg-black/20 p-2 rounded-lg">
+              <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-2">
                   <Heart className="w-4 h-4 text-red-400" />
                   <label className="text-sm font-medium text-white">
@@ -83,14 +80,11 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
                 onValueChange={handleSettingChange('peakDetection')}
                 className="[&_[role=slider]]:bg-red-400"
               />
-              <p className="mt-1 text-xs text-gray-500">
-                Controla la precisión en la detección de cada latido
-              </p>
             </div>
 
             {/* Velocidad de Muestreo */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
+            <div className="bg-black/20 p-2 rounded-lg">
+              <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-2">
                   <Zap className="w-4 h-4 text-yellow-400" />
                   <label className="text-sm font-medium text-white">
@@ -109,14 +103,11 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
                 onValueChange={handleSettingChange('responseTime')}
                 className="[&_[role=slider]]:bg-yellow-400"
               />
-              <p className="mt-1 text-xs text-gray-500">
-                Ajusta la frecuencia de captación de datos
-              </p>
             </div>
 
             {/* Intensidad Mínima */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
+            <div className="bg-black/20 p-2 rounded-lg">
+              <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-2">
                   <Gauge className="w-4 h-4 text-green-400" />
                   <label className="text-sm font-medium text-white">
@@ -135,14 +126,11 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
                 onValueChange={handleSettingChange('heartbeatThreshold')}
                 className="[&_[role=slider]]:bg-green-400"
               />
-              <p className="mt-1 text-xs text-gray-500">
-                Define el umbral mínimo para detectar un latido
-              </p>
             </div>
 
             {/* Filtro de Ruido */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
+            <div className="bg-black/20 p-2 rounded-lg">
+              <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-2">
                   <Waves className="w-4 h-4 text-purple-400" />
                   <label className="text-sm font-medium text-white">
@@ -161,19 +149,10 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
                 onValueChange={handleSettingChange('noiseReduction')}
                 className="[&_[role=slider]]:bg-purple-400"
               />
-              <p className="mt-1 text-xs text-gray-500">
-                Reduce interferencias en la señal del pulso
-              </p>
             </div>
           </div>
         </CardContent>
       </Card>
-
-      <div className="text-center">
-        <p className="text-xs text-gray-500">
-          Los cambios se aplican automáticamente
-        </p>
-      </div>
     </div>
   );
 };
