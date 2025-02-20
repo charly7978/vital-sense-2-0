@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
-import { Heart, Target, Zap, Gauge, Waves } from 'lucide-react';
+import { Heart, Target, Gauge, Waves, Signal } from 'lucide-react';
 import type { SensitivitySettings } from '@/utils/types';
 
 interface CalibrationPanelProps {
@@ -82,29 +82,6 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
               />
             </div>
 
-            {/* Velocidad de Muestreo */}
-            <div className="bg-black/20 p-2 rounded-lg">
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-yellow-400" />
-                  <label className="text-sm font-medium text-white">
-                    Velocidad de Muestreo
-                  </label>
-                </div>
-                <span className="text-xs text-gray-400">
-                  {getValue('responseTime').toFixed(2)}x
-                </span>
-              </div>
-              <Slider
-                value={[getValue('responseTime')]}
-                min={0.5}
-                max={2.0}
-                step={0.1}
-                onValueChange={handleSettingChange('responseTime')}
-                className="[&_[role=slider]]:bg-yellow-400"
-              />
-            </div>
-
             {/* Intensidad Mínima */}
             <div className="bg-black/20 p-2 rounded-lg">
               <div className="flex items-center justify-between mb-1.5">
@@ -148,6 +125,52 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
                 step={0.1}
                 onValueChange={handleSettingChange('noiseReduction')}
                 className="[&_[role=slider]]:bg-purple-400"
+              />
+            </div>
+
+            {/* Altura de Visualización de Picos (Nuevo) */}
+            <div className="bg-black/20 p-2 rounded-lg">
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-2">
+                  <Signal className="w-4 h-4 text-orange-400" />
+                  <label className="text-sm font-medium text-white">
+                    Altura de Visualización
+                  </label>
+                </div>
+                <span className="text-xs text-gray-400">
+                  {getValue('peakHeight', 1.0).toFixed(2)}x
+                </span>
+              </div>
+              <Slider
+                value={[getValue('peakHeight', 1.0)]}
+                min={0.5}
+                max={2.0}
+                step={0.1}
+                onValueChange={handleSettingChange('peakHeight')}
+                className="[&_[role=slider]]:bg-orange-400"
+              />
+            </div>
+
+            {/* Suavizado de Visualización (Nuevo) */}
+            <div className="bg-black/20 p-2 rounded-lg">
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-2">
+                  <Signal className="w-4 h-4 rotate-90 text-teal-400" />
+                  <label className="text-sm font-medium text-white">
+                    Suavizado de Visualización
+                  </label>
+                </div>
+                <span className="text-xs text-gray-400">
+                  {getValue('smoothing', 1.0).toFixed(2)}x
+                </span>
+              </div>
+              <Slider
+                value={[getValue('smoothing', 1.0)]}
+                min={0.1}
+                max={2.0}
+                step={0.1}
+                onValueChange={handleSettingChange('smoothing')}
+                className="[&_[role=slider]]:bg-teal-400"
               />
             </div>
           </div>
