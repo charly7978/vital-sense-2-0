@@ -1,4 +1,6 @@
 
+// NO MODIFICAR NADA SIN PREVIA AUTORIZACION DEL USUARIO
+
 export class BeepPlayer {
   private audioContext: AudioContext | null = null;
   private lastBeepTime: number = 0;
