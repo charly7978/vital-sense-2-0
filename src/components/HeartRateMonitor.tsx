@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Settings } from 'lucide-react';
 import CameraView from './CameraView';
 import VitalChart from './VitalChart';
@@ -35,6 +35,26 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
   } = useVitals();
 
   const showFingerIndicator = isStarted && measurementQuality < 0.2;
+
+  // Asegurarse de que los contenedores necesarios existan antes de inicializar
+  useEffect(() => {
+    // Crear contenedor para visualización de señal
+    const signalContainer = document.createElement('div');
+    signalContainer.id = 'signalCanvas';
+    signalContainer.className = 'absolute top-0 left-0 z-20';
+    document.body.appendChild(signalContainer);
+
+    // Crear contenedor para indicador de calidad
+    const qualityContainer = document.createElement('div');
+    qualityContainer.id = 'qualityIndicator';
+    qualityContainer.className = 'absolute top-0 right-0 z-20';
+    document.body.appendChild(qualityContainer);
+
+    return () => {
+      document.body.removeChild(signalContainer);
+      document.body.removeChild(qualityContainer);
+    };
+  }, []);
 
   return (
     <div className="relative h-screen w-screen overflow-hidden">
