@@ -25,8 +25,8 @@ interface VitalsContextType {
 
 const VitalsContext = createContext<VitalsContextType | undefined>(undefined);
 
+const ppgProcessor = new UltraAdvancedPPGProcessor('signalCanvas', 'qualityIndicator');
 const beepPlayer = new BeepPlayer();
-const ppgProcessor = new UltraAdvancedPPGProcessor();
 
 const MEASUREMENT_DURATION = 30;
 

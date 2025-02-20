@@ -154,20 +154,20 @@ export interface ProcessedPPGSignal {
   signalQuality: number;
 }
 
-export interface ProcessedSignal extends ProcessedPPGSignal {
-  value: number[];
-  quality: SignalQuality;
-  features: SignalFeatures;
-  confidence: number;
-  timestamp: number;
-  bpm: number;
-  spo2: number;
-  systolic: number;
-  diastolic: number;
-  hasArrhythmia: boolean;
-  arrhythmiaType: string;
-  readings: VitalReading[];
-  signalQuality: number;
+export interface ProcessedSignal {
+  valid: boolean;
+  signal?: number[];
+  quality?: SignalQuality;
+  timestamp?: number;
+  reason?: string;
+  bpm?: number;
+  spo2?: number;
+  systolic?: number;
+  diastolic?: number;
+  hasArrhythmia?: boolean;
+  arrhythmiaType?: string;
+  readings?: VitalReading[];
+  signalQuality?: number;
 }
 
 export class ProcessingError extends Error {
