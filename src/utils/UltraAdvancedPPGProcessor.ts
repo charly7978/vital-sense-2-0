@@ -276,7 +276,7 @@ export class UltraAdvancedPPGProcessor {
   }
 
   private async detectFinger(frame: ImageData): Promise<FingerDetection> {
-    // Implementación simulada de detección de dedo
+    // Simulación de detección de dedo
     return {
       detected: true,
       confidence: 0.95,
