@@ -8,14 +8,14 @@ export class WaveletPPGProcessor {
   private lastProcessedTime: number = 0;
   
   private sensitivitySettings: SensitivitySettings = {
-    signalAmplification: 0.9,      // Optimizado para luz intensa
-    noiseReduction: 1.8,           // Filtrado adaptativo
-    peakDetection: 1.4,           // Sensibilidad de picos
-    heartbeatThreshold: 0.5,      // Umbral adaptativo
-    responseTime: 0.7,            // Respuesta rápida
-    signalStability: 1.1,         // Estabilidad mejorada
-    brightness: 0.8,              // Control de brillo
-    redIntensity: 0.85           // Intensidad del rojo
+    signalAmplification: 2.5,      // Aumentado para mejor detección
+    noiseReduction: 1.2,           // Reducido para no perder señal
+    peakDetection: 0.8,           // Reducido para detectar picos más sutiles
+    heartbeatThreshold: 0.3,      // Reducido para detectar pulsos más débiles
+    responseTime: 0.9,            // Aumentado para mejor estabilidad
+    signalStability: 1.5,         // Aumentado para mejor filtrado
+    brightness: 1.2,              // Aumentado para mejor captura
+    redIntensity: 1.3            // Aumentado para mejor separación R/IR
   };
 
   constructor() {
@@ -28,6 +28,114 @@ export class WaveletPPGProcessor {
       ...settings
     };
     console.log('🔧 Configuración actualizada:', this.sensitivitySettings);
+  }
+
+  private extractColorComponents(imageData: ImageData): { red: number, green: number, blue: number } {
+    const { data, width, height } = imageData;
+    let redSum = 0, greenSum = 0, blueSum = 0;
+    let validPixels = 0;
+
+    // ROI en el centro de la imagen
+    const centerX = Math.floor(width / 2);
+    const centerY = Math.floor(height / 2);
+    const roiSize = Math.floor(Math.min(width, height) * 0.4); // Aumentado ROI
+    
+    for (let y = centerY - roiSize; y < centerY + roiSize; y++) {
+      for (let x = centerX - roiSize; x < centerX + roiSize; x++) {
+        if (y >= 0 && y < height && x >= 0 && x < width) {
+          const i = (y * width + x) * 4;
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+
+          // Criterio de validación menos estricto
+          if (r > 30 && r < 250) {
+            redSum += r;
+            greenSum += g;
+            blueSum += b;
+            validPixels++;
+          }
+        }
+      }
+    }
+
+    if (validPixels === 0) return { red: 0, green: 0, blue: 0 };
+
+    // Aplicar amplificación de señal
+    const amplification = this.sensitivitySettings.signalAmplification;
+    return {
+      red: (redSum / validPixels) * amplification,
+      green: (greenSum / validPixels) * amplification,
+      blue: (blueSum / validPixels) * amplification
+    };
+  }
+
+  private calculatePerfusionIndex(red: number, green: number, blue: number): number {
+    if (red === 0) return 0;
+    
+    // Índice de perfusión mejorado con mayor sensibilidad
+    const ac = Math.abs(red - green) * this.sensitivitySettings.signalAmplification;
+    const dc = red;
+    const perfusionIndex = (ac / dc) * 2.5; // Factor de amplificación adicional
+
+    // Aplicar filtro de suavizado
+    return this.applySmoothing(perfusionIndex);
+  }
+
+  private applySmoothing(value: number): number {
+    // Implementar filtro de media móvil ponderada
+    const alpha = 0.3; // Factor de suavizado
+    if (this.signalBuffer.length === 0) return value;
+    
+    const lastValue = this.signalBuffer[this.signalBuffer.length - 1];
+    return alpha * value + (1 - alpha) * lastValue;
+  }
+
+  private findPeaks(signal: number[]): number[] {
+    const peaks: number[] = [];
+    const threshold = this.sensitivitySettings.peakDetection * 0.5; // Reducido para mayor sensibilidad
+    
+    for (let i = 2; i < signal.length - 2; i++) {
+      const window = signal.slice(i-2, i+3);
+      const current = signal[i];
+      
+      // Detector de picos mejorado
+      if (current === Math.max(...window) && 
+          current > threshold && 
+          current > signal[i-1] * 1.1 && // 10% más alto que el punto anterior
+          current > signal[i+1] * 1.1) { // 10% más alto que el punto siguiente
+        peaks.push(i);
+      }
+    }
+    
+    return peaks;
+  }
+
+  private calculateHeartRate(peaks: number[]): number {
+    if (peaks.length < 2) return 0;
+    
+    const intervals: number[] = [];
+    for (let i = 1; i < peaks.length; i++) {
+      const interval = this.timeBuffer[peaks[i]] - this.timeBuffer[peaks[i-1]];
+      // Ventana más amplia para detectar pulsos
+      if (interval > 250 && interval < 2000) { // 30-240 bpm
+        intervals.push(interval);
+      }
+    }
+    
+    if (intervals.length === 0) return 0;
+    
+    // Promedio ponderado de intervalos
+    const weightedIntervals = intervals.map((interval, index) => ({
+      interval,
+      weight: Math.exp(-0.1 * (intervals.length - index)) // Dar más peso a los intervalos recientes
+    }));
+    
+    const totalWeight = weightedIntervals.reduce((sum, { weight }) => sum + weight, 0);
+    const avgInterval = weightedIntervals.reduce((sum, { interval, weight }) => 
+      sum + interval * weight, 0) / totalWeight;
+
+    return Math.round(60000 / avgInterval);
   }
 
   async processFrame(imageData: ImageData): Promise<ProcessedPPGSignal> {
@@ -86,49 +194,19 @@ export class WaveletPPGProcessor {
     };
   }
 
-  private extractColorComponents(imageData: ImageData): { red: number, green: number, blue: number } {
-    const { data, width, height } = imageData;
-    let redSum = 0, greenSum = 0, blueSum = 0;
-    let validPixels = 0;
+  private discreteWaveletTransform(signal: number[]): number[] {
+    const n = signal.length;
+    const output = new Array(n).fill(0);
 
-    // ROI en el centro de la imagen
-    const centerX = Math.floor(width / 2);
-    const centerY = Math.floor(height / 2);
-    const roiSize = Math.floor(Math.min(width, height) * 0.3);
-    
-    for (let y = centerY - roiSize; y < centerY + roiSize; y++) {
-      for (let x = centerX - roiSize; x < centerX + roiSize; x++) {
-        if (y >= 0 && y < height && x >= 0 && x < width) {
-          const i = (y * width + x) * 4;
-          const r = data[i];
-          const g = data[i + 1];
-          const b = data[i + 2];
-
-          // Criterio de validación optimizado para luz intensa
-          if (r > 60 && r < 250 && r > g * 1.1 && r > b * 1.1) {
-            redSum += r;
-            greenSum += g;
-            blueSum += b;
-            validPixels++;
-          }
-        }
-      }
+    // Haar wavelet simplificado
+    for (let i = 0; i < n - 1; i += 2) {
+      const avg = (signal[i] + signal[i + 1]) / Math.sqrt(2);
+      const diff = (signal[i] - signal[i + 1]) / Math.sqrt(2);
+      output[i/2] = avg;
+      output[n/2 + i/2] = diff;
     }
 
-    return validPixels > 0 ? {
-      red: redSum / validPixels,
-      green: greenSum / validPixels,
-      blue: blueSum / validPixels
-    } : { red: 0, green: 0, blue: 0 };
-  }
-
-  private calculatePerfusionIndex(red: number, green: number, blue: number): number {
-    if (red === 0) return 0;
-    
-    // Índice de perfusión mejorado
-    const ac = Math.abs(red - green);
-    const dc = red;
-    return (ac / dc) * this.sensitivitySettings.signalAmplification;
+    return output;
   }
 
   private performWaveletAnalysis(): { heartRate: number, signalQuality: number, peaks: number[] } {
@@ -149,53 +227,6 @@ export class WaveletPPGProcessor {
     const signalQuality = this.evaluateSignalQuality(coefficients, peaks);
 
     return { heartRate, signalQuality, peaks };
-  }
-
-  private discreteWaveletTransform(signal: number[]): number[] {
-    const n = signal.length;
-    const output = new Array(n).fill(0);
-
-    // Haar wavelet simplificado
-    for (let i = 0; i < n - 1; i += 2) {
-      const avg = (signal[i] + signal[i + 1]) / Math.sqrt(2);
-      const diff = (signal[i] - signal[i + 1]) / Math.sqrt(2);
-      output[i/2] = avg;
-      output[n/2 + i/2] = diff;
-    }
-
-    return output;
-  }
-
-  private findPeaks(signal: number[]): number[] {
-    const peaks: number[] = [];
-    const threshold = this.sensitivitySettings.peakDetection;
-    
-    for (let i = 1; i < signal.length - 1; i++) {
-      if (signal[i] > signal[i-1] && 
-          signal[i] > signal[i+1] && 
-          signal[i] > threshold) {
-        peaks.push(i);
-      }
-    }
-    
-    return peaks;
-  }
-
-  private calculateHeartRate(peaks: number[]): number {
-    if (peaks.length < 2) return 0;
-    
-    const intervals: number[] = [];
-    for (let i = 1; i < peaks.length; i++) {
-      const interval = this.timeBuffer[peaks[i]] - this.timeBuffer[peaks[i-1]];
-      if (interval > 300 && interval < 2000) { // 30-200 bpm
-        intervals.push(interval);
-      }
-    }
-    
-    if (intervals.length === 0) return 0;
-    
-    const avgInterval = intervals.reduce((a, b) => a + b) / intervals.length;
-    return Math.round(60000 / avgInterval);
   }
 
   private evaluateSignalQuality(coefficients: number[], peaks: number[]): number {
