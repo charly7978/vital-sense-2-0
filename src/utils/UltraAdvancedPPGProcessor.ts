@@ -1,17 +1,9 @@
+
 // UltraAdvancedPPGProcessor.ts - Sistema Completo de Procesamiento PPG
 import type { VitalReading, SensitivitySettings, ProcessedSignal, SignalQuality } from './types';
 
-/**
- * Sistema DEFINITIVO de procesamiento PPG que incluye:
- * - Detección ultra-precisa de dedo
- * - Procesamiento cuántico de señal
- * - Visualización en tiempo real
- * - Análisis de calidad avanzado
- * - Optimizaciones automáticas
- */
-
 class SignalVisualizer {
-  private canvas: HTMLCanvasElement;
+  private canvas: HTMLCanvasElement | null = null;
   private ctx: CanvasRenderingContext2D | null = null;
   private readonly config = {
     width: 800,
@@ -26,41 +18,59 @@ class SignalVisualizer {
   };
 
   constructor(containerId: string) {
-    // Crear el canvas si no existe
-    const existingCanvas = document.getElementById(containerId);
-    if (!existingCanvas) {
-      this.canvas = document.createElement('canvas');
-      this.canvas.id = containerId;
-      // Encontrar un contenedor donde insertar el canvas
-      const container = document.querySelector('.heart-rate-container');
-      if (container) {
-        container.appendChild(this.canvas);
-      } else {
-        // Si no hay contenedor específico, añadirlo al body
-        document.body.appendChild(this.canvas);
+    // Inicialización diferida
+    setTimeout(() => this.initializeCanvas(containerId), 0);
+  }
+
+  private initializeCanvas(containerId: string): void {
+    try {
+      let canvas = document.getElementById(containerId) as HTMLCanvasElement;
+      
+      if (!canvas) {
+        console.log('Canvas no encontrado, creando uno nuevo...');
+        canvas = document.createElement('canvas');
+        canvas.id = containerId;
+        
+        const container = document.querySelector('.heart-rate-container');
+        if (container) {
+          container.appendChild(canvas);
+          console.log('Canvas añadido al contenedor heart-rate-container');
+        } else {
+          document.body.appendChild(canvas);
+          console.log('Canvas añadido al body (fallback)');
+        }
       }
-    } else {
-      this.canvas = existingCanvas as HTMLCanvasElement;
+
+      this.canvas = canvas;
+      this.setupCanvas();
+      console.log('Canvas inicializado correctamente');
+    } catch (error) {
+      console.error('Error inicializando canvas:', error);
     }
-    
-    this.setupCanvas();
   }
 
   private setupCanvas(): void {
+    if (!this.canvas) {
+      console.error('Canvas no disponible durante setup');
+      return;
+    }
+
     this.canvas.width = this.config.width;
     this.canvas.height = this.config.height;
     this.canvas.style.backgroundColor = this.config.backgroundColor;
-    this.ctx = this.canvas.getContext('2d');
     
+    this.ctx = this.canvas.getContext('2d');
     if (!this.ctx) {
       console.error('No se pudo obtener el contexto 2D del canvas');
       return;
     }
+
+    console.log('Canvas configurado con dimensiones:', this.config.width, 'x', this.config.height);
   }
 
   public drawSignal(signal: number[]): void {
-    if (!this.ctx) {
-      console.error('Contexto 2D no disponible');
+    if (!this.ctx || !this.canvas) {
+      console.warn('Canvas o contexto no disponible para dibujar señal');
       return;
     }
 
@@ -89,7 +99,7 @@ class SignalVisualizer {
   }
 
   private drawGrid(): void {
-    if (!this.ctx) return;
+    if (!this.ctx || !this.canvas) return;
 
     this.ctx.strokeStyle = this.config.gridColor;
     this.ctx.lineWidth = 0.5;
