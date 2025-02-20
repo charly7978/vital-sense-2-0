@@ -1,57 +1,54 @@
 
 export class SignalQualityAnalyzer {
-  private readonly windowSize = 30;
-  private readonly artifactThreshold = 0.4;
-  private readonly minValidAmplitude = 20;
-  private readonly maxNoiseTolerance = 0.3;
-  private readonly minSignalDynamicRange = 0.15;
-  private readonly smoothingFactor = 0.85;
+  // Configuración optimizada para análisis de calidad PPG
+  private readonly config = {
+    metrics: {
+      snr: { min: 4.0, optimal: 8.0 },
+      stability: { min: 0.85, optimal: 0.95 },
+      perfusion: { min: 0.5, optimal: 2.0 },
+      artifacts: { max: 0.1 }
+    },
+    signal: {
+      minAmplitude: 20,
+      maxNoise: 0.3,
+      minDynamicRange: 0.15
+    },
+    analysis: {
+      windowSize: 30,
+      minValidFrames: 4,
+      smoothingFactor: 0.85
+    }
+  };
+
   private lastQualityValue = 0;
 
   analyzeSignalQuality(signal: number[]): number {
-    if (signal.length < 4) return 0;
+    if (signal.length < this.config.analysis.minValidFrames) return 0;
 
     try {
-      // 1. Análisis de Amplitud y Rango Dinámico
+      // 1. Análisis de amplitud y rango dinámico
       const { amplitudeQuality, dynamicRange } = this.analyzeAmplitude(signal);
-      if (amplitudeQuality < 0.2) return 0.1; // Señal muy débil
+      if (amplitudeQuality < 0.2) return 0;
 
-      // 2. Detección de Artefactos y Ruido
-      const noiseQuality = this.analyzeNoise(signal);
-      
-      // 3. Análisis de Forma de Onda
-      const waveformQuality = this.analyzeWaveform(signal);
-      
-      // 4. Estabilidad de línea base
-      const baselineStability = this.calculateBaselineStability(signal);
-      
-      // 5. Consistencia de Intervalos
-      const rhythmStability = this.analyzeRhythmStability(signal);
+      // 2. Análisis de estabilidad y ruido
+      const stabilityScore = this.analyzeStability(signal);
+      const noiseScore = this.analyzeNoise(signal);
 
-      // 6. Cálculo de calidad final con pesos optimizados
+      // 3. Cálculo de perfusión
+      const perfusionScore = this.calculatePerfusion(signal);
+
+      // 4. Cálculo de calidad final
       const rawQuality = this.calculateWeightedQuality({
-        amplitudeQuality,
-        noiseQuality,
-        waveformQuality,
-        baselineStability,
-        rhythmStability,
-        dynamicRange
+        amplitude: amplitudeQuality,
+        stability: stabilityScore,
+        noise: noiseScore,
+        perfusion: perfusionScore,
+        range: dynamicRange
       });
 
-      // 7. Suavizado exponencial para evitar cambios bruscos
-      this.lastQualityValue = (this.smoothingFactor * this.lastQualityValue) + 
-                             ((1 - this.smoothingFactor) * rawQuality);
-
-      // 8. Logging detallado para depuración
-      console.log('Métricas de calidad:', {
-        amplitud: amplitudeQuality.toFixed(2),
-        ruido: noiseQuality.toFixed(2),
-        forma: waveformQuality.toFixed(2),
-        baseline: baselineStability.toFixed(2),
-        ritmo: rhythmStability.toFixed(2),
-        rangoD: dynamicRange.toFixed(2),
-        calidadFinal: this.lastQualityValue.toFixed(2)
-      });
+      // 5. Suavizado temporal para evitar cambios bruscos
+      this.lastQualityValue = (this.config.analysis.smoothingFactor * this.lastQualityValue) +
+                             ((1 - this.config.analysis.smoothingFactor) * rawQuality);
 
       return this.lastQualityValue;
 
@@ -65,154 +62,83 @@ export class SignalQualityAnalyzer {
     const max = Math.max(...signal);
     const min = Math.min(...signal);
     const amplitude = max - min;
-    const mean = signal.reduce((a, b) => a + b, 0) / signal.length;
     
-    // Rango dinámico normalizado
-    const dynamicRange = amplitude / (max + Number.EPSILON);
-    
-    // Calidad basada en amplitud con umbral mínimo
-    const amplitudeQuality = Math.min(
-      1, 
-      Math.max(0, (amplitude - this.minValidAmplitude) / 100)
-    );
+    const dynamicRange = amplitude / (Math.max(Math.abs(max), Math.abs(min)) + 1e-6);
+    const amplitudeQuality = Math.min(1, Math.max(0, amplitude / this.config.signal.minAmplitude));
 
     return { amplitudeQuality, dynamicRange };
+  }
+
+  private analyzeStability(signal: number[]): number {
+    if (signal.length < 3) return 0;
+
+    const differences = [];
+    for (let i = 1; i < signal.length; i++) {
+      differences.push(Math.abs(signal[i] - signal[i - 1]));
+    }
+
+    const meanDiff = differences.reduce((a, b) => a + b, 0) / differences.length;
+    const maxSignal = Math.max(...signal);
+    
+    return Math.max(0, 1 - (meanDiff / (maxSignal + 1e-6)));
   }
 
   private analyzeNoise(signal: number[]): number {
     if (signal.length < 3) return 0;
 
-    // Cálculo de ruido de alta frecuencia usando diferencias de primer orden
-    const differences = signal.slice(1).map((val, i) => Math.abs(val - signal[i]));
-    const meanDiff = differences.reduce((a, b) => a + b, 0) / differences.length;
-    
-    // Estimación de SNR simplificada
-    const signalPower = signal.reduce((a, b) => a + b * b, 0) / signal.length;
-    const noisePower = differences.reduce((a, b) => a + b * b, 0) / differences.length;
-    
-    const snr = signalPower / (noisePower + Number.EPSILON);
-    const noiseQuality = Math.min(1, Math.max(0, 1 - (meanDiff / this.maxNoiseTolerance)));
+    // Estimación de SNR usando varianza de la señal y del ruido
+    const signalMean = signal.reduce((a, b) => a + b, 0) / signal.length;
+    const signalVariance = signal.reduce((acc, val) => 
+      acc + Math.pow(val - signalMean, 2), 0) / signal.length;
 
-    return Math.min(1, Math.max(0, (snr * noiseQuality)));
+    const differences = signal.slice(1).map((val, i) => val - signal[i]);
+    const noiseVariance = differences.reduce((acc, diff) => 
+      acc + Math.pow(diff, 2), 0) / differences.length;
+
+    const snr = signalVariance / (noiseVariance + 1e-6);
+    return Math.min(1, snr / this.config.metrics.snr.optimal);
   }
 
-  private analyzeWaveform(signal: number[]): number {
-    if (signal.length < this.windowSize) return 0;
-
-    let qualityScore = 0;
-    const segments = Math.floor(signal.length / this.windowSize);
-
-    for (let i = 0; i < segments; i++) {
-      const segment = signal.slice(i * this.windowSize, (i + 1) * this.windowSize);
-      const segmentQuality = this.analyzeSegmentMorphology(segment);
-      qualityScore += segmentQuality;
-    }
-
-    return Math.min(1, qualityScore / segments);
-  }
-
-  private analyzeSegmentMorphology(segment: number[]): number {
-    const max = Math.max(...segment);
-    const min = Math.min(...segment);
-    const mean = segment.reduce((a, b) => a + b, 0) / segment.length;
+  private calculatePerfusion(signal: number[]): number {
+    const max = Math.max(...signal);
+    const min = Math.min(...signal);
+    const mean = signal.reduce((a, b) => a + b, 0) / signal.length;
     
-    // Análisis de simetría
-    const upstroke = segment.findIndex(v => v === max);
-    const symmetryScore = Math.abs(0.5 - (upstroke / segment.length));
-    
-    // Análisis de suavidad
-    let smoothnessScore = 0;
-    for (let i = 1; i < segment.length - 1; i++) {
-      const diff1 = Math.abs(segment[i] - segment[i - 1]);
-      const diff2 = Math.abs(segment[i + 1] - segment[i]);
-      smoothnessScore += Math.abs(diff2 - diff1);
-    }
-    smoothnessScore = 1 - (smoothnessScore / (segment.length * (max - min)));
-
-    return (symmetryScore + smoothnessScore) / 2;
-  }
-
-  private calculateBaselineStability(signal: number[]): number {
-    if (signal.length < 8) return 0;
-    
-    const windowSize = 8;
-    const baseline = [];
-    
-    for (let i = windowSize; i < signal.length; i++) {
-      const windowMean = signal.slice(i - windowSize, i)
-        .reduce((a, b) => a + b, 0) / windowSize;
-      baseline.push(windowMean);
-    }
-    
-    if (baseline.length < 2) return 0;
-    
-    const baselineVariation = Math.sqrt(
-      baseline.reduce((acc, val) => acc + Math.pow(val - baseline[0], 2), 0) / baseline.length
-    );
-    
-    return Math.exp(-baselineVariation / 8);
-  }
-
-  private analyzeRhythmStability(signal: number[]): number {
-    if (signal.length < 4) return 0;
-
-    const peaks = this.findPeaks(signal);
-    if (peaks.length < 2) return 0;
-
-    const intervals = peaks.slice(1).map((peak, i) => peak - peaks[i]);
-    const meanInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-    
-    const variability = intervals.reduce((acc, interval) => 
-      acc + Math.pow(interval - meanInterval, 2), 0) / intervals.length;
-
-    return Math.exp(-variability / (meanInterval * 2));
-  }
-
-  private findPeaks(signal: number[]): number[] {
-    const peaks: number[] = [];
-    for (let i = 1; i < signal.length - 1; i++) {
-      if (signal[i] > signal[i - 1] && signal[i] > signal[i + 1]) {
-        peaks.push(i);
-      }
-    }
-    return peaks;
+    const perfusionIndex = ((max - min) / (mean + 1e-6)) * 100;
+    return Math.min(1, perfusionIndex / this.config.metrics.perfusion.optimal);
   }
 
   private calculateWeightedQuality(metrics: {
-    amplitudeQuality: number;
-    noiseQuality: number;
-    waveformQuality: number;
-    baselineStability: number;
-    rhythmStability: number;
-    dynamicRange: number;
+    amplitude: number;
+    stability: number;
+    noise: number;
+    perfusion: number;
+    range: number;
   }): number {
     const weights = {
-      amplitude: 0.25,
-      noise: 0.20,
-      waveform: 0.20,
-      baseline: 0.15,
-      rhythm: 0.10,
-      range: 0.10
+      amplitude: 0.3,
+      stability: 0.25,
+      noise: 0.2,
+      perfusion: 0.15,
+      range: 0.1
     };
 
     let quality = 
-      metrics.amplitudeQuality * weights.amplitude +
-      metrics.noiseQuality * weights.noise +
-      metrics.waveformQuality * weights.waveform +
-      metrics.baselineStability * weights.baseline +
-      metrics.rhythmStability * weights.rhythm +
-      (metrics.dynamicRange > this.minSignalDynamicRange ? weights.range : 0);
+      metrics.amplitude * weights.amplitude +
+      metrics.stability * weights.stability +
+      metrics.noise * weights.noise +
+      metrics.perfusion * weights.perfusion +
+      (metrics.range > this.config.signal.minDynamicRange ? weights.range : 0);
 
     // Penalización si alguna métrica es muy baja
     const minMetricValue = Math.min(
-      metrics.amplitudeQuality,
-      metrics.noiseQuality,
-      metrics.waveformQuality,
-      metrics.baselineStability
+      metrics.amplitude,
+      metrics.stability,
+      metrics.noise
     );
 
     if (minMetricValue < 0.2) {
-      quality *= 0.5; // Penalización significativa
+      quality *= 0.5;
     }
 
     return Math.min(1, Math.max(0, quality));
