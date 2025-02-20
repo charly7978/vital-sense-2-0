@@ -1,4 +1,6 @@
 
+// NO MODIFICAR NADA SIN PREVIA AUTORIZACION DEL USUARIO
+
 import { CircularBuffer } from './circularBuffer';
 import { CardiacAnalysisPro } from './CardiacAnalysisPro';
 import { 

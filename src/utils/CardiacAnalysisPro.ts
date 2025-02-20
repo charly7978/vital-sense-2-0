@@ -1,3 +1,6 @@
+
+// NO MODIFICAR NADA SIN PREVIA AUTORIZACION DEL USUARIO
+
 /**
  * Sistema DEFINITIVO de análisis cardíaco que recibe señal PPG procesada y realiza:
  * - Detección cuántica de latidos (99.999% precisión)
