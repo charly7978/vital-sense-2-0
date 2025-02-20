@@ -38,7 +38,7 @@ const BPCalibrationForm = () => {
       };
 
       const { error } = await supabase
-        .from('blood_pressure_calibration')
+        .from('medical_device_calibration')  // Cambiado de 'blood_pressure_calibration' a 'medical_device_calibration'
         .insert([calibrationData]);
 
       if (error) throw error;
