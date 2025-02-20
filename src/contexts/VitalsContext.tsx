@@ -1,7 +1,6 @@
-
 import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { BeepPlayer } from '../utils/audioUtils';
-import { CardiacAnalysisPro } from '../utils/CardiacAnalysisPro';
+import { UltraAdvancedPPGProcessor } from '../utils/UltraAdvancedPPGProcessor';
 import { useToast } from "@/hooks/use-toast";
 import type { VitalReading, SensitivitySettings } from '../utils/types';
 
@@ -27,7 +26,7 @@ interface VitalsContextType {
 const VitalsContext = createContext<VitalsContextType | undefined>(undefined);
 
 const beepPlayer = new BeepPlayer();
-const cardiacAnalyzer = new CardiacAnalysisPro();
+const ppgProcessor = new UltraAdvancedPPGProcessor();
 
 const MEASUREMENT_DURATION = 30;
 
@@ -71,58 +70,38 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     try {
       setIsProcessing(true);
+      const processedSignal = await ppgProcessor.processFrame(imageData);
       
-      // Extraemos el canal rojo para análisis cardíaco
-      const redChannel = new Array(imageData.width * imageData.height);
-      for (let i = 0, j = 0; i < imageData.data.length; i += 4, j++) {
-        redChannel[j] = imageData.data[i];
-      }
-      
-      // Creamos una señal PPG básica para el análisis cardíaco
-      const processedSignal = {
-        signal: redChannel,
-        quality: 1.0,
-        features: {
-          peaks: [],
-          valleys: [],
-          frequency: 0,
-          amplitude: 0,
-          perfusionIndex: 0
-        },
-        confidence: 1.0,
-        timestamp: Date.now(),
-        bpm: 0,
-        spo2: 0,
-        systolic: 0,
-        diastolic: 0,
-        hasArrhythmia: false,
-        arrhythmiaType: 'Normal',
-        readings: [],
-        signalQuality: 1.0
+      // Actualizar lecturas en tiempo real
+      const newReading: VitalReading = {
+        timestamp: processedSignal.timestamp,
+        value: processedSignal.signal[0] || 0
       };
 
-      const cardiacResult = await cardiacAnalyzer.analyzeCardiacSignal(processedSignal);
+      setReadings(prev => [...prev.slice(-100), newReading]);
       
-      if (cardiacResult.valid) {
-        // Actualizar lecturas en tiempo real
-        const newReading: VitalReading = {
-          timestamp: Date.now(),
-          value: cardiacResult.heartbeat?.intensity || 0
-        };
-
-        setReadings(prev => [...prev.slice(-100), newReading]);
-        
-        // Actualizar métricas vitales
-        if (cardiacResult.heartbeat?.bpm && cardiacResult.heartbeat.bpm > 40 && cardiacResult.heartbeat.bpm < 200) {
-          setBpm(Math.round(cardiacResult.heartbeat.bpm));
-        }
-
-        setHasArrhythmia(cardiacResult.arrhythmia?.isPresent || false);
-        setArrhythmiaType(cardiacResult.arrhythmia?.type || 'Normal');
-        
-        // Actualizar calidad de la señal
-        setMeasurementQuality(cardiacResult.heartbeat?.quality || 0);
+      // Actualizar métricas vitales
+      if (processedSignal.bpm > 40 && processedSignal.bpm < 200) {
+        setBpm(Math.round(processedSignal.bpm));
       }
+
+      // Actualizar SpO2
+      if (processedSignal.spo2 > 0) {
+        setSpo2(processedSignal.spo2);
+      }
+
+      // Actualizar presión arterial
+      if (processedSignal.systolic > 0 && processedSignal.diastolic > 0) {
+        setSystolic(processedSignal.systolic);
+        setDiastolic(processedSignal.diastolic);
+      }
+
+      // Actualizar calidad de la señal
+      setMeasurementQuality(processedSignal.signalQuality);
+
+      // Actualizar estado de arritmia
+      setHasArrhythmia(processedSignal.hasArrhythmia);
+      setArrhythmiaType(processedSignal.arrhythmiaType);
 
       setIsProcessing(false);
     } catch (error) {
