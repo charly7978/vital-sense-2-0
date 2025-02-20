@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Settings } from 'lucide-react';
+import { Settings, Fingerprint } from 'lucide-react';
 import CameraView from './CameraView';
 import VitalChart from './VitalChart';
 import VitalSignsDisplay from './vitals/VitalSignsDisplay';
@@ -33,8 +33,6 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
     updateSensitivitySettings
   } = useVitals();
 
-  const showFingerIndicator = isStarted && measurementQuality < 0.2;
-
   return (
     <div className="relative h-screen w-screen overflow-hidden">
       <div className="absolute inset-0 z-0">
@@ -58,17 +56,6 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
                     />
                   </div>
                 )}
-                
-                {showFingerIndicator && (
-                  <div className="px-3 py-2 bg-yellow-500/10 border border-yellow-500/20 backdrop-blur-md rounded-lg">
-                    <div className="flex items-center justify-center space-x-2">
-                      <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"/>
-                      <p className="text-yellow-300 text-xs">
-                        Coloque su dedo sobre el lente de la cámara
-                      </p>
-                    </div>
-                  </div>
-                )}
               </div>
 
               <div className="mt-3 space-y-2">
@@ -87,6 +74,15 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
                   <h3 className="text-xs font-medium mb-1 text-gray-100">PPG en Tiempo Real</h3>
                   <div className="h-[50px]">
                     <VitalChart data={readings} color="#ea384c" />
+                  </div>
+                  
+                  {/* Ícono de huella digital */}
+                  <div className="flex justify-center mt-2">
+                    <Fingerprint 
+                      className="transition-colors duration-300"
+                      size={24}
+                      color={isStarted && measurementQuality >= 0.2 ? "#22c55e" : "#9ca3af"}
+                    />
                   </div>
                 </div>
               </div>
