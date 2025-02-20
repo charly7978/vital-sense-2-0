@@ -1,8 +1,9 @@
+
 import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { BeepPlayer } from '../utils/audioUtils';
-import { UltraAdvancedPPGProcessor } from '../utils/UltraAdvancedPPGProcessor';
+import { CardiacAnalysisPro } from '../utils/CardiacAnalysisPro';
 import { useToast } from "@/hooks/use-toast";
-import type { VitalReading, SensitivitySettings, ProcessedPPGSignal } from '../utils/types';
+import type { VitalReading, SensitivitySettings } from '../utils/types';
 
 interface VitalsContextType {
   bpm: number;
@@ -26,7 +27,7 @@ interface VitalsContextType {
 const VitalsContext = createContext<VitalsContextType | undefined>(undefined);
 
 const beepPlayer = new BeepPlayer();
-const ppgProcessor = new UltraAdvancedPPGProcessor();
+const cardiacAnalyzer = new CardiacAnalysisPro();
 
 const MEASUREMENT_DURATION = 30;
 
@@ -70,38 +71,58 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     try {
       setIsProcessing(true);
-      const processedSignal = await ppgProcessor.processFrame(imageData);
       
-      // Actualizar lecturas en tiempo real
-      const newReading: VitalReading = {
-        timestamp: processedSignal.timestamp,
-        value: processedSignal.signal[0] || 0
+      // Extraemos el canal rojo para análisis cardíaco
+      const redChannel = new Array(imageData.width * imageData.height);
+      for (let i = 0, j = 0; i < imageData.data.length; i += 4, j++) {
+        redChannel[j] = imageData.data[i];
+      }
+      
+      // Creamos una señal PPG básica para el análisis cardíaco
+      const processedSignal = {
+        signal: redChannel,
+        quality: 1.0,
+        features: {
+          peaks: [],
+          valleys: [],
+          frequency: 0,
+          amplitude: 0,
+          perfusionIndex: 0
+        },
+        confidence: 1.0,
+        timestamp: Date.now(),
+        bpm: 0,
+        spo2: 0,
+        systolic: 0,
+        diastolic: 0,
+        hasArrhythmia: false,
+        arrhythmiaType: 'Normal',
+        readings: [],
+        signalQuality: 1.0
       };
 
-      setReadings(prev => [...prev.slice(-100), newReading]);
+      const cardiacResult = await cardiacAnalyzer.analyzeCardiacSignal(processedSignal);
       
-      // Actualizar métricas vitales
-      if (processedSignal.bpm > 40 && processedSignal.bpm < 200) {
-        setBpm(Math.round(processedSignal.bpm));
+      if (cardiacResult.valid) {
+        // Actualizar lecturas en tiempo real
+        const newReading: VitalReading = {
+          timestamp: Date.now(),
+          value: cardiacResult.heartbeat?.intensity || 0
+        };
+
+        setReadings(prev => [...prev.slice(-100), newReading]);
+        
+        // Actualizar métricas vitales
+        if (cardiacResult.heartbeat?.bpm && cardiacResult.heartbeat.bpm > 40 && cardiacResult.heartbeat.bpm < 200) {
+          setBpm(Math.round(cardiacResult.heartbeat.bpm));
+        }
+
+        setHasArrhythmia(cardiacResult.arrhythmia?.isPresent || false);
+        setArrhythmiaType(cardiacResult.arrhythmia?.type || 'Normal');
+        
+        // Actualizar calidad de la señal
+        setMeasurementQuality(cardiacResult.heartbeat?.quality || 0);
       }
-
-      // Actualizar SpO2
-      if (processedSignal.spo2 > 0) {
-        setSpo2(processedSignal.spo2);
-      }
-
-      // Actualizar presión arterial
-      if (processedSignal.systolic > 0 && processedSignal.diastolic > 0) {
-        setSystolic(processedSignal.systolic);
-        setDiastolic(processedSignal.diastolic);
-      }
-
-      // Actualizar calidad de la señal
-      setMeasurementQuality(processedSignal.signalQuality);
-
-      // Actualizar estado de arritmia
-      setHasArrhythmia(processedSignal.hasArrhythmia);
-      setArrhythmiaType(processedSignal.arrhythmiaType);
 
       setIsProcessing(false);
     } catch (error) {
@@ -114,19 +135,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
     }
   }, [isStarted, toast]);
-
-  const calculateHeartRateVariability = (peaks: number[]): number => {
-    if (peaks.length < 2) return 0;
-    
-    const intervals = [];
-    for (let i = 1; i < peaks.length; i++) {
-      intervals.push(peaks[i] - peaks[i-1]);
-    }
-    
-    const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-    const variance = intervals.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / intervals.length;
-    return Math.sqrt(variance) / mean; // Coeficiente de variación
-  };
 
   const resetMeasurements = useCallback(() => {
     setBpm(0);
@@ -153,7 +161,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const updateSensitivitySettings = useCallback((newSettings: SensitivitySettings) => {
     setSensitivitySettings(newSettings);
-    ppgProcessor.updateSensitivitySettings(newSettings);
   }, []);
 
   const toggleMeasurement = useCallback(() => {
