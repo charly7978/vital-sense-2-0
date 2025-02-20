@@ -80,7 +80,8 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const resetMeasurement = useCallback(() => {
     resetMeasurements();
     if (isStarted) {
-      toggleMeasurement();
+      setIsStarted(false);
+      setMeasurementStartTime(null);
     }
     toast({
       title: "Medición reiniciada",
@@ -138,7 +139,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         toast({
           title: "Calidad de señal baja",
           description: "Por favor, ajuste la posición de su dedo",
-          variant: "destructive"  // Cambiado de "warning" a "destructive"
+          variant: "destructive"
         });
       }
 
