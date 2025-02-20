@@ -9,7 +9,10 @@ export class SpectralAnalyzer {
     return {
       frequencies: [],
       amplitudes: [],
-      phase: []
+      phase: [],
+      signal: [],
+      features: {},
+      quality: 0
     };
   }
 }
