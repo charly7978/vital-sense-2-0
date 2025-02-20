@@ -1,4 +1,5 @@
 // UltraAdvancedPPGProcessor.ts - Sistema Completo de Procesamiento PPG
+import type { VitalReading, SensitivitySettings, ProcessedSignal, SignalQuality } from './types';
 
 /**
  * Sistema DEFINITIVO de procesamiento PPG que incluye:
