@@ -1,3 +1,4 @@
+
 export interface VitalReading {
   [key: string]: number;
   timestamp: number;
@@ -62,15 +63,21 @@ export interface CalibrationSettings {
 }
 
 export interface BPCalibrationData {
-  id?: string;
-  systolic_reference: number;
-  diastolic_reference: number;
-  age?: number;
-  weight?: number;
-  height?: number;
-  calibration_date?: string;
-  is_active?: boolean;
-  calibration_quality?: number;
-  notes?: string;
-  environmental_conditions?: Record<string, any>;
+  calibration_type: 'blood_pressure';
+  calibration_values: {
+    systolic_reference: number;
+    diastolic_reference: number;
+  };
+  environmental_data: {
+    timestamp: string;
+    device_type: string;
+  };
+  reference_measurements: {
+    age?: number;
+    weight?: number;
+    height?: number;
+    notes?: string;
+  };
+  is_active: boolean;
 }
+

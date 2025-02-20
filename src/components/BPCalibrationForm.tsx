@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,7 +23,7 @@ const BPCalibrationForm = () => {
     setIsSubmitting(true);
 
     try {
-      const calibrationData = {
+      const calibrationData: BPCalibrationData = {
         calibration_type: 'blood_pressure',
         calibration_values: {
           systolic_reference: systolic,
@@ -172,4 +171,3 @@ const BPCalibrationForm = () => {
 };
 
 export default BPCalibrationForm;
-
