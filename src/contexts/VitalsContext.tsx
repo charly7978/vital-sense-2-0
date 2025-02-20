@@ -1,8 +1,8 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { BeepPlayer } from '../utils/audioUtils';
-import { PPGProcessor } from '../utils/ppgProcessor';
+import { UltraAdvancedPPGProcessor } from '../utils/UltraAdvancedPPGProcessor';
 import { useToast } from "@/hooks/use-toast";
-import type { VitalReading, SensitivitySettings } from '../utils/types';
+import type { VitalReading, SensitivitySettings, ProcessedPPGSignal } from '../utils/types';
 
 interface VitalsContextType {
   bpm: number;
@@ -26,7 +26,7 @@ interface VitalsContextType {
 const VitalsContext = createContext<VitalsContextType | undefined>(undefined);
 
 const beepPlayer = new BeepPlayer();
-const ppgProcessor = new PPGProcessor();
+const ppgProcessor = new UltraAdvancedPPGProcessor();
 
 const MEASUREMENT_DURATION = 30;
 
@@ -43,6 +43,9 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [measurementProgress, setMeasurementProgress] = useState(0);
   const [measurementQuality, setMeasurementQuality] = useState(0);
   const [measurementStartTime, setMeasurementStartTime] = useState<number | null>(null);
+  const lastProcessedTime = useRef<number>(0);
+  const processingInterval = 33; // ~30fps
+
   const [sensitivitySettings, setSensitivitySettings] = useState<SensitivitySettings>({
     signalAmplification: 1.5,
     noiseReduction: 1.2,
@@ -55,6 +58,75 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   });
 
   const { toast } = useToast();
+
+  const processFrame = useCallback(async (imageData: ImageData) => {
+    if (!isStarted) return;
+
+    const currentTime = Date.now();
+    if (currentTime - lastProcessedTime.current < processingInterval) {
+      return;
+    }
+    lastProcessedTime.current = currentTime;
+
+    try {
+      setIsProcessing(true);
+      const processedSignal = await ppgProcessor.processFrame(imageData);
+      
+      // Actualizar lecturas en tiempo real
+      const newReading: VitalReading = {
+        timestamp: processedSignal.timestamp,
+        value: processedSignal.signal[0] || 0
+      };
+
+      setReadings(prev => [...prev.slice(-100), newReading]);
+      
+      // Actualizar métricas vitales
+      if (processedSignal.bpm > 40 && processedSignal.bpm < 200) {
+        setBpm(Math.round(processedSignal.bpm));
+      }
+
+      // Actualizar SpO2
+      if (processedSignal.spo2 > 0) {
+        setSpo2(processedSignal.spo2);
+      }
+
+      // Actualizar presión arterial
+      if (processedSignal.systolic > 0 && processedSignal.diastolic > 0) {
+        setSystolic(processedSignal.systolic);
+        setDiastolic(processedSignal.diastolic);
+      }
+
+      // Actualizar calidad de la señal
+      setMeasurementQuality(processedSignal.signalQuality);
+
+      // Actualizar estado de arritmia
+      setHasArrhythmia(processedSignal.hasArrhythmia);
+      setArrhythmiaType(processedSignal.arrhythmiaType);
+
+      setIsProcessing(false);
+    } catch (error) {
+      console.error('Error procesando frame:', error);
+      setIsProcessing(false);
+      toast({
+        variant: "destructive",
+        title: "Error en el procesamiento",
+        description: "Error al procesar la imagen de la cámara."
+      });
+    }
+  }, [isStarted, toast]);
+
+  const calculateHeartRateVariability = (peaks: number[]): number => {
+    if (peaks.length < 2) return 0;
+    
+    const intervals = [];
+    for (let i = 1; i < peaks.length; i++) {
+      intervals.push(peaks[i] - peaks[i-1]);
+    }
+    
+    const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+    const variance = intervals.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / intervals.length;
+    return Math.sqrt(variance) / mean; // Coeficiente de variación
+  };
 
   const resetMeasurements = useCallback(() => {
     setBpm(0);
@@ -83,40 +155,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setSensitivitySettings(newSettings);
     ppgProcessor.updateSensitivitySettings(newSettings);
   }, []);
-
-  const processFrame = useCallback(async (imageData: ImageData) => {
-    if (!isStarted) return;
-
-    try {
-      const vitals = await ppgProcessor.processFrame(imageData);
-      
-      if (vitals) {
-        if (vitals.isPeak) {
-          console.log('Pico detectado - Reproduciendo beep');
-          await beepPlayer.playBeep('heartbeat', vitals.signalQuality);
-        }
-
-        if (vitals.bpm > 0) setBpm(vitals.bpm);
-        if (vitals.spo2 > 0) setSpo2(vitals.spo2);
-        if (vitals.systolic > 0 && vitals.diastolic > 0) {
-          setSystolic(vitals.systolic);
-          setDiastolic(vitals.diastolic);
-        }
-        
-        setHasArrhythmia(vitals.hasArrhythmia);
-        setArrhythmiaType(vitals.arrhythmiaType);
-        setReadings(ppgProcessor.getReadings());
-        setMeasurementQuality(vitals.signalQuality);
-      }
-    } catch (error) {
-      console.error('Error procesando frame:', error);
-      toast({
-        variant: "destructive",
-        title: "Error en el procesamiento",
-        description: "Error al procesar la imagen de la cámara."
-      });
-    }
-  }, [isStarted, toast]);
 
   const toggleMeasurement = useCallback(() => {
     if (isStarted) {
