@@ -1,4 +1,3 @@
-
 import { CircularBuffer } from './circularBuffer';
 import { SpectralAnalyzer } from './spectralAnalyzer';
 import { QualityAnalyzer } from './qualityAnalyzer';
@@ -85,42 +84,50 @@ export class UltraAdvancedPPGProcessor {
 
   async processFrame(frame: ImageData): Promise<ProcessedPPGSignal> {
     try {
+      console.log('Procesando frame...');
       const spectralData = await this.systems.spectral.analyze(frame, this.sensitivitySettings);
+      console.log('Datos espectrales:', spectralData);
       
       const signalQuality = spectralData.quality;
       const features = spectralData.features;
       const signal = spectralData.signal || [];
       
-      const bpm = features?.frequency ? features.frequency * 60 : 0;
+      const bpm = features.frequency * 60;
+      console.log('BPM calculado:', bpm);
+      
       const spo2 = signalQuality > 0.6 ? Math.round(95 + (signalQuality * 4)) : 0;
-      const systolic = signalQuality > 0.7 ? Math.round(120 + (features?.amplitude || 0) * 10) : 0;
-      const diastolic = signalQuality > 0.7 ? Math.round(80 + (features?.amplitude || 0) * 5) : 0;
       
-      const hasArrhythmia = features?.peaks ? this.calculateHeartRateVariability(features.peaks) > 0.2 : false;
+      const systolic = signalQuality > 0.7 ? Math.round(120 + (features.amplitude * 10)) : 0;
+      const diastolic = signalQuality > 0.7 ? Math.round(80 + (features.amplitude * 5)) : 0;
       
+      const hrv = this.calculateHeartRateVariability(features.peaks);
+      const hasArrhythmia = hrv > 0.2;
+      
+      const reading: VitalReading = {
+        timestamp: Date.now(),
+        value: signal[signal.length - 1] || 0
+      };
+
       await this.updateFeedback(signal, signalQuality);
 
-      return {
+      const processedSignal: ProcessedPPGSignal = {
         signal,
         quality: signalQuality,
-        features: features || {
-          peaks: [],
-          valleys: [],
-          frequency: 0,
-          amplitude: 0,
-          perfusionIndex: 0
-        },
+        features,
         confidence: signalQuality,
         timestamp: Date.now(),
-        bpm,
+        bpm: Math.round(bpm),
         spo2,
         systolic,
         diastolic,
         hasArrhythmia,
         arrhythmiaType: hasArrhythmia ? 'Irregular' : 'Normal',
-        readings: [],
+        readings: [reading],
         signalQuality
       };
+
+      console.log('Señal procesada:', processedSignal);
+      return processedSignal;
     } catch (error) {
       console.error('Error en procesamiento:', error);
       throw error;
@@ -227,7 +234,6 @@ class DisplayManager {
   }
 
   private drawQualityIndicators(quality: SignalQuality): void {
-    // Implementación básica de indicadores de calidad
     const size = 10;
     const color = quality.overall > 0.7 ? '#10b981' : quality.overall > 0.4 ? '#f59e0b' : '#ef4444';
     

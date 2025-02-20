@@ -1,3 +1,6 @@
+
+import { SignalFeatures } from './types';
+
 export class SpectralAnalyzer {
   private config: any;
 
@@ -5,7 +8,7 @@ export class SpectralAnalyzer {
     this.config = config;
   }
 
-  async analyze(signal: any, options: any) {
+  async analyze(signal: ImageData, options: any) {
     try {
       // Extraer el canal rojo de la imagen para análisis PPG
       const redChannel = this.extractRedChannel(signal);
@@ -59,7 +62,7 @@ export class SpectralAnalyzer {
     }
   }
 
-  private extractRedChannel(signal: any): number[] {
+  private extractRedChannel(signal: ImageData): number[] {
     if (signal && signal.data && signal.data.length > 0) {
       // Extraer solo el canal rojo (cada 4 bytes, RGBA)
       const redValues = [];
@@ -87,18 +90,30 @@ export class SpectralAnalyzer {
 
   private findPeaks(data: number[]): number[] {
     const peaks = [];
+    const threshold = this.calculateThreshold(data);
+    
     for (let i = 1; i < data.length - 1; i++) {
-      if (data[i] > data[i - 1] && data[i] > data[i + 1]) {
+      if (data[i] > threshold && data[i] > data[i - 1] && data[i] > data[i + 1]) {
         peaks.push(i);
       }
     }
     return peaks;
   }
 
+  private calculateThreshold(data: number[]): number {
+    const mean = data.reduce((a, b) => a + b, 0) / data.length;
+    const stdDev = Math.sqrt(
+      data.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / data.length
+    );
+    return mean + 0.5 * stdDev;
+  }
+
   private findValleys(data: number[]): number[] {
     const valleys = [];
+    const threshold = this.calculateThreshold(data);
+    
     for (let i = 1; i < data.length - 1; i++) {
-      if (data[i] < data[i - 1] && data[i] < data[i + 1]) {
+      if (data[i] < threshold && data[i] < data[i - 1] && data[i] < data[i + 1]) {
         valleys.push(i);
       }
     }
@@ -116,15 +131,16 @@ export class SpectralAnalyzer {
     
     const averageDistance = totalDistance / (peaks.length - 1);
     // Convertir a frecuencia (asumiendo 30 fps)
-    return 30 / averageDistance;
+    return (30 / averageDistance) || 0;
   }
 
   private calculateAmplitudes(signal: number[]): number[] {
-    return signal.map(value => Math.abs(value - Math.mean(signal)));
+    if (signal.length === 0) return [];
+    const mean = signal.reduce((a, b) => a + b, 0) / signal.length;
+    return signal.map(value => Math.abs(value - mean));
   }
 
   private calculatePhase(signal: number[]): number[] {
-    // Implementación básica de fase
     return signal.map((_, i) => (i / signal.length) * 2 * Math.PI);
   }
 
@@ -136,7 +152,7 @@ export class SpectralAnalyzer {
     const variance = signal.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / signal.length;
     
     // Calcular SNR aproximado
-    const snr = Math.abs(mean) / Math.sqrt(variance);
+    const snr = variance > 0 ? Math.abs(mean) / Math.sqrt(variance) : 0;
     
     // Normalizar a un valor entre 0 y 1
     return Math.min(Math.max(snr / 10, 0), 1);
@@ -150,20 +166,11 @@ export class SpectralAnalyzer {
     const mean = signal.reduce((a, b) => a + b, 0) / signal.length;
     
     // Calcular PI como (AC/DC)*100
-    const ac = max - min;
-    const dc = mean;
-    
-    return dc !== 0 ? (ac / dc) * 100 : 0;
+    return mean !== 0 ? ((max - min) / mean) * 100 : 0;
+  }
+
+  updateSettings(settings: any): void {
+    // Implementación de actualización de configuración
+    this.config = { ...this.config, ...settings };
   }
 }
-
-// Extender Math con el método mean
-declare global {
-  interface Math {
-    mean(numbers: number[]): number;
-  }
-}
-
-Math.mean = function(numbers: number[]): number {
-  return numbers.reduce((a, b) => a + b, 0) / numbers.length;
-};
