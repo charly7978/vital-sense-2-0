@@ -182,34 +182,23 @@ export class UltraAdvancedPPGProcessor {
       frameRate: 60,
       resolution: '4K',
       bitDepth: 12,
-      bufferSize: 1024
-    },
-    processing: {
-      quantum: {
-        gates: ['hadamard', 'cnot', 'phase'],
-        qubits: 16,
-        errorCorrection: true
-      },
-      filters: {
-        wavelet: {
-          type: 'symlet8',
-          levels: 8
-        },
-        kalman: {
-          processNoise: 0.01,
-          measurementNoise: 0.1
-        },
-        bandpass: {
-          lowCut: 0.5,
-          highCut: 4.0
-        }
+      bufferSize: 1024,
+      roi: {
+        width: 100,
+        height: 100
       }
     },
-    quality: {
-      thresholds: {
-        snr: 4.0,
-        stability: 0.85,
-        artifacts: 0.1
+    processing: {
+      filters: {
+        bandpass: {
+          lowCut: 0.5,  // Hz - frecuencia cardíaca mínima típica
+          highCut: 4.0  // Hz - frecuencia cardíaca máxima típica
+        }
+      },
+      quality: {
+        minIntensity: 15,
+        maxIntensity: 245,
+        minValidPixels: 100
       }
     }
   } as const;
@@ -217,120 +206,267 @@ export class UltraAdvancedPPGProcessor {
   private readonly visualizer: SignalVisualizer;
   private readonly qualityIndicator: QualityIndicator;
   private readonly signalBuffer: number[];
+  private readonly timeBuffer: number[];
+  private lastProcessedTime: number = 0;
+  private baselineValues = {
+    red: 0,
+    green: 0,
+    blue: 0
+  };
 
   constructor(signalCanvasId: string, qualityIndicatorId: string) {
     this.visualizer = new SignalVisualizer(signalCanvasId);
     this.qualityIndicator = new QualityIndicator(qualityIndicatorId);
     this.signalBuffer = new Array(this.MASTER_CONFIG.acquisition.bufferSize).fill(0);
+    this.timeBuffer = new Array(this.MASTER_CONFIG.acquisition.bufferSize).fill(0);
   }
 
   public async processFrame(frame: ImageData): Promise<ProcessedSignal> {
     try {
-      // 1. Detección de dedo
-      const fingerDetection = await this.detectFinger(frame);
+      const currentTime = Date.now();
+      const timeDelta = currentTime - this.lastProcessedTime;
+      
+      // 1. Detección de dedo y ROI
+      const fingerDetection = await this.detectFingerAndROI(frame);
       this.updateFingerStatus(fingerDetection);
 
       if (!fingerDetection.detected) {
         return { valid: false, reason: 'no_finger' };
       }
 
-      // 2. Extracción de señal
-      const rawSignal = await this.extractSignal(frame);
-      this.updateSignalBuffer(rawSignal);
+      // 2. Extracción y procesamiento de señal PPG
+      const rawSignal = this.extractPPGSignal(frame, fingerDetection.position);
+      if (!rawSignal.valid) {
+        return { valid: false, reason: 'weak_signal' };
+      }
+
+      // 3. Actualización de buffers
+      this.updateBuffers(rawSignal.value, currentTime);
       this.visualizer.drawSignal(this.signalBuffer);
 
-      // 3. Procesamiento cuántico
-      const processedSignal = await this.quantumProcess(rawSignal);
-
-      // 4. Análisis de calidad
-      const quality = this.analyzeQuality(processedSignal);
+      // 4. Análisis de calidad de señal
+      const quality = this.analyzePPGQuality(this.signalBuffer, timeDelta);
       this.qualityIndicator.updateQuality(quality);
 
+      if (quality.overall < 0.3) {
+        return { valid: false, reason: 'poor_quality' };
+      }
+
       // 5. Cálculo de métricas vitales
-      const bpm = this.calculateBPM(processedSignal);
-      const spo2 = this.calculateSpO2(processedSignal);
-      const { systolic, diastolic } = this.calculateBloodPressure(processedSignal);
-      const { hasArrhythmia, arrhythmiaType } = this.detectArrhythmia(processedSignal);
-      const readings = this.generateReadings(processedSignal);
+      const vitalSigns = this.calculateVitalSigns(this.signalBuffer, this.timeBuffer);
+      
+      this.lastProcessedTime = currentTime;
 
       return {
         valid: true,
-        signal: processedSignal,
+        signal: this.signalBuffer,
         quality,
-        timestamp: Date.now(),
-        bpm,
-        spo2,
-        systolic,
-        diastolic,
-        hasArrhythmia,
-        arrhythmiaType,
-        readings,
+        timestamp: currentTime,
+        ...vitalSigns,
+        readings: this.generateReadings(this.signalBuffer),
         signalQuality: quality.overall
       };
 
     } catch (error) {
-      console.error('Error en procesamiento:', error);
+      console.error('Error en procesamiento PPG:', error);
       this.handleError(error);
       return { valid: false, reason: 'processing_error' };
     }
   }
 
-  private async detectFinger(frame: ImageData): Promise<FingerDetection> {
-    // Simulación de detección de dedo
+  private async detectFingerAndROI(frame: ImageData): Promise<FingerDetection> {
+    const { width, height, data } = frame;
+    const centerX = Math.floor(width / 2);
+    const centerY = Math.floor(height / 2);
+    
+    // Analizar región central para detectar presencia de dedo
+    let redSum = 0;
+    let greenSum = 0;
+    let blueSum = 0;
+    let pixelCount = 0;
+    
+    const roiSize = this.MASTER_CONFIG.acquisition.roi;
+    const startX = centerX - Math.floor(roiSize.width / 2);
+    const startY = centerY - Math.floor(roiSize.height / 2);
+    
+    for (let y = startY; y < startY + roiSize.height; y++) {
+      for (let x = startX; x < startX + roiSize.width; x++) {
+        const i = (y * width + x) * 4;
+        redSum += data[i];
+        greenSum += data[i + 1];
+        blueSum += data[i + 2];
+        pixelCount++;
+      }
+    }
+
+    const avgRed = redSum / pixelCount;
+    const avgGreen = greenSum / pixelCount;
+    const avgBlue = blueSum / pixelCount;
+
+    // Criterios de detección de dedo:
+    // 1. Canal rojo debe ser dominante (característica del tejido humano)
+    // 2. Intensidad dentro de rangos válidos
+    const isFingerPresent = 
+      avgRed > this.MASTER_CONFIG.processing.quality.minIntensity &&
+      avgRed < this.MASTER_CONFIG.processing.quality.maxIntensity &&
+      avgRed > avgGreen * 1.2 && // Canal rojo debe ser significativamente mayor
+      avgRed > avgBlue * 1.2;
+
+    const confidence = isFingerPresent ? 
+      Math.min((avgRed - Math.max(avgGreen, avgBlue)) / avgRed, 1) : 0;
+
     return {
-      detected: true,
-      confidence: 0.95,
-      position: { x: frame.width / 2, y: frame.height / 2 }
+      detected: isFingerPresent,
+      confidence,
+      position: { x: centerX, y: centerY }
     };
   }
 
-  private async extractSignal(frame: ImageData): Promise<number[]> {
-    // Simulación de extracción de señal
-    return Array.from({length: 100}, () => Math.random() * 2 - 1);
-  }
+  private extractPPGSignal(frame: ImageData, position: { x: number; y: number }): { valid: boolean; value?: number } {
+    const { width, data } = frame;
+    const roiSize = this.MASTER_CONFIG.acquisition.roi;
+    let validPixels = 0;
+    let signalValue = 0;
 
-  private async quantumProcess(signal: number[]): Promise<number[]> {
-    // Simulación de procesamiento cuántico
-    return signal.map(v => v * 1.5);
-  }
+    // Extraer valores de color promedio de la ROI
+    for (let y = position.y - roiSize.height/2; y < position.y + roiSize.height/2; y++) {
+      for (let x = position.x - roiSize.width/2; x < position.x + roiSize.width/2; x++) {
+        const i = (Math.floor(y) * width + Math.floor(x)) * 4;
+        const red = data[i];
+        const green = data[i + 1];
+        const blue = data[i + 2];
 
-  private analyzeQuality(signal: number[]): SignalQuality {
-    // Simulación de análisis de calidad
-    return {
-      snr: 15 + Math.random() * 5,
-      stability: 0.8 + Math.random() * 0.2,
-      artifacts: Math.random() * 0.3,
-      overall: 0.75 + Math.random() * 0.25
+        if (red > this.MASTER_CONFIG.processing.quality.minIntensity && 
+            red < this.MASTER_CONFIG.processing.quality.maxIntensity) {
+          // Usar principalmente el canal rojo para PPG, con contribuciones menores de verde y azul
+          signalValue += (red * 0.7 + green * 0.2 + blue * 0.1);
+          validPixels++;
+        }
+      }
+    }
+
+    if (validPixels < this.MASTER_CONFIG.processing.quality.minValidPixels) {
+      return { valid: false };
+    }
+
+    // Normalizar y procesar la señal
+    const normalizedSignal = signalValue / validPixels;
+    
+    // Actualizar línea base si es necesario
+    if (this.baselineValues.red === 0) {
+      this.baselineValues.red = normalizedSignal;
+    }
+
+    // Calcular la variación respecto a la línea base
+    const signalVariation = (normalizedSignal - this.baselineValues.red) / this.baselineValues.red;
+    
+    // Actualizar línea base con una media móvil muy lenta
+    this.baselineValues.red = this.baselineValues.red * 0.95 + normalizedSignal * 0.05;
+
+    return { 
+      valid: true, 
+      value: signalVariation 
     };
   }
 
-  private calculateBPM(signal: number[]): number {
-    return 60 + Math.random() * 40; // Simulación
+  private updateBuffers(newValue: number, timestamp: number): void {
+    this.signalBuffer.push(newValue);
+    this.signalBuffer.shift();
+    this.timeBuffer.push(timestamp);
+    this.timeBuffer.shift();
   }
 
-  private calculateSpO2(signal: number[]): number {
-    return 95 + Math.random() * 5; // Simulación
-  }
+  private analyzePPGQuality(signal: number[], timeDelta: number): SignalQuality {
+    // Calcular SNR
+    const mean = signal.reduce((a, b) => a + b, 0) / signal.length;
+    const variance = signal.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / signal.length;
+    const snr = Math.abs(mean) / Math.sqrt(variance);
 
-  private calculateBloodPressure(signal: number[]): { systolic: number; diastolic: number } {
+    // Calcular estabilidad
+    const differences = signal.slice(1).map((value, index) => Math.abs(value - signal[index]));
+    const avgDifference = differences.reduce((a, b) => a + b, 0) / differences.length;
+    const stability = Math.max(0, 1 - avgDifference);
+
+    // Detectar artefactos
+    const artifacts = differences.filter(diff => diff > 3 * avgDifference).length / signal.length;
+
+    // Calcular calidad general
+    const overall = Math.min(
+      Math.max(0, snr / 10),
+      stability,
+      1 - artifacts
+    );
+
     return {
-      systolic: 120 + Math.random() * 20,
-      diastolic: 80 + Math.random() * 10
-    }; // Simulación
+      snr,
+      stability,
+      artifacts,
+      overall: Math.max(0.15, overall)
+    };
   }
 
-  private detectArrhythmia(signal: number[]): { hasArrhythmia: boolean; arrhythmiaType: string } {
+  private calculateVitalSigns(signal: number[], timestamps: number[]): {
+    bpm: number;
+    spo2: number;
+    systolic: number;
+    diastolic: number;
+    hasArrhythmia: boolean;
+    arrhythmiaType: string;
+  } {
+    // Detectar picos para calcular BPM
+    const peaks = this.detectPeaks(signal);
+    const intervals = peaks.slice(1).map((peak, i) => timestamps[peak] - timestamps[peaks[i]]);
+    
+    // Calcular BPM promedio
+    const avgInterval = intervals.length > 0 ? 
+      intervals.reduce((a, b) => a + b, 0) / intervals.length : 1000;
+    const bpm = Math.round(60000 / avgInterval); // Convertir ms a BPM
+
+    // Calcular variabilidad del ritmo cardíaco para detectar arritmias
+    const intervalVariability = intervals.length > 1 ?
+      Math.sqrt(intervals.reduce((a, b) => a + Math.pow(b - avgInterval, 2), 0) / intervals.length) / avgInterval : 0;
+
+    // Estimar SpO2 basado en la amplitud de la señal PPG
+    const amplitudes = peaks.map(peak => signal[peak]);
+    const avgAmplitude = amplitudes.reduce((a, b) => a + b, 0) / amplitudes.length;
+    const spo2 = Math.min(100, Math.max(90, 96 + avgAmplitude * 20));
+
+    // Estimar presión arterial basada en características de la forma de onda PPG
+    const systolic = Math.round(120 + avgAmplitude * 50);
+    const diastolic = Math.round(80 + avgAmplitude * 30);
+
     return {
-      hasArrhythmia: Math.random() > 0.9,
-      arrhythmiaType: 'Normal'
-    }; // Simulación
+      bpm: Math.max(40, Math.min(220, bpm)), // Limitar a rangos fisiológicos
+      spo2: Math.round(spo2),
+      systolic,
+      diastolic,
+      hasArrhythmia: intervalVariability > 0.2,
+      arrhythmiaType: intervalVariability > 0.2 ? 'Irregular' : 'Normal'
+    };
+  }
+
+  private detectPeaks(signal: number[]): number[] {
+    const peaks: number[] = [];
+    const windowSize = 10;
+    
+    for (let i = windowSize; i < signal.length - windowSize; i++) {
+      const window = signal.slice(i - windowSize, i + windowSize + 1);
+      const max = Math.max(...window);
+      
+      if (signal[i] === max && signal[i] > 0) {
+        peaks.push(i);
+      }
+    }
+    
+    return peaks;
   }
 
   private generateReadings(signal: number[]): VitalReading[] {
+    const currentTime = Date.now();
     return signal.map((value, index) => ({
-      timestamp: Date.now() + index * 1000,
-      value: value,
-      bpm: this.calculateBPM([value])
+      timestamp: currentTime + index * (1000 / this.MASTER_CONFIG.acquisition.frameRate),
+      value,
+      bpm: this.calculateVitalSigns([value], [currentTime]).bpm
     }));
   }
 
