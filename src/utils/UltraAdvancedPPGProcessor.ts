@@ -1,4 +1,3 @@
-
 import { CircularBuffer } from './circularBuffer';
 import { 
   ProcessedPPGSignal, 
@@ -14,6 +13,7 @@ import {
   SensitivitySettings,
   VitalReading
 } from './types';
+import { QuantumHeartbeatDetector } from './QuantumHeartbeatDetector';
 
 export class UltraAdvancedPPGProcessor {
   private readonly MASTER_CONFIG = {
@@ -50,7 +50,10 @@ export class UltraAdvancedPPGProcessor {
     alerts: AlertManager;
   };
 
+  private readonly heartbeatDetector: QuantumHeartbeatDetector;
+  
   constructor() {
+    this.heartbeatDetector = new QuantumHeartbeatDetector();
     this.feedbackSystem = {
       display: new DisplayManager({
         refreshRate: 60,
@@ -75,15 +78,13 @@ export class UltraAdvancedPPGProcessor {
     };
   }
 
-  async processFrame(frame: ImageData): Promise<ProcessedPPGSignal> {
+  async processFrame(imageData: ImageData): Promise<ProcessedPPGSignal> {
     try {
-      console.log('Procesando frame...');
-      
-      // Extraer señal PPG del frame
-      const redChannel = this.extractRedChannel(frame);
+      // Extraer señal del frame
+      const { red: rawRed, quality } = this.extractSignal(imageData);
       
       // Almacenar en buffer raw
-      redChannel.forEach(value => this.buffers.raw.push(value));
+      this.buffers.raw.push(rawRed);
       
       // Procesar señal
       const rawData = this.buffers.raw.getData();
@@ -112,8 +113,16 @@ export class UltraAdvancedPPGProcessor {
         perfusionIndex: this.calculatePerfusionIndexSafe(signalForAnalysis)
       };
 
+      // Añadir muestra al detector cuántico
+      this.heartbeatDetector.addSample(rawRed, quality);
+      
+      // Detectar latido
+      const isHeartbeat = this.heartbeatDetector.detectHeartbeat();
+      
+      // Si se detectó un latido, actualizar BPM
+      const bpm = this.heartbeatDetector.getCurrentBPM();
+
       // Cálculos vitales
-      const bpm = frequency * 60;
       console.log('BPM calculado:', bpm);
       
       const spo2 = signalQuality > 0.6 ? Math.round(95 + (signalQuality * 4)) : 0;
@@ -152,6 +161,18 @@ export class UltraAdvancedPPGProcessor {
       console.error('Error en procesamiento:', error);
       throw error;
     }
+  }
+
+  private extractSignal(frame: ImageData): { red: number, quality: number } {
+    const redValues = [];
+    for (let i = 0; i < frame.data.length; i += 4) {
+      redValues.push(frame.data[i]);
+    }
+    
+    const red = redValues.reduce((a, b) => a + b, 0) / redValues.length;
+    const quality = this.calculateSignalQuality(redValues);
+    
+    return { red, quality };
   }
 
   private extractRedChannel(frame: ImageData): number[] {

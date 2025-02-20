@@ -1,3 +1,4 @@
+
 export class BeepPlayer {
   private audioContext: AudioContext | null = null;
   private lastBeepTime: number = 0;
@@ -48,22 +49,22 @@ export class BeepPlayer {
       gainNode1.connect(this.audioContext.destination);
       gainNode2.connect(this.audioContext.destination);
 
-      // Configurar frecuencias para simular "lub-dub"
-      oscillator1.frequency.setValueAtTime(80, currentTime); // Frecuencia más baja para "lub"
-      oscillator2.frequency.setValueAtTime(60, currentTime); // Frecuencia aún más baja para "dub"
+      // Configurar frecuencias más bajas para un sonido más realista
+      oscillator1.frequency.setValueAtTime(65, currentTime); // Frecuencia más baja para "lub"
+      oscillator2.frequency.setValueAtTime(45, currentTime); // Frecuencia aún más baja para "dub"
 
-      // Volumen base ajustado
-      const baseVolume = Math.min(0.15 * volumeMultiplier, 0.3);
+      // Volumen base aumentado significativamente
+      const baseVolume = Math.min(0.75 * volumeMultiplier, 1.0);
 
-      // Primer sonido (lub)
+      // Primer sonido (lub) más fuerte
       gainNode1.gain.setValueAtTime(0, currentTime);
       gainNode1.gain.linearRampToValueAtTime(baseVolume, currentTime + 0.01);
-      gainNode1.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.1);
+      gainNode1.gain.exponentialRampToValueAtTime(0.01, currentTime + 0.1);
 
-      // Segundo sonido (dub)
+      // Segundo sonido (dub) proporcionalmente más fuerte
       gainNode2.gain.setValueAtTime(0, currentTime + 0.05);
-      gainNode2.gain.linearRampToValueAtTime(baseVolume * 0.8, currentTime + 0.06);
-      gainNode2.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.15);
+      gainNode2.gain.linearRampToValueAtTime(baseVolume * 0.85, currentTime + 0.06);
+      gainNode2.gain.exponentialRampToValueAtTime(0.01, currentTime + 0.15);
 
       // Iniciar y detener los osciladores
       oscillator1.start(currentTime);
