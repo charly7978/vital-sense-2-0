@@ -1,10 +1,9 @@
-
 import { CircularBuffer } from './circularBuffer';
 import { SpectralAnalyzer } from './spectralAnalyzer';
 import { QualityAnalyzer } from './qualityAnalyzer';
 import { LowLightEnhancer } from './lowLightEnhancer';
 import { 
-  ProcessedSignal, 
+  ProcessedPPGSignal, 
   SignalQuality, 
   SignalFeatures,
   DisplayConfig,
@@ -13,7 +12,8 @@ import {
   Alert,
   SignalData,
   QualityMetrics,
-  QualityIndicators
+  QualityIndicators,
+  SensitivitySettings
 } from './types';
 
 export class UltraAdvancedPPGProcessor {
@@ -27,6 +27,17 @@ export class UltraAdvancedPPGProcessor {
       }
     }
   } as const;
+
+  private sensitivitySettings: SensitivitySettings = {
+    signalAmplification: 1.5,
+    noiseReduction: 1.2,
+    peakDetection: 1.3,
+    heartbeatThreshold: 0.5,
+    responseTime: 1.0,
+    signalStability: 0.5,
+    brightness: 1.0,
+    redIntensity: 1.0
+  };
 
   // SISTEMAS PRINCIPALES
   private readonly systems = {
@@ -67,7 +78,18 @@ export class UltraAdvancedPPGProcessor {
     };
   }
 
-  async processFrame(frame: ImageData): Promise<ProcessedSignal> {
+  updateSensitivitySettings(settings: SensitivitySettings): void {
+    this.sensitivitySettings = {
+      ...this.sensitivitySettings,
+      ...settings
+    };
+    // Actualizar configuraciones en subsistemas
+    this.systems.spectral.updateSettings(this.sensitivitySettings);
+    this.systems.lowLight.updateSettings(this.sensitivitySettings);
+    this.systems.quality.updateSettings(this.sensitivitySettings);
+  }
+
+  async processFrame(frame: ImageData): Promise<ProcessedPPGSignal> {
     try {
       // Análisis espectral
       const spectralData = await this.systems.spectral.analyze(frame, {});
@@ -84,11 +106,19 @@ export class UltraAdvancedPPGProcessor {
       await this.updateFeedback(spectralData.signal, quality);
 
       return {
-        value: spectralData.signal,
+        signal: spectralData.signal,
         quality,
         features: spectralData.features,
         confidence: quality.overall,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        bpm: 0,
+        spo2: 0,
+        systolic: 0,
+        diastolic: 0,
+        hasArrhythmia: false,
+        arrhythmiaType: '',
+        readings: [],
+        signalQuality: quality.overall
       };
     } catch (error) {
       console.error('Error en procesamiento:', error);
@@ -127,7 +157,8 @@ export class UltraAdvancedPPGProcessor {
         type: 'quality',
         message: 'Calidad de señal baja',
         suggestion: 'Ajuste la posición del dedo',
-        priority: 'high'
+        priority: 'high',
+        timestamp: Date.now()
       });
     }
   }

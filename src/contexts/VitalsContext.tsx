@@ -75,7 +75,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       // Actualizar lecturas en tiempo real
       const newReading: VitalReading = {
         timestamp: processedSignal.timestamp,
-        value: processedSignal.value[processedSignal.value.length - 1] || 0
+        value: processedSignal.signal[processedSignal.signal.length - 1] || 0
       };
 
       setReadings(prev => [...prev.slice(-100), newReading]);

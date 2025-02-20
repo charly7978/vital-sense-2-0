@@ -174,6 +174,7 @@ export interface Alert {
   message: string;
   suggestion?: string;
   priority: 'low' | 'medium' | 'high';
+  timestamp?: number;
 }
 
 export interface SignalData {
