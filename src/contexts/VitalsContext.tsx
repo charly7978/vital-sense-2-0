@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { BeepPlayer } from '../utils/audioUtils';
 import { UltraAdvancedPPGProcessor } from '../utils/UltraAdvancedPPGProcessor';
@@ -27,6 +28,7 @@ const VitalsContext = createContext<VitalsContextType | undefined>(undefined);
 
 const beepPlayer = new BeepPlayer();
 const ppgProcessor = new UltraAdvancedPPGProcessor();
+const MEASUREMENT_DURATION = 30; // Duración de la medición en segundos
 
 export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [bpm, setBpm] = useState<number>(0);
@@ -114,19 +116,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
     }
   }, [isStarted, toast]);
-
-  const calculateHeartRateVariability = (peaks: number[]): number => {
-    if (peaks.length < 2) return 0;
-    
-    const intervals = [];
-    for (let i = 1; i < peaks.length; i++) {
-      intervals.push(peaks[i] - peaks[i-1]);
-    }
-    
-    const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-    const variance = intervals.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / intervals.length;
-    return Math.sqrt(variance) / mean; // Coeficiente de variación
-  };
 
   const resetMeasurements = useCallback(() => {
     setBpm(0);
