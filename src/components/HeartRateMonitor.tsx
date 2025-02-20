@@ -96,7 +96,26 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
 
           {/* Vista de Calibración */}
           <div className={`absolute inset-0 transition-transform duration-500 ${currentView === 'calibration' ? 'translate-x-0' : 'translate-x-full'}`}>
-            <div className="h-full w-full p-3 pb-32">
+            <div className="h-full w-full p-3">
+              {/* Controles de vista movidos arriba */}
+              <div className="flex gap-2 justify-center mb-4 sticky top-0 z-30">
+                <Button
+                  variant={currentView === 'monitor' ? 'default' : 'secondary'}
+                  className="h-8 flex-1 max-w-32 text-sm"
+                  onClick={() => setCurrentView('monitor')}
+                >
+                  Monitor
+                </Button>
+                <Button
+                  variant={currentView === 'calibration' ? 'default' : 'secondary'}
+                  className="h-8 flex-1 max-w-32 gap-2 text-sm"
+                  onClick={() => setCurrentView('calibration')}
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                  Calibración
+                </Button>
+              </div>
+
               <CalibrationPanel 
                 settings={sensitivitySettings}
                 onUpdateSettings={updateSensitivitySettings}
@@ -106,24 +125,6 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
 
           {/* Controles fijos en la parte inferior */}
           <div className="absolute bottom-6 left-0 right-0 px-4 z-30">
-            <div className="flex gap-2 justify-center mb-4">
-              <Button
-                variant={currentView === 'monitor' ? 'default' : 'secondary'}
-                className="h-8 flex-1 max-w-32 text-sm"
-                onClick={() => setCurrentView('monitor')}
-              >
-                Monitor
-              </Button>
-              <Button
-                variant={currentView === 'calibration' ? 'default' : 'secondary'}
-                className="h-8 flex-1 max-w-32 gap-2 text-sm"
-                onClick={() => setCurrentView('calibration')}
-              >
-                <Settings className="w-3.5 h-3.5" />
-                Calibración
-              </Button>
-            </div>
-
             <div className="flex flex-col gap-2 items-center">
               <MeasurementControls
                 isStarted={isStarted}
