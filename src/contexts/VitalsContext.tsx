@@ -28,7 +28,7 @@ const VitalsContext = createContext<VitalsContextType | undefined>(undefined);
 
 const beepPlayer = new BeepPlayer();
 const ppgProcessor = new UltraAdvancedPPGProcessor();
-const MEASUREMENT_DURATION = 30; // Duración de la medición en segundos
+const MEASUREMENT_DURATION = 30; // Duration of measurement in seconds
 
 export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [bpm, setBpm] = useState<number>(0);
