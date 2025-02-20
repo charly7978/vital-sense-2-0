@@ -27,29 +27,38 @@ export class UltraAdvancedPPGProcessor {
   async processFrame(imageData: ImageData): Promise<ProcessedPPGSignal> {
     try {
       // Extraer señal del frame y normalizar
-      const { red, quality } = this.extractSignal(imageData);
+      const { red, quality, validPixels, totalPixels } = this.extractSignal(imageData);
       
+      // Si no hay suficientes píxeles válidos, la señal es inválida
+      if (validPixels / totalPixels < 0.1) {
+        console.log('❌ Señal insuficiente:', {
+          pixelesValidos: validPixels,
+          pixelesTotales: totalPixels,
+          ratio: validPixels / totalPixels
+        });
+        return this.createInvalidSignalResponse();
+      }
+
       // Aplicar amplificación de señal basada en la configuración
       const amplifiedRed = red * this.sensitivitySettings.signalAmplification;
       
-      // Detectar latido usando el detector cuántico con umbral ajustado
-      const isHeartbeat = this.heartbeatDetector.addSample(
-        amplifiedRed, 
-        quality * this.sensitivitySettings.signalStability
-      );
+      // Detectar latido usando el detector cuántico
+      const isHeartbeat = this.heartbeatDetector.addSample(amplifiedRed, quality);
       
       // Obtener BPM actual
       const bpm = this.heartbeatDetector.getCurrentBPM();
 
-      // Calcular SpO2 basado en la calidad de la señal
-      const spo2 = this.calculateSpO2(quality, amplifiedRed);
-
-      // Calcular presión arterial basada en la señal
-      const { systolic, diastolic } = this.calculateBloodPressure(amplifiedRed, quality);
+      // Solo calcular SpO2 y presión si tenemos una señal mínimamente válida
+      const signalQuality = quality * (bpm > 0 ? 1 : 0.5); // Penalizar si no hay latidos
+      const spo2 = signalQuality > 0.6 ? this.calculateSpO2(signalQuality, amplifiedRed) : 0;
+      const { systolic, diastolic } = signalQuality > 0.7 ? 
+        this.calculateBloodPressure(amplifiedRed, signalQuality) : 
+        { systolic: 0, diastolic: 0 };
 
       console.log('📊 Procesamiento de frame:', {
         valorRojo: amplifiedRed,
-        calidadSeñal: quality,
+        calidadSeñal: signalQuality,
+        pixelesValidos: validPixels,
         esLatido: isHeartbeat,
         bpm: bpm,
         configuracion: this.sensitivitySettings
@@ -57,7 +66,7 @@ export class UltraAdvancedPPGProcessor {
 
       return {
         signal: [amplifiedRed],
-        quality: quality,
+        quality: signalQuality,
         isHeartbeat: isHeartbeat,
         bpm: bpm,
         timestamp: Date.now(),
@@ -70,80 +79,129 @@ export class UltraAdvancedPPGProcessor {
           timestamp: Date.now(),
           value: amplifiedRed
         }],
-        signalQuality: quality
+        signalQuality: signalQuality
       };
     } catch (error) {
       console.error('Error procesando frame:', error);
-      throw error;
+      return this.createInvalidSignalResponse();
     }
   }
 
-  private extractSignal(imageData: ImageData): { red: number; quality: number } {
+  private createInvalidSignalResponse(): ProcessedPPGSignal {
+    return {
+      signal: [0],
+      quality: 0,
+      isHeartbeat: false,
+      bpm: 0,
+      timestamp: Date.now(),
+      spo2: 0,
+      systolic: 0,
+      diastolic: 0,
+      hasArrhythmia: false,
+      arrhythmiaType: 'Normal',
+      readings: [{
+        timestamp: Date.now(),
+        value: 0
+      }],
+      signalQuality: 0
+    };
+  }
+
+  private extractSignal(imageData: ImageData): { 
+    red: number; 
+    quality: number; 
+    validPixels: number;
+    totalPixels: number;
+  } {
     const { data, width, height } = imageData;
     let redSum = 0;
     let validPixels = 0;
     let maxRed = 0;
     let minRed = 255;
 
-    // Analizar región central de la imagen (más pequeña para mejor precisión)
+    // Analizar región central de la imagen
     const centerX = Math.floor(width / 2);
     const centerY = Math.floor(height / 2);
-    const regionSize = Math.floor(Math.min(width, height) * 0.2); // Reducido a 20% para mejor enfoque
+    const regionSize = Math.floor(Math.min(width, height) * 0.15); // Región más pequeña para mayor precisión
 
-    for (let y = centerY - regionSize; y < centerY + regionSize; y++) {
-      for (let x = centerX - regionSize; x < centerX + regionSize; x++) {
+    // Calcular límites de la región
+    const startY = Math.max(0, centerY - regionSize);
+    const endY = Math.min(height, centerY + regionSize);
+    const startX = Math.max(0, centerX - regionSize);
+    const endX = Math.min(width, centerX + regionSize);
+    const totalPixels = (endX - startX) * (endY - startY);
+
+    for (let y = startY; y < endY; y++) {
+      for (let x = startX; x < endX; x++) {
         const i = (y * width + x) * 4;
-        if (i >= 0 && i < data.length) {
-          const red = data[i];
-          if (red > 50 && red < 240) { // Ajustado rango válido
-            redSum += red;
-            validPixels++;
-            maxRed = Math.max(maxRed, red);
-            minRed = Math.min(minRed, red);
-          }
+        const red = data[i];
+        // Solo considerar píxeles con suficiente intensidad roja y no saturados
+        if (red > 60 && red < 230) {
+          redSum += red;
+          validPixels++;
+          maxRed = Math.max(maxRed, red);
+          minRed = Math.min(minRed, red);
         }
       }
     }
 
     if (validPixels === 0) {
-      return { red: 0, quality: 0 };
+      return { red: 0, quality: 0, validPixels: 0, totalPixels };
     }
 
     const avgRed = redSum / validPixels;
-    const quality = this.calculateSignalQuality(avgRed, maxRed, minRed, validPixels);
-
-    // Aplicar ajustes de brillo y intensidad del rojo
+    const quality = this.calculateSignalQuality(avgRed, maxRed, minRed, validPixels, totalPixels);
     const adjustedRed = avgRed * this.sensitivitySettings.brightness * this.sensitivitySettings.redIntensity;
 
     return {
       red: adjustedRed,
-      quality: Math.min(1, quality * this.sensitivitySettings.signalStability * 1.2) // Aumentado factor de calidad
+      quality: quality,
+      validPixels,
+      totalPixels
     };
   }
 
-  private calculateSignalQuality(avgRed: number, maxRed: number, minRed: number, validPixels: number): number {
-    // Calcular calidad basada en varios factores
+  private calculateSignalQuality(
+    avgRed: number, 
+    maxRed: number, 
+    minRed: number, 
+    validPixels: number,
+    totalPixels: number
+  ): number {
+    // Evaluar la amplitud de la señal (diferencia entre máximo y mínimo)
     const amplitude = maxRed - minRed;
-    const amplitudeQuality = Math.min(1, amplitude / 40); // Ajustado para ser más sensible
-    const coverageQuality = Math.min(1, validPixels / 800);
-    const intensityQuality = Math.min(1, (avgRed - 50) / 150);
+    const amplitudeQuality = Math.min(1, amplitude / 30); // Más sensible a cambios pequeños
 
-    // Aplicar factor de reducción de ruido
-    const baseQuality = (amplitudeQuality + coverageQuality + intensityQuality) / 3;
-    return Math.min(1, baseQuality * this.sensitivitySettings.noiseReduction);
+    // Evaluar cobertura de píxeles válidos
+    const coverageQuality = validPixels / totalPixels;
+
+    // Evaluar intensidad media (debe estar en un rango óptimo)
+    const optimalRedMean = 150; // Valor óptimo esperado
+    const intensityQuality = 1 - Math.min(1, Math.abs(avgRed - optimalRedMean) / optimalRedMean);
+
+    // Calcular calidad final considerando todos los factores
+    const rawQuality = (
+      amplitudeQuality * 0.5 + // La amplitud es el factor más importante
+      coverageQuality * 0.3 + // La cobertura es el segundo factor más importante
+      intensityQuality * 0.2   // La intensidad es el factor menos importante
+    );
+
+    // Aplicar reducción de ruido y normalizar
+    return Math.min(1, rawQuality * this.sensitivitySettings.noiseReduction);
   }
 
   private calculateSpO2(quality: number, signal: number): number {
-    if (quality < 0.4) return 0;
-    // Simulación mejorada de SpO2
+    // Solo calcular SpO2 si la calidad es suficiente
+    if (quality < 0.6) return 0;
+    
     const baseSpO2 = 95 + (quality * 4);
     return Math.min(100, Math.max(80, Math.round(baseSpO2 + (signal * 0.01))));
   }
 
   private calculateBloodPressure(signal: number, quality: number): { systolic: number; diastolic: number } {
-    if (quality < 0.4) return { systolic: 0, diastolic: 0 };
+    // Solo calcular presión si la calidad es suficiente
+    if (quality < 0.7) return { systolic: 0, diastolic: 0 };
     
-    // Simulación mejorada de presión arterial
     const baseSystolic = 120 + (signal * 0.2);
     const baseDiastolic = 80 + (signal * 0.1);
 
