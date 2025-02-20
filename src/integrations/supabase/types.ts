@@ -71,6 +71,162 @@ export type Database = {
         }
         Relationships: []
       }
+      backup_calibration_reference_data_2024: {
+        Row: {
+          calibration_accuracy: number | null
+          calibration_constants: Json | null
+          created_at: string | null
+          device_specs: Json | null
+          device_type: string | null
+          id: string | null
+          is_active: boolean | null
+          light_conditions: Json | null
+          ppg_calibration_data: Json | null
+          reference_measurements: Json | null
+          user_id: string | null
+        }
+        Insert: {
+          calibration_accuracy?: number | null
+          calibration_constants?: Json | null
+          created_at?: string | null
+          device_specs?: Json | null
+          device_type?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          light_conditions?: Json | null
+          ppg_calibration_data?: Json | null
+          reference_measurements?: Json | null
+          user_id?: string | null
+        }
+        Update: {
+          calibration_accuracy?: number | null
+          calibration_constants?: Json | null
+          created_at?: string | null
+          device_specs?: Json | null
+          device_type?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          light_conditions?: Json | null
+          ppg_calibration_data?: Json | null
+          reference_measurements?: Json | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      backup_measurement_signals_2024: {
+        Row: {
+          id: string | null
+          measurement_id: string | null
+          noise_levels: number[] | null
+          processed_at: string | null
+          processing_metadata: Json | null
+          sampling_frequency: number | null
+          signal_data: number[] | null
+          signal_quality_metrics: Json | null
+          signal_type: string | null
+        }
+        Insert: {
+          id?: string | null
+          measurement_id?: string | null
+          noise_levels?: number[] | null
+          processed_at?: string | null
+          processing_metadata?: Json | null
+          sampling_frequency?: number | null
+          signal_data?: number[] | null
+          signal_quality_metrics?: Json | null
+          signal_type?: string | null
+        }
+        Update: {
+          id?: string | null
+          measurement_id?: string | null
+          noise_levels?: number[] | null
+          processed_at?: string | null
+          processing_metadata?: Json | null
+          sampling_frequency?: number | null
+          signal_data?: number[] | null
+          signal_quality_metrics?: Json | null
+          signal_type?: string | null
+        }
+        Relationships: []
+      }
+      backup_medical_device_calibration_2024: {
+        Row: {
+          calibration_date: string | null
+          calibration_values: Json | null
+          created_at: string | null
+          device_type: string | null
+          environmental_data: Json | null
+          id: string | null
+          is_active: boolean | null
+          reference_device: Json | null
+          user_id: string | null
+          validation_results: Json | null
+        }
+        Insert: {
+          calibration_date?: string | null
+          calibration_values?: Json | null
+          created_at?: string | null
+          device_type?: string | null
+          environmental_data?: Json | null
+          id?: string | null
+          is_active?: boolean | null
+          reference_device?: Json | null
+          user_id?: string | null
+          validation_results?: Json | null
+        }
+        Update: {
+          calibration_date?: string | null
+          calibration_values?: Json | null
+          created_at?: string | null
+          device_type?: string | null
+          environmental_data?: Json | null
+          id?: string | null
+          is_active?: boolean | null
+          reference_device?: Json | null
+          user_id?: string | null
+          validation_results?: Json | null
+        }
+        Relationships: []
+      }
+      backup_ppg_signals_2024: {
+        Row: {
+          created_at: string | null
+          environmental_conditions: Json | null
+          filtered_signal: number[] | null
+          id: string | null
+          measurement_id: string | null
+          peak_locations: number[] | null
+          raw_signal: number[] | null
+          sampling_rate: number | null
+          signal_quality_metrics: Json | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          environmental_conditions?: Json | null
+          filtered_signal?: number[] | null
+          id?: string | null
+          measurement_id?: string | null
+          peak_locations?: number[] | null
+          raw_signal?: number[] | null
+          sampling_rate?: number | null
+          signal_quality_metrics?: Json | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          environmental_conditions?: Json | null
+          filtered_signal?: number[] | null
+          id?: string | null
+          measurement_id?: string | null
+          peak_locations?: number[] | null
+          raw_signal?: number[] | null
+          sampling_rate?: number | null
+          signal_quality_metrics?: Json | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       calibration_history: {
         Row: {
           calibration_id: string | null
