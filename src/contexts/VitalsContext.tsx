@@ -75,39 +75,33 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       // Actualizar lecturas en tiempo real
       const newReading: VitalReading = {
         timestamp: processedSignal.timestamp,
-        value: processedSignal.signal[processedSignal.signal.length - 1] || 0
+        value: processedSignal.signal[0] || 0
       };
 
       setReadings(prev => [...prev.slice(-100), newReading]);
       
       // Actualizar métricas vitales
-      if (processedSignal.features) {
-        const calculatedBPM = processedSignal.features.frequency * 60;
-        if (calculatedBPM > 40 && calculatedBPM < 200) {
-          setBpm(Math.round(calculatedBPM));
-        }
+      if (processedSignal.bpm > 40 && processedSignal.bpm < 200) {
+        setBpm(Math.round(processedSignal.bpm));
+      }
 
-        // Actualizar SpO2 basado en la calidad de la señal
-        if (processedSignal.quality.overall > 0.6) {
-          setSpo2(Math.round(95 + (processedSignal.quality.overall * 4)));
-        }
+      // Actualizar SpO2
+      if (processedSignal.spo2 > 0) {
+        setSpo2(processedSignal.spo2);
+      }
 
-        // Actualizar presión arterial
-        if (processedSignal.quality.overall > 0.7) {
-          setSystolic(Math.round(120 + (processedSignal.features.amplitude * 10)));
-          setDiastolic(Math.round(80 + (processedSignal.features.amplitude * 5)));
-        }
+      // Actualizar presión arterial
+      if (processedSignal.systolic > 0 && processedSignal.diastolic > 0) {
+        setSystolic(processedSignal.systolic);
+        setDiastolic(processedSignal.diastolic);
       }
 
       // Actualizar calidad de la señal
-      setMeasurementQuality(processedSignal.quality.overall);
+      setMeasurementQuality(processedSignal.signalQuality);
 
-      // Detección de arritmias
-      if (processedSignal.features && processedSignal.features.peaks) {
-        const variability = calculateHeartRateVariability(processedSignal.features.peaks);
-        setHasArrhythmia(variability > 0.2);
-        setArrhythmiaType(variability > 0.2 ? 'Irregular' : 'Normal');
-      }
+      // Actualizar estado de arritmia
+      setHasArrhythmia(processedSignal.hasArrhythmia);
+      setArrhythmiaType(processedSignal.arrhythmiaType);
 
       setIsProcessing(false);
     } catch (error) {

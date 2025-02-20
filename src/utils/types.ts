@@ -139,11 +139,19 @@ export interface Channels {
 }
 
 export interface ProcessedPPGSignal {
-  signal: ValidatedSignal;
+  signal: number[];
   quality: number;
   features: SignalFeatures;
   confidence: number;
   timestamp: number;
+  bpm: number;
+  spo2: number;
+  systolic: number;
+  diastolic: number;
+  hasArrhythmia: boolean;
+  arrhythmiaType: string;
+  readings: VitalReading[];
+  signalQuality: number;
 }
 
 export class ProcessingError extends Error {
