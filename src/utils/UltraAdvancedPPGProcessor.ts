@@ -48,9 +48,30 @@ export class UltraAdvancedPPGProcessor {
     try {
       // Extraer datos del canal rojo
       const redChannel = new Float32Array(frame.width * frame.height);
+      let totalIntensity = 0;
+      let validPixels = 0;
+      
       for (let i = 0, j = 0; i < frame.data.length; i += 4, j++) {
-        redChannel[j] = frame.data[i];
+        const red = frame.data[i];
+        redChannel[j] = red;
+        if (red > 50) { // Umbral mínimo de intensidad
+          totalIntensity += red;
+          validPixels++;
+        }
       }
+
+      // Calcular calidad basada en la cantidad de píxeles válidos y su intensidad
+      const coverage = validPixels / (frame.width * frame.height);
+      const averageIntensity = validPixels > 0 ? totalIntensity / validPixels : 0;
+      const normalizedIntensity = Math.min(1, averageIntensity / 255);
+      
+      // Calcular calidad final
+      const signalQuality = this.calculateSignalQuality({
+        coverage,
+        normalizedIntensity,
+        stability: this.sensitivitySettings.signalStability,
+        noise: this.sensitivitySettings.noiseReduction
+      });
 
       // Aplicar configuraciones de sensibilidad
       const processedSignal = this.applySettings(redChannel);
@@ -60,7 +81,6 @@ export class UltraAdvancedPPGProcessor {
       const spo2 = this.calculateSpO2(processedSignal);
       const { systolic, diastolic } = this.calculateBloodPressure(processedSignal);
       const { hasArrhythmia, arrhythmiaType } = this.detectArrhythmia(processedSignal);
-      const signalQuality = this.calculateSignalQuality(processedSignal);
 
       return {
         signal: Array.from(processedSignal),
@@ -69,8 +89,8 @@ export class UltraAdvancedPPGProcessor {
           peaks: [],
           valleys: [],
           frequency: bpm / 60,
-          amplitude: 1.0,
-          perfusionIndex: 1.0
+          amplitude: normalizedIntensity,
+          perfusionIndex: coverage
         },
         confidence: signalQuality,
         timestamp: Date.now(),
@@ -100,6 +120,33 @@ export class UltraAdvancedPPGProcessor {
     );
   }
 
+  private calculateSignalQuality(metrics: {
+    coverage: number;
+    normalizedIntensity: number;
+    stability: number;
+    noise: number;
+  }): number {
+    const { coverage, normalizedIntensity, stability, noise } = metrics;
+    
+    // Pesos para cada métrica
+    const weights = {
+      coverage: 0.4,
+      intensity: 0.3,
+      stability: 0.2,
+      noise: 0.1
+    };
+
+    // Calcular calidad ponderada
+    const quality = 
+      (coverage * weights.coverage) +
+      (normalizedIntensity * weights.intensity) +
+      (stability * weights.stability) +
+      (noise * weights.noise);
+
+    // Normalizar entre 0 y 1
+    return Math.min(1, Math.max(0, quality));
+  }
+
   private calculateBPM(signal: Float32Array): number {
     return 60 + Math.random() * 40;
   }
@@ -120,9 +167,5 @@ export class UltraAdvancedPPGProcessor {
       hasArrhythmia: Math.random() > 0.9,
       arrhythmiaType: 'Normal'
     };
-  }
-
-  private calculateSignalQuality(signal: Float32Array): number {
-    return Math.min(1, Math.max(0.1, 0.7 + Math.random() * 0.3));
   }
 }

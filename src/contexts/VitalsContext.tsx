@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { BeepPlayer } from '../utils/audioUtils';
 import { UltraAdvancedPPGProcessor } from '../utils/UltraAdvancedPPGProcessor';
@@ -59,6 +60,12 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const { toast } = useToast();
 
+  // Actualización de configuraciones de sensibilidad
+  const updateSensitivitySettings = useCallback((settings: SensitivitySettings) => {
+    setSensitivitySettings(settings);
+    ppgProcessor.updateSensitivitySettings(settings);
+  }, []);
+
   const processFrame = useCallback(async (imageData: ImageData) => {
     if (!isStarted) return;
 
@@ -97,11 +104,21 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
 
       // Actualizar calidad de la señal
-      setMeasurementQuality(processedSignal.signalQuality);
+      const quality = Math.min(1, Math.max(0, processedSignal.quality));
+      setMeasurementQuality(quality);
 
       // Actualizar estado de arritmia
       setHasArrhythmia(processedSignal.hasArrhythmia);
       setArrhythmiaType(processedSignal.arrhythmiaType);
+
+      // Mostrar feedback de calidad si es muy baja
+      if (quality < 0.3 && isStarted) {
+        toast({
+          title: "Calidad de señal baja",
+          description: "Por favor, ajuste la posición de su dedo",
+          variant: "warning"
+        });
+      }
 
       setIsProcessing(false);
     } catch (error) {
