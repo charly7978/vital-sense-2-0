@@ -1,10 +1,11 @@
+
 import { QuantumProcessor } from './quantumProcessor';
 import { SpectralAnalyzer } from './spectralAnalyzer';
 import { WaveletTransform, UnscentedKalmanFilter, QuantumICA } from './signalProcessors';
 import { LowLightEnhancer } from './lowLightEnhancer';
 import { QualityAnalyzer } from './qualityAnalyzer';
 import { CircularBuffer } from './circularBuffer';
-import type { 
+import { 
   ProcessedPPGSignal, 
   RawSignal, 
   QuantumSignal,
