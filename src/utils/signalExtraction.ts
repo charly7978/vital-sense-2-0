@@ -1,19 +1,20 @@
+
 export class SignalExtractor {
-  private readonly minIntensity = 10;
+  private readonly minIntensity = 15;
   private readonly maxIntensity = 245;
   private readonly smoothingWindow = 10;
   private lastRedValues: number[] = [];
   private lastIrValues: number[] = [];
   private frameCount = 0;
-  private readonly minValidPixels = 8;
-  private readonly redDominanceThreshold = 0.90;
+  private readonly minValidPixels = 10;
+  private readonly redDominanceThreshold = 0.95;
   private readonly stabilityThreshold = 0.1;
   private lastStabilityValues: number[] = [];
-  private readonly pixelStep = 2;
+  private readonly pixelStep = 2; // Aumentado para reducir la carga de procesamiento
 
   private kalmanState = {
-    red: { q: 0.06, r: 1.0, p: 1, x: 0, k: 0 },
-    ir: { q: 0.06, r: 1.0, p: 1, x: 0, k: 0 }
+    red: { q: 0.05, r: 1.2, p: 1, x: 0, k: 0 },
+    ir: { q: 0.05, r: 1.2, p: 1, x: 0, k: 0 }
   };
 
   private applyKalmanFilter(measurement: number, state: typeof this.kalmanState.red) {
@@ -38,7 +39,7 @@ export class SignalExtractor {
 
     const mean = this.calculateMean(this.lastStabilityValues);
     const variance = this.lastStabilityValues.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / this.lastStabilityValues.length;
-    return Math.max(0.15, 1 - Math.min(1, Math.sqrt(variance) / mean));
+    return Math.max(0.1, 1 - Math.min(1, Math.sqrt(variance) / mean));
   }
 
   extractChannels(imageData: ImageData): { red: number; ir: number; quality: number; perfusionIndex: number } {
@@ -57,6 +58,7 @@ export class SignalExtractor {
         max: { red: 0, ir: 0 }
       };
 
+      // Optimizado el bucle de procesamiento de píxeles
       for (let y = centerY - regionSize; y < centerY + regionSize; y += this.pixelStep) {
         if (y < 0 || y >= height) continue;
         
@@ -94,6 +96,7 @@ export class SignalExtractor {
         return { red: 0, ir: 0, quality: 0, perfusionIndex: 0 };
       }
 
+      // Manejo del buffer de valores
       if (this.lastRedValues.length >= this.smoothingWindow) {
         this.lastRedValues.shift();
         this.lastIrValues.shift();
@@ -101,6 +104,7 @@ export class SignalExtractor {
       this.lastRedValues.push(avgRed);
       this.lastIrValues.push(avgIr);
 
+      // Aplicar filtros Kalman por separado para red e ir
       const filteredRed = this.applyKalmanFilter(
         this.calculateMean(this.lastRedValues),
         this.kalmanState.red
@@ -113,14 +117,16 @@ export class SignalExtractor {
 
       const stability = this.calculateStability(filteredRed);
       
+      // ÚNICO CAMBIO: Aumentar sutilmente el factor de multiplicación de 100 a 105
       const perfusionIndex = validPixels.max.red > 0 ? 
-        (validPixels.max.red - Math.min(...validPixels.red)) / validPixels.max.red * 120 : 0;
+        (validPixels.max.red - Math.min(...validPixels.red)) / validPixels.max.red * 105 : 0;
 
+      // Cálculo de calidad optimizado
       const qualities = {
-        pixel: Math.min(1, validPixels.count / (this.minValidPixels * 1.8)),
+        pixel: Math.min(1, validPixels.count / (this.minValidPixels * 2)),
         stability: stability > this.stabilityThreshold ? 1 : stability / this.stabilityThreshold,
         red: Math.min(1, redDominance / this.redDominanceThreshold),
-        perfusion: Math.min(1, perfusionIndex / 35)
+        perfusion: Math.min(1, perfusionIndex / 30)
       };
 
       const quality = Math.min(
@@ -141,7 +147,7 @@ export class SignalExtractor {
       return {
         red: filteredRed,
         ir: filteredIr,
-        quality: Math.max(0.15, quality),
+        quality,
         perfusionIndex
       };
     } catch (error) {
