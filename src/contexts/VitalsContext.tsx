@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { BeepPlayer } from '../utils/audioUtils';
-import { UltraAdvancedPPGProcessor } from '../utils/UltraAdvancedPPGProcessor';
+import { WaveletPPGProcessor } from '../utils/WaveletPPGProcessor';
 import { useToast } from "@/hooks/use-toast";
 import type { VitalReading, SensitivitySettings, ProcessedPPGSignal } from '../utils/types';
 
@@ -42,18 +42,18 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const processingInterval = 33; // ~30fps
 
   const [sensitivitySettings, setSensitivitySettings] = useState<SensitivitySettings>({
-    signalAmplification: 1.8,
-    noiseReduction: 1.2,
+    signalAmplification: 0.9,
+    noiseReduction: 1.8,
     peakDetection: 1.4,
-    heartbeatThreshold: 0.4,
-    responseTime: 1.0,
-    signalStability: 0.5,
-    brightness: 1.0,
-    redIntensity: 1.0
+    heartbeatThreshold: 0.5,
+    responseTime: 0.7,
+    signalStability: 1.1,
+    brightness: 0.8,
+    redIntensity: 0.85
   });
 
   const { toast } = useToast();
-  const ppgProcessor = useRef(new UltraAdvancedPPGProcessor());
+  const ppgProcessor = useRef(new WaveletPPGProcessor()); // 👈 Cambiado a WaveletPPGProcessor
   const beepPlayer = useRef(new BeepPlayer());
 
   const processFrame = useCallback(async (imageData: ImageData) => {
