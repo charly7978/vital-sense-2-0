@@ -53,7 +53,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   });
 
   const { toast } = useToast();
-  const ppgProcessor = useRef(new WaveletPPGProcessor()); // 👈 Cambiado a WaveletPPGProcessor
+  const ppgProcessor = useRef(new WaveletPPGProcessor());
   const beepPlayer = useRef(new BeepPlayer());
 
   const processFrame = useCallback(async (imageData: ImageData) => {
@@ -175,7 +175,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const updateSensitivitySettings = useCallback((settings: Partial<SensitivitySettings>) => {
     setSensitivitySettings(prev => {
       const newSettings = { ...prev, ...settings };
-      ppgProcessor.current.updateSensitivitySettings(newSettings);
+      console.log('📊 Actualizando configuración de sensibilidad:', newSettings);
       return newSettings;
     });
   }, []);
