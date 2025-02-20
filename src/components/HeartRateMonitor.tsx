@@ -42,6 +42,12 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
         <CameraView onFrame={processFrame} isActive={isStarted} />
       </div>
 
+      {/* Añadimos el contenedor para el canvas */}
+      <div className="heart-rate-container absolute inset-0 z-10">
+        <canvas id="signalCanvas" />
+        <div id="qualityIndicator" />
+      </div>
+
       <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/60 z-10" />
 
       <div className="absolute inset-0 z-20">

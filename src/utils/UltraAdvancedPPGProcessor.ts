@@ -1,4 +1,3 @@
-
 // UltraAdvancedPPGProcessor.ts - Sistema Completo de Procesamiento PPG
 import type { VitalReading, SensitivitySettings, ProcessedSignal, SignalQuality } from './types';
 
@@ -13,7 +12,7 @@ import type { VitalReading, SensitivitySettings, ProcessedSignal, SignalQuality 
 
 class SignalVisualizer {
   private canvas: HTMLCanvasElement;
-  private ctx: CanvasRenderingContext2D;
+  private ctx: CanvasRenderingContext2D | null = null;
   private readonly config = {
     width: 800,
     height: 200,
@@ -27,8 +26,23 @@ class SignalVisualizer {
   };
 
   constructor(containerId: string) {
-    this.canvas = document.getElementById(containerId) as HTMLCanvasElement;
-    this.ctx = this.canvas.getContext('2d')!;
+    // Crear el canvas si no existe
+    const existingCanvas = document.getElementById(containerId);
+    if (!existingCanvas) {
+      this.canvas = document.createElement('canvas');
+      this.canvas.id = containerId;
+      // Encontrar un contenedor donde insertar el canvas
+      const container = document.querySelector('.heart-rate-container');
+      if (container) {
+        container.appendChild(this.canvas);
+      } else {
+        // Si no hay contenedor específico, añadirlo al body
+        document.body.appendChild(this.canvas);
+      }
+    } else {
+      this.canvas = existingCanvas as HTMLCanvasElement;
+    }
+    
     this.setupCanvas();
   }
 
@@ -36,9 +50,20 @@ class SignalVisualizer {
     this.canvas.width = this.config.width;
     this.canvas.height = this.config.height;
     this.canvas.style.backgroundColor = this.config.backgroundColor;
+    this.ctx = this.canvas.getContext('2d');
+    
+    if (!this.ctx) {
+      console.error('No se pudo obtener el contexto 2D del canvas');
+      return;
+    }
   }
 
   public drawSignal(signal: number[]): void {
+    if (!this.ctx) {
+      console.error('Contexto 2D no disponible');
+      return;
+    }
+
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.drawGrid();
     
@@ -54,9 +79,9 @@ class SignalVisualizer {
       const y = this.canvas.height / 2 - value * yScale;
       
       if (index === 0) {
-        this.ctx.moveTo(x, y);
+        this.ctx?.moveTo(x, y);
       } else {
-        this.ctx.lineTo(x, y);
+        this.ctx?.lineTo(x, y);
       }
     });
 
@@ -64,6 +89,8 @@ class SignalVisualizer {
   }
 
   private drawGrid(): void {
+    if (!this.ctx) return;
+
     this.ctx.strokeStyle = this.config.gridColor;
     this.ctx.lineWidth = 0.5;
 
@@ -176,12 +203,29 @@ export class UltraAdvancedPPGProcessor {
 
   private readonly visualizer: SignalVisualizer;
   private readonly qualityIndicator: QualityIndicator;
-  private readonly signalBuffer: any; // Asumiendo que CircularBuffer está definido en otro lugar
+  private readonly signalBuffer: any;
+  private settings: SensitivitySettings;
 
   constructor(signalCanvasId: string, qualityIndicatorId: string) {
+    console.log('Inicializando UltraAdvancedPPGProcessor...');
     this.visualizer = new SignalVisualizer(signalCanvasId);
     this.qualityIndicator = new QualityIndicator(qualityIndicatorId);
     this.signalBuffer = new (window as any).CircularBuffer(this.MASTER_CONFIG.acquisition.bufferSize);
+    this.settings = {
+      signalAmplification: 1.5,
+      noiseReduction: 1.2,
+      peakDetection: 1.3,
+      heartbeatThreshold: 0.5,
+      responseTime: 1.0,
+      signalStability: 0.5,
+      brightness: 1.0,
+      redIntensity: 1.0
+    };
+    console.log('UltraAdvancedPPGProcessor inicializado correctamente');
+  }
+
+  updateSensitivitySettings(newSettings: SensitivitySettings): void {
+    this.settings = { ...this.settings, ...newSettings };
   }
 
   async processFrame(frame: ImageData): Promise<ProcessedSignal> {
