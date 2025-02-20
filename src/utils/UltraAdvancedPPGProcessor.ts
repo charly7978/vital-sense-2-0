@@ -4,7 +4,7 @@ import { WaveletTransform, UnscentedKalmanFilter, QuantumICA } from './signalPro
 import { LowLightEnhancer } from './lowLightEnhancer';
 import { QualityAnalyzer } from './qualityAnalyzer';
 import { CircularBuffer } from './circularBuffer';
-import { 
+import type { 
   ProcessedPPGSignal, 
   RawSignal, 
   QuantumSignal,
@@ -15,199 +15,132 @@ import {
   ROI,
   Channels,
   SignalFeatures,
-  ProcessingError
+  ProcessingError,
+  SensitivitySettings
 } from './types';
 
 export class UltraAdvancedPPGProcessor {
-  // CONFIGURACIÓN MAESTRA DEL SISTEMA
-  private readonly MASTER_CONFIG = {
-    // Configuración de adquisición
-    acquisition: {
-      frameRate: 60,
-      resolution: '4K',
-      bitDepth: 12,
-      exposureMode: 'adaptive',
-      bufferDepth: 1024,
-      roi: {
-        type: 'adaptive',
-        size: 0.3,
-        shape: 'circular',
-        tracking: true
-      }
-    },
-
-    // Algoritmos patentados (con referencias)
-    patents: {
-      // US10524722B2 - Procesamiento PPG Avanzado
-      advancedPPG: {
-        type: 'neural-quantum',
-        enhancement: 'ultra',
-        compensation: true,
-        adaptation: 'dynamic'
-      },
-      
-      // US20200205746A1 - Análisis Multi-espectral
-      spectralAnalysis: {
-        spectrum: 'full',
-        bands: 16,
-        resolution: 'ultra',
-        integration: 'adaptive'
-      },
-
-      // EP3766416A1 - Procesamiento Cuántico
-      quantumProcessing: {
-        gates: ['hadamard', 'cnot', 'toffoli', 'phase'],
-        qubits: 16,
-        errorCorrection: 'surface-code',
-        optimization: 'quantum-annealing'
-      }
-    },
-
-    // Procesamiento de señal avanzado
+  private readonly MASTER_CONFIG: any;
+  private readonly systems: {
+    quantum: QuantumProcessor;
+    spectral: SpectralAnalyzer;
     signal: {
-      // Wavelets adaptativos
-      wavelet: {
-        type: 'symlet16',
-        levels: 12,
-        threshold: 'universal',
-        optimization: 'genetic'
-      },
-
-      // Kalman no lineal
-      kalman: {
-        type: 'unscented',
-        dimensions: 8,
-        adaptation: 'neural',
-        errorEstimation: 'adaptive'
-      },
-
-      // ICA cuántico
-      ica: {
-        method: 'quantum-fastica',
-        components: 16,
-        tolerance: 1e-8,
-        maxIterations: 1000
-      },
-
-      // Filtros avanzados
-      filters: {
-        bandpass: {
-          type: 'butterworth',
-          order: 8,
-          lowCut: 0.5,
-          highCut: 4.0,
-          ripple: 0.01
-        },
-        notch: {
-          frequency: 50,
-          q: 30
-        },
-        median: {
-          windowSize: 5,
-          adaptive: true
-        }
-      }
-    },
-
-    // Optimizaciones para luz baja
-    lowLight: {
-      enhancement: {
-        type: 'super-resolution',
-        factor: 2,
-        method: 'neural'
-      },
-      noise: {
-        reduction: 'wavelet-based',
-        threshold: 'adaptive',
-        estimation: 'neural'
-      },
-      contrast: {
-        enhancement: 'adaptive-histogram',
-        clipping: 0.01
-      }
-    },
-
-    // Análisis de calidad
-    quality: {
-      metrics: {
-        snr: { min: 4.0, optimal: 8.0 },
-        stability: { min: 0.85, optimal: 0.95 },
-        perfusion: { min: 0.5, optimal: 2.0 },
-        artifacts: { max: 0.1 }
-      },
-      validation: {
-        method: 'multi-factor',
-        confidence: 0.95
-      }
-    }
-  } as const;
-
-  // SISTEMAS PRINCIPALES
-  private readonly systems = {
-    // Procesador cuántico
-    quantum: new QuantumProcessor({
-      ...this.MASTER_CONFIG.patents.quantumProcessing,
-      optimization: 'quantum-annealing'
-    }),
-
-    // Analizador espectral
-    spectral: new SpectralAnalyzer({
-      ...this.MASTER_CONFIG.patents.spectralAnalysis,
-      resolution: 'ultra-high'
-    }),
-
-    // Procesador de señal
-    signal: {
-      wavelet: new WaveletTransform(this.MASTER_CONFIG.signal.wavelet),
-      kalman: new UnscentedKalmanFilter(this.MASTER_CONFIG.signal.kalman),
-      ica: new QuantumICA(this.MASTER_CONFIG.signal.ica)
-    },
-
-    // Optimizador de luz baja
-    lowLight: new LowLightEnhancer({
-      ...this.MASTER_CONFIG.lowLight,
-      adaptation: 'dynamic'
-    }),
-
-    // Analizador de calidad
-    quality: new QualityAnalyzer(this.MASTER_CONFIG.quality)
+      wavelet: WaveletTransform;
+      kalman: UnscentedKalmanFilter;
+      ica: QuantumICA;
+    };
+    lowLight: LowLightEnhancer;
+    quality: QualityAnalyzer;
   };
 
-  // BUFFERS Y ESTADO
-  private readonly buffers = {
-    raw: new CircularBuffer(this.MASTER_CONFIG.acquisition.bufferDepth),
-    processed: new CircularBuffer(this.MASTER_CONFIG.acquisition.bufferDepth),
-    quality: new CircularBuffer(60)
+  private readonly buffers: {
+    raw: CircularBuffer;
+    processed: CircularBuffer;
+    quality: CircularBuffer;
   };
 
-  // MÉTODO PRINCIPAL DE PROCESAMIENTO
-  async processFrame(frame: ImageData): Promise<ProcessedPPGSignal> {
+  private settings: SensitivitySettings;
+
+  constructor() {
+    this.MASTER_CONFIG = {
+      // Configuración inicial
+      acquisition: {
+        frameRate: 30,
+        bufferSize: 100
+      }
+    };
+
+    this.systems = {
+      quantum: new QuantumProcessor({}),
+      spectral: new SpectralAnalyzer({}),
+      signal: {
+        wavelet: new WaveletTransform({}),
+        kalman: new UnscentedKalmanFilter({}),
+        ica: new QuantumICA({})
+      },
+      lowLight: new LowLightEnhancer({}),
+      quality: new QualityAnalyzer({})
+    };
+
+    this.buffers = {
+      raw: new CircularBuffer(100),
+      processed: new CircularBuffer(100),
+      quality: new CircularBuffer(30)
+    };
+
+    this.settings = {
+      signalAmplification: 1.5,
+      noiseReduction: 1.2,
+      peakDetection: 1.3,
+      heartbeatThreshold: 0.5,
+      responseTime: 1.0,
+      signalStability: 0.5,
+      brightness: 1.0,
+      redIntensity: 1.0
+    };
+  }
+
+  updateSensitivitySettings(newSettings: SensitivitySettings): void {
+    this.settings = {
+      ...this.settings,
+      ...newSettings
+    };
+    
+    // Actualizar los sistemas con las nuevas configuraciones
+    this.systems.quantum = new QuantumProcessor({ sensitivity: this.settings });
+    this.systems.spectral = new SpectralAnalyzer({ sensitivity: this.settings });
+    this.systems.signal.wavelet = new WaveletTransform({ sensitivity: this.settings });
+    this.systems.signal.kalman = new UnscentedKalmanFilter({ sensitivity: this.settings });
+    this.systems.signal.ica = new QuantumICA({ sensitivity: this.settings });
+    this.systems.lowLight = new LowLightEnhancer({ sensitivity: this.settings });
+  }
+
+  async processFrame(imageData: ImageData): Promise<ProcessedPPGSignal> {
     try {
-      // 1. Pre-procesamiento y extracción
-      const extracted = await this.extractSignal(frame);
-      
-      // 2. Procesamiento cuántico inicial
-      const quantumProcessed = await this.quantumPreProcess(extracted);
-      
-      // 3. Análisis espectral
-      const spectralAnalyzed = await this.spectralAnalysis(quantumProcessed);
-      
-      // 4. Procesamiento principal
-      const processed = await this.mainProcessing(spectralAnalyzed);
-      
-      // 5. Optimización final
-      const optimized = await this.finalOptimization(processed);
-      
-      // 6. Validación y control de calidad
-      return this.validateAndFinalize(optimized);
+      // 1. Extraer señal cruda
+      const rawSignal = await this.extractSignal(imageData);
+      this.buffers.raw.push(rawSignal.red[rawSignal.red.length - 1]);
 
+      // 2. Procesamiento cuántico inicial
+      const quantumSignal = await this.systems.quantum.preProcess(rawSignal, {
+        amplification: this.settings.signalAmplification,
+        noiseReduction: this.settings.noiseReduction
+      });
+
+      // 3. Análisis espectral
+      const spectralData = await this.systems.spectral.analyze(quantumSignal, {
+        sensitivity: this.settings.signalStability
+      });
+
+      // 4. Procesamiento de señal avanzado
+      const processedData = await this.mainProcessing(spectralData);
+
+      // 5. Optimización final
+      const optimizedSignal = await this.systems.quantum.optimize(processedData, {
+        threshold: this.settings.heartbeatThreshold
+      });
+
+      // 6. Validación y control de calidad
+      const quality = this.systems.quality.analyze(optimizedSignal);
+      const validatedSignal = this.validateSignal(optimizedSignal, quality);
+
+      // 7. Extracción de características y cálculo de confianza
+      const features = this.extractFeatures(validatedSignal);
+      const confidence = this.calculateConfidence(validatedSignal);
+
+      return {
+        signal: validatedSignal,
+        features,
+        quality,
+        confidence,
+        timestamp: Date.now()
+      };
     } catch (error) {
-      console.error('Error crítico en procesamiento:', error);
-      throw new ProcessingError('Fallo en pipeline de procesamiento', error);
+      console.error('Error en el procesamiento:', error);
+      throw new ProcessingError('Error en el pipeline de procesamiento', error);
     }
   }
 
-  // MÉTODOS DE PROCESAMIENTO ESPECÍFICOS
   private async extractSignal(frame: ImageData): Promise<RawSignal> {
     const roi = this.getROI(frame);
     const channels = this.separateChannels(roi);
@@ -263,20 +196,17 @@ export class UltraAdvancedPPGProcessor {
     });
   }
 
-  private async mainProcessing(data: SpectralData): Promise<ProcessedData> {
+  private async mainProcessing(spectralData: SpectralData): Promise<ProcessedData> {
     // Pipeline principal de procesamiento
-    let processed = data;
+    const waveletResult = await this.systems.signal.wavelet.transform(spectralData);
+    const kalmanResult = await this.systems.signal.kalman.filter(waveletResult);
+    const icaResult = await this.systems.signal.ica.separate(kalmanResult);
 
-    // 1. Descomposición Wavelet
-    processed = await this.systems.signal.wavelet.transform(processed);
-
-    // 2. Filtrado Kalman
-    processed = await this.systems.signal.kalman.filter(processed);
-
-    // 3. Análisis ICA
-    processed = await this.systems.signal.ica.separate(processed);
-
-    return processed;
+    return {
+      signal: icaResult.signal,
+      features: icaResult.features,
+      quality: icaResult.quality
+    };
   }
 
   private async finalOptimization(signal: ProcessedData): Promise<OptimizedSignal> {
