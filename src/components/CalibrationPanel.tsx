@@ -36,7 +36,7 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid grid-cols-1 gap-3">
-            {/* Sensibilidad de Señal PPG */}
+            {/* Amplificación de Señal */}
             <div className="bg-black/20 p-2 rounded-lg">
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-2">
@@ -57,6 +57,13 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
                 onValueChange={handleSettingChange('signalAmplification')}
                 className="[&_[role=slider]]:bg-blue-400"
               />
+              <p className="text-xs text-gray-400 mt-2">
+                Aumenta o disminuye la intensidad general de la señal PPG.
+                <br />
+                ↑ Mayor valor: Mejora detección en señales débiles, pero puede saturarse
+                <br />
+                ↓ Menor valor: Reduce saturación, mejor para señales fuertes
+              </p>
             </div>
 
             {/* Umbral de Detección */}
@@ -80,6 +87,13 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
                 onValueChange={handleSettingChange('peakDetection')}
                 className="[&_[role=slider]]:bg-red-400"
               />
+              <p className="text-xs text-gray-400 mt-2">
+                Define qué tan pronunciado debe ser un pico para considerarse pulso.
+                <br />
+                ↑ Mayor valor: Detecta solo picos muy pronunciados, más preciso pero puede perder pulsos
+                <br />
+                ↓ Menor valor: Detecta picos más sutiles, mejor para pulsos débiles pero puede dar falsos positivos
+              </p>
             </div>
 
             {/* Sensibilidad de Picos */}
@@ -103,9 +117,16 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
                 onValueChange={handleSettingChange('heartbeatThreshold')}
                 className="[&_[role=slider]]:bg-green-400"
               />
+              <p className="text-xs text-gray-400 mt-2">
+                Ajusta la sensibilidad para diferenciar picos reales de ruido.
+                <br />
+                ↑ Mayor valor: Más estricto, solo detecta picos muy claros, reduce falsos positivos
+                <br />
+                ↓ Menor valor: Más permisivo, detecta picos más sutiles, útil en señales débiles
+              </p>
             </div>
 
-            {/* Filtro de Ruido de Señal */}
+            {/* Filtro de Ruido */}
             <div className="bg-black/20 p-2 rounded-lg">
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-2">
@@ -126,6 +147,13 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
                 onValueChange={handleSettingChange('noiseReduction')}
                 className="[&_[role=slider]]:bg-purple-400"
               />
+              <p className="text-xs text-gray-400 mt-2">
+                Controla la intensidad del filtrado de ruido en la señal.
+                <br />
+                ↑ Mayor valor: Señal más suave, elimina más ruido pero puede perder detalles
+                <br />
+                ↓ Menor valor: Señal más cruda, mantiene más detalles pero con más ruido
+              </p>
             </div>
           </div>
         </CardContent>
