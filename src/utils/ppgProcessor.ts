@@ -204,7 +204,6 @@ export class PPGProcessor {
 
     const hrvAnalysis = this.signalProcessor.analyzeHRV([]);
 
-    // Asegurarse de incluir las lecturas en el resultado
     return {
       ...validatedVitals,
       spo2: Math.min(100, Math.max(75, spo2Result.spo2)),
@@ -212,8 +211,6 @@ export class PPGProcessor {
       arrhythmiaType: hrvAnalysis.type,
       signalQuality,
       confidence: spo2Result.confidence,
-      readings: this.readings, // Añadido readings al objeto retornado
-      isPeak,
       hrvMetrics: hrvAnalysis
     };
   }
