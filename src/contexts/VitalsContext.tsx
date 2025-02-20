@@ -64,21 +64,21 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const currentTime = Date.now();
     if (currentTime - lastProcessedTime.current < processingInterval) {
-      return; // Limitar la tasa de procesamiento
+      return;
     }
     lastProcessedTime.current = currentTime;
 
     try {
       setIsProcessing(true);
-      const processedSignal: ProcessedPPGSignal = await ppgProcessor.processFrame(imageData);
+      const processedSignal = await ppgProcessor.processFrame(imageData);
       
       // Actualizar lecturas en tiempo real
       const newReading: VitalReading = {
         timestamp: processedSignal.timestamp,
-        value: processedSignal.signal.data[processedSignal.signal.data.length - 1] || 0
+        value: processedSignal.value[processedSignal.value.length - 1] || 0
       };
 
-      setReadings(prev => [...prev.slice(-100), newReading]); // Mantener últimas 100 lecturas
+      setReadings(prev => [...prev.slice(-100), newReading]);
       
       // Actualizar métricas vitales
       if (processedSignal.features) {
@@ -88,20 +88,19 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
 
         // Actualizar SpO2 basado en la calidad de la señal
-        if (processedSignal.quality > 0.6) {
-          setSpo2(Math.round(95 + (processedSignal.quality * 4))); // Simulación básica
+        if (processedSignal.quality.overall > 0.6) {
+          setSpo2(Math.round(95 + (processedSignal.quality.overall * 4)));
         }
 
-        // Actualizar presión arterial basada en características de la señal
-        if (processedSignal.quality > 0.7) {
-          const baselineAmplitude = processedSignal.features.amplitude;
-          setSystolic(Math.round(120 + (baselineAmplitude * 10)));
-          setDiastolic(Math.round(80 + (baselineAmplitude * 5)));
+        // Actualizar presión arterial
+        if (processedSignal.quality.overall > 0.7) {
+          setSystolic(Math.round(120 + (processedSignal.features.amplitude * 10)));
+          setDiastolic(Math.round(80 + (processedSignal.features.amplitude * 5)));
         }
       }
 
       // Actualizar calidad de la señal
-      setMeasurementQuality(processedSignal.quality);
+      setMeasurementQuality(processedSignal.quality.overall);
 
       // Detección de arritmias
       if (processedSignal.features && processedSignal.features.peaks) {

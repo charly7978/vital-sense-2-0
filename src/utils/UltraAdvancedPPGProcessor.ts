@@ -1,328 +1,267 @@
-import { QuantumProcessor } from './quantumProcessor';
-import { SpectralAnalyzer } from './spectralAnalyzer';
-import { WaveletTransform, UnscentedKalmanFilter, QuantumICA } from './signalProcessors';
-import { LowLightEnhancer } from './lowLightEnhancer';
-import { QualityAnalyzer } from './qualityAnalyzer';
+
 import { CircularBuffer } from './circularBuffer';
+import { SpectralAnalyzer } from './spectralAnalyzer';
+import { QualityAnalyzer } from './qualityAnalyzer';
+import { LowLightEnhancer } from './lowLightEnhancer';
 import { 
-  ProcessedPPGSignal, 
-  RawSignal, 
-  QuantumSignal,
-  SpectralData,
-  ProcessedData,
-  OptimizedSignal,
-  ValidatedSignal,
-  ROI,
-  Channels,
+  ProcessedSignal, 
+  SignalQuality, 
   SignalFeatures,
-  ProcessingError,
-  SensitivitySettings
+  DisplayConfig,
+  VisualizerConfig,
+  AlertConfig,
+  Alert,
+  SignalData,
+  QualityMetrics,
+  QualityIndicators
 } from './types';
 
 export class UltraAdvancedPPGProcessor {
-  private readonly MASTER_CONFIG: any;
-  private readonly systems: {
-    quantum: QuantumProcessor;
-    spectral: SpectralAnalyzer;
-    signal: {
-      wavelet: WaveletTransform;
-      kalman: UnscentedKalmanFilter;
-      ica: QuantumICA;
-    };
-    lowLight: LowLightEnhancer;
-    quality: QualityAnalyzer;
+  private readonly MASTER_CONFIG = {
+    quality: {
+      metrics: {
+        snr: {
+          min: 0.5,
+          max: 1.0
+        }
+      }
+    }
+  } as const;
+
+  // SISTEMAS PRINCIPALES
+  private readonly systems = {
+    spectral: new SpectralAnalyzer({}),
+    lowLight: new LowLightEnhancer({}),
+    quality: new QualityAnalyzer({})
   };
 
-  private readonly buffers: {
-    raw: CircularBuffer;
-    processed: CircularBuffer;
-    quality: CircularBuffer;
+  // BUFFERS OPTIMIZADOS
+  private readonly buffers = {
+    raw: new CircularBuffer(1024),
+    processed: new CircularBuffer(1024),
+    quality: new CircularBuffer(60)
   };
 
-  private settings: SensitivitySettings;
+  // SISTEMA DE RETROALIMENTACIÓN
+  private readonly feedbackSystem: {
+    display: DisplayManager;
+    quality: QualityVisualizer;
+    alerts: AlertManager;
+  };
 
   constructor() {
-    this.MASTER_CONFIG = {
-      // Configuración inicial
-      acquisition: {
-        frameRate: 30,
-        bufferSize: 100
-      }
-    };
-
-    this.systems = {
-      quantum: new QuantumProcessor({}),
-      spectral: new SpectralAnalyzer({}),
-      signal: {
-        wavelet: new WaveletTransform({}),
-        kalman: new UnscentedKalmanFilter({}),
-        ica: new QuantumICA({})
-      },
-      lowLight: new LowLightEnhancer({}),
-      quality: new QualityAnalyzer({})
-    };
-
-    this.buffers = {
-      raw: new CircularBuffer(100),
-      processed: new CircularBuffer(100),
-      quality: new CircularBuffer(30)
-    };
-
-    this.settings = {
-      signalAmplification: 1.5,
-      noiseReduction: 1.2,
-      peakDetection: 1.3,
-      heartbeatThreshold: 0.5,
-      responseTime: 1.0,
-      signalStability: 0.5,
-      brightness: 1.0,
-      redIntensity: 1.0
+    this.feedbackSystem = {
+      display: new DisplayManager({
+        refreshRate: 60,
+        interpolation: 'cubic-spline'
+      }),
+      quality: new QualityVisualizer({
+        updateRate: 30,
+        smoothing: true
+      }),
+      alerts: new AlertManager({
+        visual: true,
+        haptic: true,
+        audio: true
+      })
     };
   }
 
-  updateSensitivitySettings(newSettings: SensitivitySettings): void {
-    this.settings = {
-      ...this.settings,
-      ...newSettings
-    };
-    
-    // Actualizar los sistemas con las nuevas configuraciones
-    this.systems.quantum = new QuantumProcessor({ sensitivity: this.settings });
-    this.systems.spectral = new SpectralAnalyzer({ sensitivity: this.settings });
-    this.systems.signal.wavelet = new WaveletTransform({ sensitivity: this.settings });
-    this.systems.signal.kalman = new UnscentedKalmanFilter({ sensitivity: this.settings });
-    this.systems.signal.ica = new QuantumICA({ sensitivity: this.settings });
-    this.systems.lowLight = new LowLightEnhancer({ sensitivity: this.settings });
-  }
-
-  async processFrame(imageData: ImageData): Promise<ProcessedPPGSignal> {
+  async processFrame(frame: ImageData): Promise<ProcessedSignal> {
     try {
-      // 1. Extraer señal cruda del frame
-      const rawSignal = await this.extractSignal(imageData);
+      // Análisis espectral
+      const spectralData = await this.systems.spectral.analyze(frame, {});
       
-      // 2. Análisis espectral directo
-      const spectralData = await this.systems.spectral.analyze(imageData, {
-        sensitivity: this.settings.signalStability
-      });
-
-      // 3. Calcular características
-      const features = this.extractFeatures({
-        data: spectralData.signal,
-        quality: spectralData.quality,
-        features: spectralData.features
-      });
-
-      // 4. Calcular calidad y confianza
-      const quality = spectralData.quality;
-      const confidence = this.calculateConfidence({
-        data: spectralData.signal,
-        quality: quality,
-        features: features
-      });
-
-      // 5. Crear señal validada
-      const validatedSignal = {
-        data: spectralData.signal,
-        quality: quality,
-        features: features
+      // Análisis de calidad
+      const quality: SignalQuality = {
+        snr: spectralData.quality,
+        stability: this.calculateStability(spectralData.signal),
+        artifacts: this.detectArtifacts(spectralData.signal),
+        overall: spectralData.quality
       };
 
+      // Actualizar feedback
+      await this.updateFeedback(spectralData.signal, quality);
+
       return {
-        signal: validatedSignal,
-        features,
+        value: spectralData.signal,
         quality,
-        confidence,
+        features: spectralData.features,
+        confidence: quality.overall,
         timestamp: Date.now()
       };
     } catch (error) {
-      console.error('Error en el procesamiento:', error);
-      throw new ProcessingError('Error en el pipeline de procesamiento', error);
+      console.error('Error en procesamiento:', error);
+      throw error;
     }
   }
 
-  private async extractSignal(frame: ImageData): Promise<RawSignal> {
-    const roi = this.getROI(frame);
-    const channels = this.separateChannels(roi);
-    const enhanced = await this.systems.lowLight.enhance(channels);
-    
-    return {
-      red: enhanced.red,
-      ir: enhanced.ir,
-      quality: this.assessInitialQuality(enhanced)
-    };
+  private calculateStability(signal: number[]): number {
+    if (!signal.length) return 0;
+    const variance = this.calculateVariance(signal);
+    return Math.max(0, 1 - variance);
   }
 
-  private getROI(frame: ImageData): ROI {
-    const region = this.detectOptimalRegion(frame);
-    const quality = this.assessROIQuality(frame);
-    return { region, quality };
+  private calculateVariance(data: number[]): number {
+    const mean = data.reduce((a, b) => a + b, 0) / data.length;
+    const squaredDiffs = data.map(x => Math.pow(x - mean, 2));
+    return squaredDiffs.reduce((a, b) => a + b, 0) / data.length;
   }
 
-  private detectOptimalRegion(frame: ImageData): ImageData {
-    // Por ahora, usar todo el frame
-    return frame;
+  private detectArtifacts(signal: number[]): number {
+    // Implementación básica de detección de artefactos
+    return 1.0;
   }
 
-  private assessROIQuality(frame: ImageData): number {
-    // Implementación básica de calidad de ROI
-    const data = frame.data;
-    let redSum = 0;
-    let count = 0;
-    
-    for (let i = 0; i < data.length; i += 4) {
-      redSum += data[i];
-      count++;
-    }
-    
-    const avgRed = redSum / count;
-    return Math.min(avgRed / 255, 1);
-  }
-
-  private separateChannels(roi: ROI): Channels {
-    return {
-      red: this.extractChannel(roi, 'red'),
-      ir: this.extractChannel(roi, 'ir'),
-      ambient: this.extractChannel(roi, 'ambient')
-    };
-  }
-
-  private extractChannel(roi: ROI, channel: 'red' | 'ir' | 'ambient'): number[] {
-    // Implementación de extracción de canal
-    return [];
-  }
-
-  private async quantumPreProcess(signal: RawSignal): Promise<QuantumSignal> {
-    return this.systems.quantum.preProcess(signal, {
-      gates: this.MASTER_CONFIG.patents.quantumProcessing.gates,
-      errorCorrection: true
-    });
-  }
-
-  private async spectralAnalysis(signal: QuantumSignal): Promise<SpectralData> {
-    return this.systems.spectral.analyze(signal, {
-      bands: this.MASTER_CONFIG.patents.spectralAnalysis.bands,
-      resolution: 'maximum'
-    });
-  }
-
-  private async mainProcessing(spectralData: SpectralData): Promise<ProcessedData> {
-    // Pipeline principal de procesamiento
-    const waveletResult = await this.systems.signal.wavelet.transform(spectralData);
-    const kalmanResult = await this.systems.signal.kalman.filter(waveletResult);
-    const icaResult = await this.systems.signal.ica.separate(kalmanResult);
-
-    return {
-      signal: icaResult.signal,
-      features: icaResult.features,
-      quality: icaResult.quality
-    };
-  }
-
-  private async finalOptimization(signal: ProcessedData): Promise<OptimizedSignal> {
-    // Optimización final con algoritmos patentados
-    return this.systems.quantum.optimize(signal, {
-      method: 'quantum-enhanced',
-      iterations: 1000
-    });
-  }
-
-  private validateAndFinalize(signal: OptimizedSignal): ProcessedPPGSignal {
-    // Análisis final de calidad
-    const quality = this.systems.quality.analyze(signal);
-    
-    // Validación y corrección final
-    const validated = this.validateSignal(signal, quality);
-    
-    return {
-      signal: validated,
-      quality: quality,
-      features: this.extractFeatures(validated),
-      confidence: this.calculateConfidence(validated),
+  private async updateFeedback(signal: number[], quality: SignalQuality): Promise<void> {
+    await this.feedbackSystem.display.updateSignal({
+      signal,
+      quality,
       timestamp: Date.now()
-    };
+    });
+
+    await this.feedbackSystem.quality.update(quality);
+
+    if (quality.overall < this.MASTER_CONFIG.quality.metrics.snr.min) {
+      await this.feedbackSystem.alerts.show({
+        type: 'quality',
+        message: 'Calidad de señal baja',
+        suggestion: 'Ajuste la posición del dedo',
+        priority: 'high'
+      });
+    }
+  }
+}
+
+class DisplayManager {
+  private canvas: HTMLCanvasElement;
+  private ctx: CanvasRenderingContext2D;
+  private config: DisplayConfig;
+
+  constructor(config: DisplayConfig) {
+    this.config = config;
+    this.canvas = document.createElement('canvas');
+    this.ctx = this.canvas.getContext('2d')!;
+    this.setupCanvas();
   }
 
-  private extractFeatures(signal: ValidatedSignal): SignalFeatures {
-    return {
-      peaks: this.detectPeaks(signal),
-      valleys: this.detectValleys(signal),
-      frequency: this.calculateFrequency(signal),
-      amplitude: this.calculateAmplitude(signal),
-      perfusionIndex: this.calculatePerfusion(signal)
-    };
+  private setupCanvas(): void {
+    this.canvas.width = 300;
+    this.canvas.height = 150;
   }
 
-  private calculateConfidence(signal: ValidatedSignal): number {
-    const metrics = {
-      snr: this.calculateSNR(signal),
-      stability: this.calculateStability(signal),
-      quality: this.assessSignalQuality(signal)
-    };
-
-    return this.combineMetrics(metrics);
+  async updateSignal(data: SignalData): Promise<void> {
+    if (!data.signal) return;
+    
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.drawInterpolatedSignal(data.signal);
+    if (data.quality) {
+      this.drawQualityIndicators(data.quality);
+    }
   }
 
-  private detectPeaks(signal: ValidatedSignal): number[] {
-    // Implementación de detección de picos
-    return [];
-  }
+  private drawInterpolatedSignal(signal: number[]): void {
+    this.ctx.beginPath();
+    this.ctx.strokeStyle = '#ea384c';
+    this.ctx.lineWidth = 2;
 
-  private detectValleys(signal: ValidatedSignal): number[] {
-    // Implementación de detección de valles
-    return [];
-  }
-
-  private calculateFrequency(signal: ValidatedSignal): number {
-    // Implementación de cálculo de frecuencia
-    return 0;
-  }
-
-  private calculateAmplitude(signal: ValidatedSignal): number {
-    // Implementación de cálculo de amplitud
-    return 0;
-  }
-
-  private calculatePerfusion(signal: ValidatedSignal): number {
-    // Implementación de cálculo de perfusión
-    return 0;
-  }
-
-  private calculateSNR(signal: ValidatedSignal): number {
-    // Implementación de cálculo de SNR
-    return 0;
-  }
-
-  private calculateStability(signal: ValidatedSignal): number {
-    // Implementación de cálculo de estabilidad
-    return 0;
-  }
-
-  private assessSignalQuality(signal: ValidatedSignal): number {
-    // Implementación de evaluación de calidad de señal
-    return 0;
-  }
-
-  private combineMetrics(metrics: any): number {
-    // Implementación de combinación de métricas
-    return 0;
-  }
-
-  private validateSignal(signal: OptimizedSignal, quality: number): ValidatedSignal {
-    return {
-      data: signal.data,
-      quality: quality,
-      features: {
-        peaks: [],
-        valleys: [],
-        frequency: 0,
-        amplitude: 0,
-        perfusionIndex: 0
+    for (let i = 0; i < signal.length; i++) {
+      const x = (i / signal.length) * this.canvas.width;
+      const y = ((1 - signal[i]) * this.canvas.height) / 2;
+      
+      if (i === 0) {
+        this.ctx.moveTo(x, y);
+      } else {
+        this.ctx.lineTo(x, y);
       }
+    }
+    
+    this.ctx.stroke();
+  }
+
+  private drawQualityIndicators(quality: SignalQuality): void {
+    // Implementación básica de indicadores de calidad
+    const size = 10;
+    const color = quality.overall > 0.7 ? '#10b981' : quality.overall > 0.4 ? '#f59e0b' : '#ef4444';
+    
+    this.ctx.fillStyle = color;
+    this.ctx.fillRect(this.canvas.width - size - 5, 5, size, size);
+  }
+}
+
+class QualityVisualizer {
+  private config: VisualizerConfig;
+  private indicators: QualityIndicators;
+
+  constructor(config: VisualizerConfig) {
+    this.config = config;
+    this.indicators = this.initializeIndicators();
+  }
+
+  private initializeIndicators(): QualityIndicators {
+    return {
+      snr: { setValue: () => {} },
+      stability: { setValue: () => {} },
+      artifacts: { setValue: () => {} },
+      overall: { setValue: () => {} }
     };
   }
 
-  private assessInitialQuality(enhanced: any): number {
-    // Implementación de evaluación de calidad inicial
-    return 0;
+  async update(metrics: QualityMetrics): Promise<void> {
+    this.updateIndicators(metrics);
+  }
+
+  private updateIndicators(metrics: QualityMetrics): void {
+    Object.entries(metrics).forEach(([key, value]) => {
+      if (key in this.indicators) {
+        this.indicators[key as keyof QualityIndicators].setValue(value);
+      }
+    });
+  }
+}
+
+class AlertManager {
+  private config: AlertConfig;
+  private activeAlerts: Alert[] = [];
+
+  constructor(config: AlertConfig) {
+    this.config = config;
+  }
+
+  async show(alert: Alert): Promise<void> {
+    if (this.isDuplicate(alert)) return;
+    
+    this.activeAlerts.push(alert);
+    await this.displayAlert(alert);
+  }
+
+  private isDuplicate(alert: Alert): boolean {
+    return this.activeAlerts.some(a => 
+      a.type === alert.type && 
+      a.message === alert.message &&
+      Date.now() - a.timestamp < 3000
+    );
+  }
+
+  private async displayAlert(alert: Alert): Promise<void> {
+    if (this.config.visual) {
+      console.log('Alert:', alert.message);
+    }
+
+    if (this.config.haptic && navigator.vibrate) {
+      navigator.vibrate(200);
+    }
+
+    if (this.config.audio) {
+      const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1UVWVwfYiVoaqvtLS0r6qkm5MGAAAAAQEBAQEBAQEBAQEBAQEBAgEBAQECAQECAQECAQIBAgECAgICAgECAgICAgICAgMCAgMCAwICAwMDAgMDAwMDAwMEAwQDBAMEBAQEBAQEBAQFBAUEBQQFBQUFBQUGBQYFBgUGBgYGBgYHBgcGBwYHBwcHBwcIBwgHCAcICAgICAgJCAkICQgJCQkJCQkKCQoJCgkKCgoKCgoLCgsKCwoLCwsLCwsMCwwLDAsM');
+      await audio.play();
+    }
+  }
+
+  private getAlertElement(alert: Alert): HTMLElement {
+    const element = document.createElement('div');
+    element.className = 'fixed bottom-4 right-4 bg-black/80 text-white px-4 py-2 rounded-lg shadow-lg';
+    element.textContent = alert.message;
+    return element;
   }
 }

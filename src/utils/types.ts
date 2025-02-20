@@ -152,3 +152,58 @@ export class ProcessingError extends Error {
     this.name = 'ProcessingError';
   }
 }
+
+export interface DisplayConfig {
+  refreshRate: number;
+  interpolation: string;
+}
+
+export interface VisualizerConfig {
+  updateRate: number;
+  smoothing: boolean;
+}
+
+export interface AlertConfig {
+  visual: boolean;
+  haptic: boolean;
+  audio: boolean;
+}
+
+export interface Alert {
+  type: string;
+  message: string;
+  suggestion?: string;
+  priority: 'low' | 'medium' | 'high';
+}
+
+export interface SignalData {
+  signal?: number[];
+  quality?: SignalQuality;
+  data?: any;
+  timestamp: number;
+}
+
+export interface SignalQuality {
+  snr: number;
+  stability: number;
+  artifacts: number;
+  overall: number;
+}
+
+export interface QualityMetrics {
+  snr: number;
+  stability: number;
+  artifacts: number;
+  overall: number;
+}
+
+export interface QualityIndicators {
+  snr: Indicator;
+  stability: Indicator;
+  artifacts: Indicator;
+  overall: Indicator;
+}
+
+interface Indicator {
+  setValue(value: number): void;
+}
