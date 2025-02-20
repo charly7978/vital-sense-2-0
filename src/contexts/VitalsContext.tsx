@@ -60,11 +60,33 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const { toast } = useToast();
 
-  // Actualización de configuraciones de sensibilidad
   const updateSensitivitySettings = useCallback((settings: SensitivitySettings) => {
     setSensitivitySettings(settings);
     ppgProcessor.updateSensitivitySettings(settings);
   }, []);
+
+  const resetMeasurements = useCallback(() => {
+    setBpm(0);
+    setSpo2(0);
+    setSystolic(0);
+    setDiastolic(0);
+    setHasArrhythmia(false);
+    setArrhythmiaType('Normal');
+    setReadings([]);
+    setMeasurementProgress(0);
+    setMeasurementQuality(0);
+  }, []);
+
+  const resetMeasurement = useCallback(() => {
+    resetMeasurements();
+    if (isStarted) {
+      toggleMeasurement();
+    }
+    toast({
+      title: "Medición reiniciada",
+      description: "Los valores han sido reiniciados."
+    });
+  }, [isStarted, resetMeasurements, toast]);
 
   const processFrame = useCallback(async (imageData: ImageData) => {
     if (!isStarted) return;
@@ -116,7 +138,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         toast({
           title: "Calidad de señal baja",
           description: "Por favor, ajuste la posición de su dedo",
-          variant: "warning"
+          variant: "destructive"
         });
       }
 
@@ -131,33 +153,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
     }
   }, [isStarted, toast]);
-
-  const resetMeasurements = useCallback(() => {
-    setBpm(0);
-    setSpo2(0);
-    setSystolic(0);
-    setDiastolic(0);
-    setHasArrhythmia(false);
-    setArrhythmiaType('Normal');
-    setReadings([]);
-    setMeasurementProgress(0);
-    setMeasurementQuality(0);
-  }, []);
-
-  const resetMeasurement = useCallback(() => {
-    resetMeasurements();
-    if (isStarted) {
-      toggleMeasurement();
-    }
-    toast({
-      title: "Medición reiniciada",
-      description: "Los valores han sido reiniciados."
-    });
-  }, [isStarted, resetMeasurements, toast]);
-
-  const updateSensitivitySettings = useCallback((newSettings: SensitivitySettings) => {
-    setSensitivitySettings(newSettings);
-  }, []);
 
   const toggleMeasurement = useCallback(() => {
     if (isStarted) {
