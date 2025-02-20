@@ -34,27 +34,28 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
     };
 
     if (isAndroid) {
-      constraints.advanced = [{ torch: false }];
-      console.log("🔦 Configurando cámara con linterna apagada");
+      constraints.advanced = [{ torch: true }]; // Activamos la linterna
+      console.log("🔦 Configurando cámara con linterna encendida");
     }
 
     return constraints;
   };
 
-  const ensureTorchOff = async () => {
+  const enableTorch = async () => {
     if (webcamRef.current?.video) {
       const stream = webcamRef.current.video.srcObject as MediaStream;
       const track = stream?.getVideoTracks()[0];
       
-      if (track?.getCapabilities?.()?.torch) {
-        try {
+      try {
+        const capabilities = track?.getCapabilities();
+        if (capabilities && 'torch' in capabilities) {
           await track.applyConstraints({
-            advanced: [{ torch: false }]
+            advanced: [{ torch: true }]
           });
-          console.log("🔦 Linterna forzada a apagarse");
-        } catch (error) {
-          console.error("Error al intentar apagar la linterna:", error);
+          console.log("🔦 Linterna activada correctamente");
         }
+      } catch (error) {
+        console.error("Error al intentar encender la linterna:", error);
       }
     }
   };
@@ -77,10 +78,6 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       context.drawImage(video, 0, 0);
-
-      // Aplicar un ligero oscurecimiento a la imagen
-      context.fillStyle = 'rgba(0, 0, 0, 0.2)';
-      context.fillRect(0, 0, canvas.width, canvas.height);
       
       const frameData = context.getImageData(0, 0, canvas.width, canvas.height);
       
@@ -119,8 +116,8 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
     if (isActive) {
       setIsMeasuring(true);
       processFrame();
-      // Asegurarse de que la linterna esté apagada cuando se inicia la medición
-      ensureTorchOff();
+      // Activar la linterna cuando se inicia la medición
+      enableTorch();
     } else {
       stopCamera();
     }
@@ -141,7 +138,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
         audio={false}
         videoConstraints={getDeviceConstraints()}
         className="absolute inset-0 w-full h-full object-cover"
-        onUserMedia={ensureTorchOff}
+        onUserMedia={enableTorch}
       />
       <canvas 
         ref={canvasRef} 

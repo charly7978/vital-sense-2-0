@@ -1,23 +1,22 @@
-
 import { QuantumHeartbeatDetector } from './QuantumHeartbeatDetector';
 import type { ProcessedPPGSignal, SensitivitySettings } from './types';
 
 export class UltraAdvancedPPGProcessor {
   private readonly heartbeatDetector: QuantumHeartbeatDetector;
   private sensitivitySettings: SensitivitySettings = {
-    signalAmplification: 3.5,      // Aumentado significativamente para luz ambiental
-    noiseReduction: 1.8,           // Mayor reducción de ruido
-    peakDetection: 1.8,           // Mayor sensibilidad en detección de picos
-    heartbeatThreshold: 0.25,     // Umbral más bajo para detectar cambios sutiles
+    signalAmplification: 1.2,      // Reducido para luz activa
+    noiseReduction: 1.5,           // Mantiene buen filtrado
+    peakDetection: 2.0,           // Aumentado para mejor detección con luz directa
+    heartbeatThreshold: 0.4,      // Umbral más alto para señal fuerte
     responseTime: 1.0,
-    signalStability: 0.8,         // Mayor estabilidad para compensar variaciones
-    brightness: 1.5,              // Mayor brillo para compensar luz ambiental
-    redIntensity: 1.8            // Mayor sensibilidad al rojo
+    signalStability: 0.9,         // Mayor estabilidad con luz constante
+    brightness: 1.0,              // Normal con luz activa
+    redIntensity: 1.2            // Ajustado para luz directa
   };
   
   constructor() {
     this.heartbeatDetector = new QuantumHeartbeatDetector();
-    console.log('🌟 Iniciando procesador PPG optimizado para luz ambiental');
+    console.log('🌟 Iniciando procesador PPG optimizado para luz activa');
   }
 
   updateSensitivitySettings(settings: Partial<SensitivitySettings>) {
