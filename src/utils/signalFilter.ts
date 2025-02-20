@@ -1,66 +1,89 @@
 
 export class SignalFilter {
   private readonly sampleRate: number;
-  private kalmanState = {
-    x: 0,
-    p: 1,
-    q: 0.1,
-    r: 1
-  };
+  private readonly bufferSize = 64;
+  private readonly alpha = 0.95; // Coeficiente para filtro paso bajo
+  private readonly beta = 0.85;  // Coeficiente para filtro de mediana móvil
+  private readonly gamma = 0.75; // Coeficiente para eliminación de tendencia
+  private lastFiltered = 0;
+  private medianBuffer: number[] = [];
+  private readonly baselineWindow = 25;
+  private baseline = 0;
 
   constructor(sampleRate: number = 30) {
     this.sampleRate = sampleRate;
   }
 
-  lowPassFilter(signal: number[], cutoffFreq: number): number[] {
-    // Apply Kalman filter first
-    const kalmanFiltered = signal.map(value => this.kalmanFilter(value));
-    
+  public lowPassFilter(signal: number[], cutoffFreq: number): number[] {
     const filtered: number[] = [];
     const rc = 1.0 / (cutoffFreq * 2 * Math.PI);
     const dt = 1.0 / this.sampleRate;
     const alpha = dt / (rc + dt);
-    const windowSize = Math.min(10, signal.length);
-    
-    // Apply Hamming window for better frequency response
-    for (let i = 0; i < kalmanFiltered.length; i++) {
-      let sum = 0;
-      let weightSum = 0;
-      
-      for (let j = Math.max(0, i - windowSize + 1); j <= i; j++) {
-        const weight = 0.54 - 0.46 * Math.cos((2 * Math.PI * (j - i + windowSize)) / windowSize);
-        sum += kalmanFiltered[j] * weight;
-        weightSum += weight;
+
+    // Aplicar filtro paso bajo con ventana deslizante
+    for (let i = 0; i < signal.length; i++) {
+      if (i === 0) {
+        filtered[i] = signal[i];
+        continue;
       }
+
+      // Aplicar filtro exponencial
+      filtered[i] = alpha * signal[i] + (1 - alpha) * filtered[i - 1];
       
-      filtered[i] = sum / weightSum;
+      // Aplicar filtro de mediana móvil
+      const windowStart = Math.max(0, i - this.bufferSize);
+      const window = signal.slice(windowStart, i + 1);
+      const median = this.calculateMedian(window);
+      
+      // Combinar filtros con pesos
+      filtered[i] = this.alpha * filtered[i] + 
+                   (1 - this.alpha) * (this.beta * median + (1 - this.beta) * signal[i]);
     }
-    
-    // Apply additional RC filter for smoother output
-    let lastFiltered = filtered[0];
-    for (let i = 1; i < signal.length; i++) {
-      lastFiltered = lastFiltered + alpha * (filtered[i] - lastFiltered);
-      filtered[i] = lastFiltered;
-    }
-    
-    return filtered;
+
+    // Eliminar tendencia de la señal
+    return this.removeTrend(filtered);
   }
 
-  private kalmanFilter(measurement: number): number {
-    // Prediction step
-    const predictedState = this.kalmanState.x;
-    const predictedCovariance = this.kalmanState.p + this.kalmanState.q;
+  private calculateMedian(values: number[]): number {
+    if (values.length === 0) return 0;
+    const sorted = [...values].sort((a, b) => a - b);
+    const middle = Math.floor(sorted.length / 2);
     
-    // Update step
-    const kalmanGain = predictedCovariance / (predictedCovariance + this.kalmanState.r);
-    this.kalmanState.x = predictedState + kalmanGain * (measurement - predictedState);
-    this.kalmanState.p = (1 - kalmanGain) * predictedCovariance;
-    
-    return this.kalmanState.x;
+    if (sorted.length % 2 === 0) {
+      return (sorted[middle - 1] + sorted[middle]) / 2;
+    }
+    return sorted[middle];
   }
 
-  updateKalmanParameters(q: number, r: number) {
-    this.kalmanState.q = q;
-    this.kalmanState.r = r;
+  private removeTrend(signal: number[]): number[] {
+    const detrended: number[] = [];
+    let baseline = signal[0];
+
+    for (let i = 0; i < signal.length; i++) {
+      // Actualizar línea base con ventana móvil
+      const windowStart = Math.max(0, i - this.baselineWindow);
+      const windowEnd = Math.min(signal.length, i + this.baselineWindow + 1);
+      const window = signal.slice(windowStart, windowEnd);
+      const localBaseline = this.calculateMedian(window);
+
+      // Actualizar línea base con suavizado exponencial
+      baseline = this.gamma * baseline + (1 - this.gamma) * localBaseline;
+
+      // Eliminar tendencia
+      detrended[i] = signal[i] - baseline;
+    }
+
+    return this.normalizeSignal(detrended);
+  }
+
+  private normalizeSignal(signal: number[]): number[] {
+    const max = Math.max(...signal);
+    const min = Math.min(...signal);
+    const range = max - min;
+
+    if (range === 0) return signal;
+
+    return signal.map(value => (value - min) / range * 2 - 1);
   }
 }
+
