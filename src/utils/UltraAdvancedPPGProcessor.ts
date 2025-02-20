@@ -1,3 +1,4 @@
+
 import { CircularBuffer } from './circularBuffer';
 import { CardiacAnalysisPro } from './CardiacAnalysisPro';
 import { 
@@ -51,8 +52,6 @@ export class UltraAdvancedPPGProcessor {
   };
 
   private cardiacAnalyzer: CardiacAnalysisPro;
-  private lastCardiacAnalysisTime: number = 0;
-  private readonly CARDIAC_ANALYSIS_INTERVAL = 1000; // 1 segundo entre análisis cardíacos
 
   constructor() {
     this.cardiacAnalyzer = new CardiacAnalysisPro();
@@ -85,18 +84,12 @@ export class UltraAdvancedPPGProcessor {
       console.log('🎥 Procesando frame...');
       
       // Extraer señal PPG del frame
-      console.log('📊 Extrayendo canal rojo...');
       const redChannel = this.extractRedChannel(frame);
-      
-      // Almacenar en buffer raw
       redChannel.forEach(value => this.buffers.raw.push(value));
       
       // Procesar señal
-      console.log('🔄 Procesando señal...');
       const rawData = this.buffers.raw.getData();
       const smoothedSignal = this.movingAverage(rawData, 5);
-      
-      // Almacenar señal procesada
       smoothedSignal.forEach(value => this.buffers.processed.push(value));
       
       // Obtener últimos N puntos para análisis
@@ -104,16 +97,20 @@ export class UltraAdvancedPPGProcessor {
       const signalForAnalysis = processedData.slice(-100);
       
       // Análisis de características
-      console.log('📈 Analizando características de la señal...');
       const peaks = this.findPeaks(signalForAnalysis);
       const valleys = this.findValleys(signalForAnalysis);
       const frequency = this.calculateFrequency(peaks);
       const amplitude = Math.max(...signalForAnalysis) - Math.min(...signalForAnalysis);
       const signalQuality = this.calculateSignalQuality(signalForAnalysis);
+
+      // Actualizar buffer de calidad
+      this.buffers.quality.push(signalQuality);
       
-      console.log('📊 Calidad de la señal:', signalQuality);
-      console.log('⚡ Picos detectados:', peaks.length);
-      console.log('💗 Frecuencia:', frequency);
+      // Calcular calidad promedio
+      const qualityData = this.buffers.quality.getData();
+      const averageQuality = qualityData.reduce((a, b) => a + b, 0) / qualityData.length;
+      
+      console.log('📊 Calidad promedio de la señal:', averageQuality);
 
       // Características de la señal
       const features: SignalFeatures = {
@@ -128,12 +125,9 @@ export class UltraAdvancedPPGProcessor {
       const bpm = frequency * 60;
       console.log('💓 BPM calculado:', bpm);
       
-      const spo2 = signalQuality > 0.6 ? Math.round(95 + (signalQuality * 4)) : 0;
-      const systolic = signalQuality > 0.7 ? Math.round(120 + (amplitude * 10)) : 0;
-      const diastolic = signalQuality > 0.7 ? Math.round(80 + (amplitude * 5)) : 0;
-      
-      console.log('🫁 SpO2:', spo2);
-      console.log('🩺 Presión:', systolic, '/', diastolic);
+      const spo2 = averageQuality > 0.6 ? Math.round(95 + (averageQuality * 4)) : 0;
+      const systolic = averageQuality > 0.7 ? Math.round(120 + (amplitude * 10)) : 0;
+      const diastolic = averageQuality > 0.7 ? Math.round(80 + (amplitude * 5)) : 0;
 
       const hrv = this.calculateHeartRateVariability(peaks);
       const hasArrhythmia = hrv > 0.2;
@@ -141,9 +135,9 @@ export class UltraAdvancedPPGProcessor {
       // Crear señal procesada inicial
       const processedSignal: ProcessedPPGSignal = {
         signal: smoothedSignal,
-        quality: signalQuality,
+        quality: averageQuality,
         features,
-        confidence: signalQuality,
+        confidence: averageQuality,
         timestamp: Date.now(),
         bpm: Math.round(bpm),
         spo2,
@@ -152,28 +146,19 @@ export class UltraAdvancedPPGProcessor {
         hasArrhythmia,
         arrhythmiaType: hasArrhythmia ? 'Irregular' : 'Normal',
         readings: [],
-        signalQuality
+        signalQuality: averageQuality
       };
 
-      // Análisis cardíaco avanzado si la calidad es buena y ha pasado suficiente tiempo
-      const currentTime = Date.now();
-      if (signalQuality > 0.6 && (currentTime - this.lastCardiacAnalysisTime) > this.CARDIAC_ANALYSIS_INTERVAL) {
+      // Análisis cardíaco avanzado si la calidad es buena
+      if (averageQuality > 0.6) {
         console.log('🔬 Iniciando análisis cardíaco avanzado...');
         const cardiacAnalysis = await this.cardiacAnalyzer.analyzeCardiacSignal(processedSignal);
-        this.lastCardiacAnalysisTime = currentTime;
         
         if (cardiacAnalysis.valid && cardiacAnalysis.heartbeat) {
-          console.log('✨ Análisis cardíaco exitoso:', cardiacAnalysis);
           processedSignal.hasArrhythmia = cardiacAnalysis.arrhythmia?.isCritical || false;
           processedSignal.arrhythmiaType = cardiacAnalysis.arrhythmia?.type || 'Normal';
           processedSignal.confidence = cardiacAnalysis.heartbeat.confidence;
-
-          // El sonido y la visualización los maneja internamente CardiacAnalysisPro
-        } else {
-          console.warn('⚠️ Análisis cardíaco no válido:', cardiacAnalysis.reason);
         }
-      } else if (signalQuality <= 0.6) {
-        console.log('⚠️ Calidad insuficiente para análisis avanzado');
       }
 
       const reading: VitalReading = {
@@ -182,9 +167,9 @@ export class UltraAdvancedPPGProcessor {
       };
       processedSignal.readings = [reading];
 
-      await this.updateFeedback(smoothedSignal, signalQuality);
+      // Actualizar feedback y visualización
+      await this.updateFeedback(smoothedSignal, averageQuality);
 
-      console.log('✅ Señal procesada:', processedSignal);
       return processedSignal;
     } catch (error) {
       console.error('❌ Error en procesamiento:', error);
