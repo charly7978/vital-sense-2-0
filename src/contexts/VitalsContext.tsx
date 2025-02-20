@@ -1,8 +1,8 @@
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 import { BeepPlayer } from '../utils/audioUtils';
-import { UltraAdvancedPPGProcessor } from '../utils/UltraAdvancedPPGProcessor';
+import { PPGProcessor } from '../utils/ppgProcessor';
 import { useToast } from "@/hooks/use-toast";
-import type { VitalReading, SensitivitySettings, ProcessedSignal } from '../utils/types';
+import type { VitalReading, SensitivitySettings } from '../utils/types';
 
 interface VitalsContextType {
   bpm: number;
@@ -25,8 +25,8 @@ interface VitalsContextType {
 
 const VitalsContext = createContext<VitalsContextType | undefined>(undefined);
 
-const ppgProcessor = new UltraAdvancedPPGProcessor('signalCanvas', 'qualityIndicator');
 const beepPlayer = new BeepPlayer();
+const ppgProcessor = new PPGProcessor();
 
 const MEASUREMENT_DURATION = 30;
 
@@ -43,9 +43,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [measurementProgress, setMeasurementProgress] = useState(0);
   const [measurementQuality, setMeasurementQuality] = useState(0);
   const [measurementStartTime, setMeasurementStartTime] = useState<number | null>(null);
-  const lastProcessedTime = useRef<number>(0);
-  const processingInterval = 33; // ~30fps
-
   const [sensitivitySettings, setSensitivitySettings] = useState<SensitivitySettings>({
     signalAmplification: 1.5,
     noiseReduction: 1.2,
@@ -58,11 +55,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   });
 
   const { toast } = useToast();
-
-  const updateSensitivitySettings = useCallback((settings: SensitivitySettings) => {
-    setSensitivitySettings(settings);
-    ppgProcessor.updateSensitivitySettings(settings);
-  }, []);
 
   const resetMeasurements = useCallback(() => {
     setBpm(0);
@@ -79,8 +71,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const resetMeasurement = useCallback(() => {
     resetMeasurements();
     if (isStarted) {
-      setIsStarted(false);
-      setMeasurementStartTime(null);
+      toggleMeasurement();
     }
     toast({
       title: "Medición reiniciada",
@@ -88,43 +79,37 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   }, [isStarted, resetMeasurements, toast]);
 
-  const processFrame = useCallback(async (imageData: ImageData) => {
-    if (!isStarted) {
-      console.log('[PPG] Medición no iniciada, ignorando frame');
-      return;
-    }
+  const updateSensitivitySettings = useCallback((newSettings: SensitivitySettings) => {
+    setSensitivitySettings(newSettings);
+    ppgProcessor.updateSensitivitySettings(newSettings);
+  }, []);
 
-    const currentTime = Date.now();
-    if (currentTime - lastProcessedTime.current < processingInterval) {
-      console.log('[PPG] Frame ignorado por intervalo mínimo no cumplido');
-      return;
-    }
-    lastProcessedTime.current = currentTime;
+  const processFrame = useCallback(async (imageData: ImageData) => {
+    if (!isStarted) return;
 
     try {
-      setIsProcessing(true);
-      console.log('[PPG] Enviando frame a procesador PPG');
-      const processedSignal = await ppgProcessor.processFrame(imageData);
-      console.log('[PPG] Señal procesada:', processedSignal);
+      const vitals = await ppgProcessor.processFrame(imageData);
       
-      // Actualizar todas las métricas vitales
-      if (processedSignal.bpm) setBpm(processedSignal.bpm);
-      if (processedSignal.spo2) setSpo2(processedSignal.spo2);
-      if (processedSignal.systolic) setSystolic(processedSignal.systolic);
-      if (processedSignal.diastolic) setDiastolic(processedSignal.diastolic);
-      if (processedSignal.hasArrhythmia !== undefined) setHasArrhythmia(processedSignal.hasArrhythmia);
-      if (processedSignal.arrhythmiaType) setArrhythmiaType(processedSignal.arrhythmiaType);
-      
-      // Actualizar calidad y lecturas
-      setMeasurementQuality(processedSignal.quality.overall);
-      if (processedSignal.readings) {
-        setReadings(prev => [...prev, ...processedSignal.readings].slice(-100));
-      }
+      if (vitals) {
+        if (vitals.isPeak) {
+          console.log('Pico detectado - Reproduciendo beep');
+          await beepPlayer.playBeep('heartbeat', vitals.signalQuality);
+        }
 
-      setIsProcessing(false);
+        if (vitals.bpm > 0) setBpm(vitals.bpm);
+        if (vitals.spo2 > 0) setSpo2(vitals.spo2);
+        if (vitals.systolic > 0 && vitals.diastolic > 0) {
+          setSystolic(vitals.systolic);
+          setDiastolic(vitals.diastolic);
+        }
+        
+        setHasArrhythmia(vitals.hasArrhythmia);
+        setArrhythmiaType(vitals.arrhythmiaType);
+        setReadings(ppgProcessor.getReadings());
+        setMeasurementQuality(vitals.signalQuality);
+      }
     } catch (error) {
-      console.error('[PPG] Error procesando frame:', error);
-      setIsProcessing(false);
+      console.error('Error procesando frame:', error);
       toast({
         variant: "destructive",
         title: "Error en el procesamiento",
@@ -134,18 +119,11 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [isStarted, toast]);
 
   const toggleMeasurement = useCallback(() => {
-    console.log('[PPG] Toggling medición:', {
-      estadoActual: isStarted,
-      nuevoEstado: !isStarted
-    });
-
     if (isStarted) {
-      console.log('[PPG] Deteniendo medición');
       setIsStarted(false);
       setMeasurementStartTime(null);
       resetMeasurements();
     } else {
-      console.log('[PPG] Iniciando medición');
       resetMeasurements();
       setIsStarted(true);
       setMeasurementStartTime(Date.now());
@@ -160,19 +138,12 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     let interval: NodeJS.Timeout;
 
     if (isStarted && measurementStartTime) {
-      console.log('[PPG] Iniciando temporizador de medición');
       interval = setInterval(() => {
         const elapsed = (Date.now() - measurementStartTime) / 1000;
         const progress = Math.min((elapsed / MEASUREMENT_DURATION) * 100, 100);
-        console.log('[PPG] Progreso de medición:', {
-          elapsed,
-          progress,
-          measurementStartTime
-        });
         setMeasurementProgress(progress);
 
         if (elapsed >= MEASUREMENT_DURATION) {
-          console.log('[PPG] Medición completada por tiempo');
           setIsStarted(false);
           toast({
             title: "Medición completada",
@@ -184,7 +155,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     return () => {
       if (interval) {
-        console.log('[PPG] Limpiando temporizador de medición');
         clearInterval(interval);
       }
     };
