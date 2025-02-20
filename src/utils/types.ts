@@ -1,4 +1,3 @@
-
 export interface VitalReading {
   [key: string]: number;
   timestamp: number;
@@ -81,3 +80,72 @@ export interface BPCalibrationData {
   is_active: boolean;
 }
 
+export interface RawSignal {
+  red: number[];
+  ir: number[];
+  quality: number;
+}
+
+export interface QuantumSignal {
+  data: number[];
+  quality: number;
+  phase: number;
+}
+
+export interface SpectralData {
+  frequencies: number[];
+  amplitudes: number[];
+  phase: number[];
+}
+
+export interface ProcessedData {
+  signal: number[];
+  features: any;
+  quality: number;
+}
+
+export interface OptimizedSignal {
+  data: number[];
+  quality: number;
+  confidence: number;
+}
+
+export interface ValidatedSignal {
+  data: number[];
+  quality: number;
+  features: SignalFeatures;
+}
+
+export interface SignalFeatures {
+  peaks: number[];
+  valleys: number[];
+  frequency: number;
+  amplitude: number;
+  perfusionIndex: number;
+}
+
+export interface ROI {
+  region: ImageData;
+  quality: number;
+}
+
+export interface Channels {
+  red: number[];
+  ir: number[];
+  ambient: number[];
+}
+
+export interface ProcessedPPGSignal {
+  signal: ValidatedSignal;
+  quality: number;
+  features: SignalFeatures;
+  confidence: number;
+  timestamp: number;
+}
+
+export class ProcessingError extends Error {
+  constructor(message: string, public originalError?: any) {
+    super(message);
+    this.name = 'ProcessingError';
+  }
+}
