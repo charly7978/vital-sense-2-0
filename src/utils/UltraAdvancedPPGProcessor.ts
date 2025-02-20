@@ -1,5 +1,5 @@
-
 import { CircularBuffer } from './circularBuffer';
+import { CardiacAnalysisPro } from './CardiacAnalysisPro';
 import { 
   ProcessedPPGSignal, 
   SignalQuality, 
@@ -50,7 +50,10 @@ export class UltraAdvancedPPGProcessor {
     alerts: AlertManager;
   };
 
+  private cardiacAnalyzer: CardiacAnalysisPro;
+
   constructor() {
+    this.cardiacAnalyzer = new CardiacAnalysisPro();
     this.feedbackSystem = {
       display: new DisplayManager({
         refreshRate: 60,
@@ -112,7 +115,7 @@ export class UltraAdvancedPPGProcessor {
         perfusionIndex: this.calculatePerfusionIndexSafe(signalForAnalysis)
       };
 
-      // Cálculos vitales
+      // Cálculos vitales básicos
       const bpm = frequency * 60;
       console.log('BPM calculado:', bpm);
       
@@ -122,14 +125,8 @@ export class UltraAdvancedPPGProcessor {
       
       const hrv = this.calculateHeartRateVariability(peaks);
       const hasArrhythmia = hrv > 0.2;
-      
-      const reading: VitalReading = {
-        timestamp: Date.now(),
-        value: smoothedSignal[smoothedSignal.length - 1] || 0
-      };
 
-      await this.updateFeedback(smoothedSignal, signalQuality);
-
+      // Crear señal procesada inicial
       const processedSignal: ProcessedPPGSignal = {
         signal: smoothedSignal,
         quality: signalQuality,
@@ -142,9 +139,29 @@ export class UltraAdvancedPPGProcessor {
         diastolic,
         hasArrhythmia,
         arrhythmiaType: hasArrhythmia ? 'Irregular' : 'Normal',
-        readings: [reading],
+        readings: [],
         signalQuality
       };
+
+      // Análisis cardíaco avanzado si la calidad es buena
+      if (signalQuality > 0.6) {
+        const cardiacAnalysis = await this.cardiacAnalyzer.analyzeCardiacSignal(processedSignal);
+        
+        if (cardiacAnalysis.valid && cardiacAnalysis.heartbeat) {
+          // Actualizar valores con análisis más preciso
+          processedSignal.hasArrhythmia = cardiacAnalysis.arrhythmia?.isCritical || false;
+          processedSignal.arrhythmiaType = cardiacAnalysis.arrhythmia?.type || 'Normal';
+          processedSignal.confidence = cardiacAnalysis.heartbeat.confidence;
+        }
+      }
+
+      const reading: VitalReading = {
+        timestamp: Date.now(),
+        value: smoothedSignal[smoothedSignal.length - 1] || 0
+      };
+      processedSignal.readings = [reading];
+
+      await this.updateFeedback(smoothedSignal, signalQuality);
 
       console.log('Señal procesada:', processedSignal);
       return processedSignal;
