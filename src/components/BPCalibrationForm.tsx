@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,26 +25,20 @@ const BPCalibrationForm = () => {
 
     try {
       const calibrationData: BPCalibrationData = {
-        calibration_type: 'blood_pressure',
-        calibration_values: {
-          systolic_reference: systolic,
-          diastolic_reference: diastolic,
-        },
-        environmental_data: {
+        systolic_reference: systolic,
+        diastolic_reference: diastolic,
+        age,
+        weight,
+        height,
+        notes,
+        environmental_conditions: {
           timestamp: new Date().toISOString(),
           device_type: navigator.userAgent,
         },
-        reference_measurements: {
-          age,
-          weight,
-          height,
-          notes,
-        },
-        is_active: true
       };
 
       const { error } = await supabase
-        .from('unified_calibration')
+        .from('blood_pressure_calibration')
         .insert([calibrationData]);
 
       if (error) throw error;

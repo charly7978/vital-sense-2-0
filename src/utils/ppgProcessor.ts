@@ -51,10 +51,10 @@ export class PPGProcessor {
     MIN_PEAK_DISTANCE: 400,
     MAX_PEAK_DISTANCE: 1200,
     PEAK_THRESHOLD_FACTOR: 0.4,
-    MIN_RED_VALUE: 150,
-    MIN_RED_DOMINANCE: 2.0,
-    MIN_VALID_PIXELS_RATIO: 0.4,
-    MIN_BRIGHTNESS: 150,
+    MIN_RED_VALUE: 15,
+    MIN_RED_DOMINANCE: 1.2,
+    MIN_VALID_PIXELS_RATIO: 0.2,
+    MIN_BRIGHTNESS: 80,
     MIN_VALID_READINGS: 30,
     FINGER_DETECTION_DELAY: 500,
     MIN_SPO2: 75
@@ -182,27 +182,19 @@ export class PPGProcessor {
     
     const { red, ir, quality } = this.signalExtractor.extractChannels(imageData);
     
-    const isFingerDetected = 
-      red > this.processingSettings.MIN_RED_VALUE && 
-      quality > this.qualityThreshold &&
-      red / Math.max(1, (imageData.data[1] + imageData.data[2]) / 2) > this.processingSettings.MIN_RED_DOMINANCE;
-
     console.log('Estado del sensor:', {
-      detectandoDedo: isFingerDetected,
+      detectandoDedo: red > this.processingSettings.MIN_RED_VALUE,
       valorRojo: red.toFixed(2),
       umbralMinimo: this.processingSettings.MIN_RED_VALUE,
-      dominanciaRojo: (red / Math.max(1, (imageData.data[1] + imageData.data[2]) / 2)).toFixed(2),
-      umbralDominancia: this.processingSettings.MIN_RED_DOMINANCE,
       calidadSenal: (quality * 100).toFixed(1) + '%'
     });
     
-    if (!isFingerDetected) {
+    if (quality < this.qualityThreshold || red < this.processingSettings.MIN_RED_VALUE) {
       console.log('❌ No se detecta dedo o señal de baja calidad:', { 
         red: red.toFixed(2), 
         calidad: (quality * 100).toFixed(1) + '%',
         umbralCalidad: (this.qualityThreshold * 100).toFixed(1) + '%',
-        umbralRojo: this.processingSettings.MIN_RED_VALUE,
-        dominanciaRojo: (red / Math.max(1, (imageData.data[1] + imageData.data[2]) / 2)).toFixed(2)
+        umbralRojo: this.processingSettings.MIN_RED_VALUE
       });
       this.redBuffer = [];
       this.irBuffer = [];

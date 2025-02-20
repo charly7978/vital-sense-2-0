@@ -8,7 +8,7 @@ interface IndexProps {
 
 const Index: React.FC<IndexProps> = ({ onClose }) => {
   return (
-    <div className="h-screen w-screen bg-black/90 text-white overflow-hidden">
+    <div className="h-screen w-screen overflow-hidden">
       <button 
         onClick={onClose}
         className="absolute top-3 left-3 z-30 p-2 rounded-full bg-black/30 backdrop-blur-sm border border-white/10 text-white/80 hover:bg-black/40 transition-colors cursor-pointer"

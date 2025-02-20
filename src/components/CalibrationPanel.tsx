@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
-import { Heart, Target, Gauge, Waves } from 'lucide-react';
+import { Scale, Sparkles, Heart, Zap, Activity, Sun } from 'lucide-react';
 import type { SensitivitySettings } from '@/utils/types';
 
 interface CalibrationPanelProps {
@@ -26,113 +26,49 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
   };
 
   return (
-    <div className="max-w-3xl mx-auto mt-4">
+    <div className="max-w-3xl mx-auto space-y-4">
       <Card className="bg-black/30 backdrop-blur-md border-white/10">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-white text-lg">Calibración de Señal PPG</CardTitle>
-          <CardDescription className="text-gray-400 text-sm">
-            Ajustes técnicos del procesamiento de la señal fotopletismográfica
+        <CardHeader>
+          <CardTitle className="text-white">Panel de Calibración</CardTitle>
+          <CardDescription className="text-gray-400">
+            Ajusta los parámetros de sensibilidad para optimizar la detección
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid grid-cols-1 gap-3">
-            {/* Amplificación de Señal */}
-            <div className="bg-black/20 p-2 rounded-lg">
-              <div className="flex items-center justify-between mb-1.5">
+        <CardContent className="space-y-6">
+          <div className="space-y-4">
+            {/* Brillo */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <Target className="w-4 h-4 text-blue-400" />
+                  <Sun className="w-4 h-4 text-yellow-400" />
                   <label className="text-sm font-medium text-white">
-                    Ganancia del Sensor PPG
+                    Brillo
                   </label>
                 </div>
                 <span className="text-xs text-gray-400">
-                  {getValue('signalAmplification').toFixed(2)}x
+                  {getValue('brightness').toFixed(2)}x
                 </span>
               </div>
               <Slider
-                value={[getValue('signalAmplification')]}
-                min={1.0}
-                max={5.0}
-                step={0.1}
-                onValueChange={handleSettingChange('signalAmplification')}
-                className="[&_[role=slider]]:bg-blue-400"
-              />
-              <p className="text-xs text-gray-400 mt-2">
-                Ajusta la ganancia del sensor óptico para la captura de señal PPG.
-                <br />
-                ↑ Alto (5.0): Máxima sensibilidad para captar señales muy débiles
-                <br />
-                ↓ Bajo (1.0): Evita saturación en señales fuertes y piel clara
-              </p>
-            </div>
-
-            {/* Umbral de Detección */}
-            <div className="bg-black/20 p-2 rounded-lg">
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="flex items-center gap-2">
-                  <Heart className="w-4 h-4 text-red-400" />
-                  <label className="text-sm font-medium text-white">
-                    Umbral de Detección R-R
-                  </label>
-                </div>
-                <span className="text-xs text-gray-400">
-                  {getValue('peakDetection').toFixed(2)}x
-                </span>
-              </div>
-              <Slider
-                value={[getValue('peakDetection')]}
-                min={0.5}
-                max={2.5}
-                step={0.1}
-                onValueChange={handleSettingChange('peakDetection')}
-                className="[&_[role=slider]]:bg-red-400"
-              />
-              <p className="text-xs text-gray-400 mt-2">
-                Configura el umbral para detección de intervalos R-R en la señal PPG.
-                <br />
-                ↑ Alto (2.5): Mayor precisión, requiere señal fuerte y estable
-                <br />
-                ↓ Bajo (0.5): Mejor detección en señales débiles o irregulares
-              </p>
-            </div>
-
-            {/* Sensibilidad de Picos */}
-            <div className="bg-black/20 p-2 rounded-lg">
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="flex items-center gap-2">
-                  <Gauge className="w-4 h-4 text-green-400" />
-                  <label className="text-sm font-medium text-white">
-                    Discriminador de Impulsos
-                  </label>
-                </div>
-                <span className="text-xs text-gray-400">
-                  {getValue('heartbeatThreshold').toFixed(2)}x
-                </span>
-              </div>
-              <Slider
-                value={[getValue('heartbeatThreshold')]}
+                value={[getValue('brightness')]}
                 min={0.1}
-                max={1.0}
-                step={0.05}
-                onValueChange={handleSettingChange('heartbeatThreshold')}
-                className="[&_[role=slider]]:bg-green-400"
+                max={2}
+                step={0.1}
+                onValueChange={handleSettingChange('brightness')}
+                className="[&_[role=slider]]:bg-yellow-400"
               />
-              <p className="text-xs text-gray-400 mt-2">
-                Nivel de discriminación entre pulsos cardíacos y artefactos.
-                <br />
-                ↑ Alto (1.0): Máxima discriminación, elimina falsos positivos
-                <br />
-                ↓ Bajo (0.1): Mayor sensibilidad, útil en señales atenuadas
+              <p className="mt-1 text-xs text-gray-500">
+                Ajusta el brillo de la imagen capturada
               </p>
             </div>
 
-            {/* Filtro de Ruido */}
-            <div className="bg-black/20 p-2 rounded-lg">
-              <div className="flex items-center justify-between mb-1.5">
+            {/* Reducción de Ruido */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <Waves className="w-4 h-4 text-purple-400" />
+                  <Sparkles className="w-4 h-4 text-blue-400" />
                   <label className="text-sm font-medium text-white">
-                    Filtro Digital PPG
+                    Reducción de Ruido
                   </label>
                 </div>
                 <span className="text-xs text-gray-400">
@@ -142,22 +78,128 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
               <Slider
                 value={[getValue('noiseReduction')]}
                 min={0.5}
-                max={2.5}
+                max={2}
                 step={0.1}
                 onValueChange={handleSettingChange('noiseReduction')}
-                className="[&_[role=slider]]:bg-purple-400"
+                className="[&_[role=slider]]:bg-blue-400"
               />
-              <p className="text-xs text-gray-400 mt-2">
-                Filtrado digital de la señal PPG (paso bajo y banda).
-                <br />
-                ↑ Alto (2.5): Máxima limpieza, mejor para entornos ruidosos
-                <br />
-                ↓ Bajo (0.5): Mínimo procesamiento, preserva detalles de la onda
+              <p className="mt-1 text-xs text-gray-500">
+                Ajusta el nivel de filtrado de ruido
+              </p>
+            </div>
+
+            {/* Sensibilidad de Detección */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Scale className="w-4 h-4 text-green-400" />
+                  <label className="text-sm font-medium text-white">
+                    Sensibilidad de Detección
+                  </label>
+                </div>
+                <span className="text-xs text-gray-400">
+                  {getValue('peakDetection').toFixed(2)}x
+                </span>
+              </div>
+              <Slider
+                value={[getValue('peakDetection')]}
+                min={0.5}
+                max={2}
+                step={0.1}
+                onValueChange={handleSettingChange('peakDetection')}
+                className="[&_[role=slider]]:bg-green-400"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Controla la precisión en la detección de picos
+              </p>
+            </div>
+
+            {/* Umbral de Latidos */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Heart className="w-4 h-4 text-red-400" />
+                  <label className="text-sm font-medium text-white">
+                    Umbral de Latidos
+                  </label>
+                </div>
+                <span className="text-xs text-gray-400">
+                  {getValue('heartbeatThreshold').toFixed(2)}x
+                </span>
+              </div>
+              <Slider
+                value={[getValue('heartbeatThreshold')]}
+                min={0.1}
+                max={1}
+                step={0.05}
+                onValueChange={handleSettingChange('heartbeatThreshold')}
+                className="[&_[role=slider]]:bg-red-400"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Ajusta la sensibilidad para detectar latidos
+              </p>
+            </div>
+
+            {/* Tiempo de Respuesta */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-yellow-400" />
+                  <label className="text-sm font-medium text-white">
+                    Tiempo de Respuesta
+                  </label>
+                </div>
+                <span className="text-xs text-gray-400">
+                  {getValue('responseTime').toFixed(2)}x
+                </span>
+              </div>
+              <Slider
+                value={[getValue('responseTime')]}
+                min={0.5}
+                max={2}
+                step={0.1}
+                onValueChange={handleSettingChange('responseTime')}
+                className="[&_[role=slider]]:bg-yellow-400"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Controla la velocidad de respuesta del sensor
+              </p>
+            </div>
+
+            {/* Estabilidad de Señal */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-orange-400" />
+                  <label className="text-sm font-medium text-white">
+                    Estabilidad de Señal
+                  </label>
+                </div>
+                <span className="text-xs text-gray-400">
+                  {getValue('signalStability').toFixed(2)}x
+                </span>
+              </div>
+              <Slider
+                value={[getValue('signalStability')]}
+                min={0.1}
+                max={1}
+                step={0.05}
+                onValueChange={handleSettingChange('signalStability')}
+                className="[&_[role=slider]]:bg-orange-400"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Ajusta la estabilidad de la señal capturada
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      <div className="text-center">
+        <p className="text-xs text-gray-500">
+          Los cambios se aplican automáticamente
+        </p>
+      </div>
     </div>
   );
 };
