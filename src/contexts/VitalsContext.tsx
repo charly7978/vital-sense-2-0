@@ -80,9 +80,17 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       setReadings(prev => [...prev.slice(-100), newReading]);
       
-      // Actualizar métricas vitales
+      // Actualizar métricas vitales y reproducir sonido si se detecta un latido
       if (processedSignal.bpm > 40 && processedSignal.bpm < 200) {
         setBpm(Math.round(processedSignal.bpm));
+        
+        // Calcular volumen basado en la calidad de la señal
+        const volumeMultiplier = Math.min(1, processedSignal.signalQuality * 2);
+        
+        // Reproducir sonido de latido si la calidad de señal es aceptable
+        if (processedSignal.signalQuality > 0.3) {
+          beepPlayer.playHeartbeatSound(volumeMultiplier);
+        }
       }
 
       // Actualizar SpO2
