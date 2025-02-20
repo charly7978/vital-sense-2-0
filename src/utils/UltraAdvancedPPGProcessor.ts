@@ -51,6 +51,8 @@ export class UltraAdvancedPPGProcessor {
   };
 
   private cardiacAnalyzer: CardiacAnalysisPro;
+  private lastCardiacAnalysisTime: number = 0;
+  private readonly CARDIAC_ANALYSIS_INTERVAL = 1000; // 1 segundo entre análisis cardíacos
 
   constructor() {
     this.cardiacAnalyzer = new CardiacAnalysisPro();
@@ -153,20 +155,24 @@ export class UltraAdvancedPPGProcessor {
         signalQuality
       };
 
-      // Análisis cardíaco avanzado si la calidad es buena
-      if (signalQuality > 0.6) {
+      // Análisis cardíaco avanzado si la calidad es buena y ha pasado suficiente tiempo
+      const currentTime = Date.now();
+      if (signalQuality > 0.6 && (currentTime - this.lastCardiacAnalysisTime) > this.CARDIAC_ANALYSIS_INTERVAL) {
         console.log('🔬 Iniciando análisis cardíaco avanzado...');
         const cardiacAnalysis = await this.cardiacAnalyzer.analyzeCardiacSignal(processedSignal);
+        this.lastCardiacAnalysisTime = currentTime;
         
         if (cardiacAnalysis.valid && cardiacAnalysis.heartbeat) {
           console.log('✨ Análisis cardíaco exitoso:', cardiacAnalysis);
           processedSignal.hasArrhythmia = cardiacAnalysis.arrhythmia?.isCritical || false;
           processedSignal.arrhythmiaType = cardiacAnalysis.arrhythmia?.type || 'Normal';
           processedSignal.confidence = cardiacAnalysis.heartbeat.confidence;
+
+          // El sonido y la visualización los maneja internamente CardiacAnalysisPro
         } else {
           console.warn('⚠️ Análisis cardíaco no válido:', cardiacAnalysis.reason);
         }
-      } else {
+      } else if (signalQuality <= 0.6) {
         console.log('⚠️ Calidad insuficiente para análisis avanzado');
       }
 
