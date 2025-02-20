@@ -29,7 +29,7 @@ const CameraView: React.FC<CameraViewProps> = ({ onFrame, isActive, onMeasuremen
     width: { ideal: 1280 },
     height: { ideal: 720 },
     facingMode: isAndroid ? "environment" : "user",
-    advanced: isAndroid ? [{ torch: isMeasuring }] : undefined,
+    advanced: isAndroid ? [{ torch: false }] : undefined, // Forzamos la linterna apagada
   });
 
   const processFrame = () => {
