@@ -1,4 +1,3 @@
-
 import type { ProcessedPPGSignal, SensitivitySettings } from './types';
 
 export class WaveletPPGProcessor {
@@ -21,6 +20,14 @@ export class WaveletPPGProcessor {
 
   constructor() {
     console.log('🌊 Iniciando procesador PPG basado en Wavelets');
+  }
+
+  updateSensitivitySettings(settings: Partial<SensitivitySettings>): void {
+    this.sensitivitySettings = {
+      ...this.sensitivitySettings,
+      ...settings
+    };
+    console.log('🔧 Configuración actualizada:', this.sensitivitySettings);
   }
 
   async processFrame(imageData: ImageData): Promise<ProcessedPPGSignal> {
