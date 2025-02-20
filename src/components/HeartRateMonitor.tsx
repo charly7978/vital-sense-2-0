@@ -1,12 +1,12 @@
 
 import React, { useState } from 'react';
-import { Activity } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import CameraView from './CameraView';
 import VitalChart from './VitalChart';
 import VitalSignsDisplay from './vitals/VitalSignsDisplay';
 import SignalQualityIndicator from './vitals/SignalQualityIndicator';
 import MeasurementControls from './vitals/MeasurementControls';
-import AutoCalibrationButton from './vitals/AutoCalibrationButton';
+import CalibrationPanel from './CalibrationPanel';
 import { useVitals } from '@/contexts/VitalsContext';
 import { Button } from "@/components/ui/button";
 
@@ -29,6 +29,8 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
     measurementQuality,
     toggleMeasurement,
     processFrame,
+    sensitivitySettings,
+    updateSensitivitySettings,
     resetMeasurement
   } = useVitals();
 
@@ -45,7 +47,7 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
       <div className="absolute inset-0 z-20">
         <div className="h-full w-full relative">
           {/* Vista del Monitor */}
-          <div className="absolute inset-0 transition-all duration-500">
+          <div className={`absolute inset-0 transition-transform duration-500 ${currentView === 'monitor' ? 'translate-x-0' : '-translate-x-full'}`}>
             <div className="h-full w-full p-3 flex flex-col">
               <div className="space-y-2">
                 {isStarted && (
@@ -67,34 +69,6 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
                       </p>
                     </div>
                   </div>
-                )}
-
-                {isStarted && (
-                  <>
-                    <div className="bg-black/30 backdrop-blur-md rounded-lg p-2 border border-white/10">
-                      <AutoCalibrationButton />
-                    </div>
-                    
-                    {/* Animación de Calibración */}
-                    <div className="relative overflow-hidden rounded-lg bg-gradient-to-r from-blue-500/20 to-purple-500/20 backdrop-blur-md p-4 border border-white/10">
-                      <div className="flex items-center justify-center space-x-3">
-                        <Activity className="w-5 h-5 text-blue-400 animate-pulse" />
-                        <div className="flex flex-col items-start">
-                          <div className="flex space-x-2 items-center">
-                            <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-ping" />
-                            <span className="text-sm text-blue-100">Amplificación de Señal</span>
-                          </div>
-                          <div className="mt-1 h-1 w-full bg-black/20 rounded-full overflow-hidden">
-                            <div className="h-full bg-blue-400/50 rounded-full animate-[wave_2s_ease-in-out_infinite]" 
-                                 style={{ width: `${measurementQuality * 100}%` }} />
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="absolute -bottom-6 -left-6 w-32 h-32 bg-blue-500/10 rounded-full filter blur-xl animate-pulse" />
-                      <div className="absolute -top-6 -right-6 w-32 h-32 bg-purple-500/10 rounded-full filter blur-xl animate-pulse" />
-                    </div>
-                  </>
                 )}
               </div>
 
@@ -120,8 +94,36 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
             </div>
           </div>
 
+          {/* Vista de Calibración */}
+          <div className={`absolute inset-0 transition-transform duration-500 ${currentView === 'calibration' ? 'translate-x-0' : 'translate-x-full'}`}>
+            <div className="h-full w-full p-3 pb-32">
+              <CalibrationPanel 
+                settings={sensitivitySettings}
+                onUpdateSettings={updateSensitivitySettings}
+              />
+            </div>
+          </div>
+
           {/* Controles fijos en la parte inferior */}
           <div className="absolute bottom-6 left-0 right-0 px-4 z-30">
+            <div className="flex gap-2 justify-center mb-4">
+              <Button
+                variant={currentView === 'monitor' ? 'default' : 'secondary'}
+                className="h-8 flex-1 max-w-32 text-sm"
+                onClick={() => setCurrentView('monitor')}
+              >
+                Monitor
+              </Button>
+              <Button
+                variant={currentView === 'calibration' ? 'default' : 'secondary'}
+                className="h-8 flex-1 max-w-32 gap-2 text-sm"
+                onClick={() => setCurrentView('calibration')}
+              >
+                <Settings className="w-3.5 h-3.5" />
+                Calibración
+              </Button>
+            </div>
+
             <div className="flex flex-col gap-2 items-center">
               <MeasurementControls
                 isStarted={isStarted}
