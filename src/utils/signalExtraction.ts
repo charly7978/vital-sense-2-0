@@ -1,4 +1,3 @@
-
 export class SignalExtractor {
   private readonly minIntensity = 15;
   private readonly maxIntensity = 245;
@@ -10,7 +9,7 @@ export class SignalExtractor {
   private readonly redDominanceThreshold = 0.95;
   private readonly stabilityThreshold = 0.1;
   private lastStabilityValues: number[] = [];
-  private readonly pixelStep = 2; // Aumentado para reducir la carga de procesamiento
+  private readonly pixelStep = 2;
 
   private kalmanState = {
     red: { q: 0.05, r: 1.2, p: 1, x: 0, k: 0 },
@@ -58,7 +57,6 @@ export class SignalExtractor {
         max: { red: 0, ir: 0 }
       };
 
-      // Optimizado el bucle de procesamiento de píxeles
       for (let y = centerY - regionSize; y < centerY + regionSize; y += this.pixelStep) {
         if (y < 0 || y >= height) continue;
         
@@ -96,7 +94,6 @@ export class SignalExtractor {
         return { red: 0, ir: 0, quality: 0, perfusionIndex: 0 };
       }
 
-      // Manejo del buffer de valores
       if (this.lastRedValues.length >= this.smoothingWindow) {
         this.lastRedValues.shift();
         this.lastIrValues.shift();
@@ -104,7 +101,6 @@ export class SignalExtractor {
       this.lastRedValues.push(avgRed);
       this.lastIrValues.push(avgIr);
 
-      // Aplicar filtros Kalman por separado para red e ir
       const filteredRed = this.applyKalmanFilter(
         this.calculateMean(this.lastRedValues),
         this.kalmanState.red
@@ -117,11 +113,9 @@ export class SignalExtractor {
 
       const stability = this.calculateStability(filteredRed);
       
-      // ÚNICO CAMBIO: Aumentar sutilmente el factor de multiplicación de 100 a 105
       const perfusionIndex = validPixels.max.red > 0 ? 
-        (validPixels.max.red - Math.min(...validPixels.red)) / validPixels.max.red * 105 : 0;
+        (validPixels.max.red - Math.min(...validPixels.red)) / validPixels.max.red * 90 : 0;
 
-      // Cálculo de calidad optimizado
       const qualities = {
         pixel: Math.min(1, validPixels.count / (this.minValidPixels * 2)),
         stability: stability > this.stabilityThreshold ? 1 : stability / this.stabilityThreshold,
