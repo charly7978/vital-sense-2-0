@@ -5,14 +5,14 @@ import type { ProcessedPPGSignal, SensitivitySettings } from './types';
 export class UltraAdvancedPPGProcessor {
   private readonly heartbeatDetector: QuantumHeartbeatDetector;
   private sensitivitySettings: SensitivitySettings = {
-    signalAmplification: 1.5,
-    noiseReduction: 1.2,
-    peakDetection: 1.3,
-    heartbeatThreshold: 0.5,
+    signalAmplification: 2.5, // Aumentado de 1.5 a 2.5
+    noiseReduction: 1.4,      // Aumentado de 1.2 a 1.4
+    peakDetection: 1.5,       // Aumentado de 1.3 a 1.5
+    heartbeatThreshold: 0.35,  // Reducido de 0.5 a 0.35 para mayor sensibilidad
     responseTime: 1.0,
-    signalStability: 0.5,
-    brightness: 1.0,
-    redIntensity: 1.0
+    signalStability: 0.6,     // Aumentado de 0.5 a 0.6
+    brightness: 1.2,          // Aumentado de 1.0 a 1.2
+    redIntensity: 1.3         // Aumentado de 1.0 a 1.3
   };
   
   constructor() {
@@ -29,8 +29,8 @@ export class UltraAdvancedPPGProcessor {
       // Extraer señal del frame y normalizar
       const { red, quality, validPixels, totalPixels } = this.extractSignal(imageData);
       
-      // Si no hay suficientes píxeles válidos, la señal es inválida
-      if (validPixels / totalPixels < 0.1) {
+      // Ajustado el umbral mínimo de píxeles válidos
+      if (validPixels / totalPixels < 0.05) { // Reducido de 0.1 a 0.05
         console.log('❌ Señal insuficiente:', {
           pixelesValidos: validPixels,
           pixelesTotales: totalPixels,
@@ -42,16 +42,16 @@ export class UltraAdvancedPPGProcessor {
       // Aplicar amplificación de señal basada en la configuración
       const amplifiedRed = red * this.sensitivitySettings.signalAmplification;
       
-      // Detectar latido usando el detector cuántico
+      // Detectar latido usando el detector cuántico con umbral ajustado
       const isHeartbeat = this.heartbeatDetector.addSample(amplifiedRed, quality);
       
       // Obtener BPM actual
       const bpm = this.heartbeatDetector.getCurrentBPM();
 
-      // Solo calcular SpO2 y presión si tenemos una señal mínimamente válida
-      const signalQuality = quality * (bpm > 0 ? 1 : 0.5); // Penalizar si no hay latidos
-      const spo2 = signalQuality > 0.6 ? this.calculateSpO2(signalQuality, amplifiedRed) : 0;
-      const { systolic, diastolic } = signalQuality > 0.7 ? 
+      // Ajustado el umbral de calidad de señal
+      const signalQuality = quality * (bpm > 0 ? 1.2 : 0.6); // Aumentado el multiplicador
+      const spo2 = signalQuality > 0.5 ? this.calculateSpO2(signalQuality, amplifiedRed) : 0; // Reducido umbral de 0.6 a 0.5
+      const { systolic, diastolic } = signalQuality > 0.6 ? 
         this.calculateBloodPressure(amplifiedRed, signalQuality) : 
         { systolic: 0, diastolic: 0 };
 
@@ -119,12 +119,11 @@ export class UltraAdvancedPPGProcessor {
     let maxRed = 0;
     let minRed = 255;
 
-    // Analizar región central de la imagen
+    // Analizar región central más grande
     const centerX = Math.floor(width / 2);
     const centerY = Math.floor(height / 2);
-    const regionSize = Math.floor(Math.min(width, height) * 0.15); // Región más pequeña para mayor precisión
+    const regionSize = Math.floor(Math.min(width, height) * 0.25); // Aumentado de 0.15 a 0.25
 
-    // Calcular límites de la región
     const startY = Math.max(0, centerY - regionSize);
     const endY = Math.min(height, centerY + regionSize);
     const startX = Math.max(0, centerX - regionSize);
@@ -135,8 +134,8 @@ export class UltraAdvancedPPGProcessor {
       for (let x = startX; x < endX; x++) {
         const i = (y * width + x) * 4;
         const red = data[i];
-        // Solo considerar píxeles con suficiente intensidad roja y no saturados
-        if (red > 60 && red < 230) {
+        // Ajustado el rango de intensidad válida
+        if (red > 40 && red < 240) { // Ampliado el rango de 60-230 a 40-240
           redSum += red;
           validPixels++;
           maxRed = Math.max(maxRed, red);
@@ -168,22 +167,22 @@ export class UltraAdvancedPPGProcessor {
     validPixels: number,
     totalPixels: number
   ): number {
-    // Evaluar la amplitud de la señal (diferencia entre máximo y mínimo)
+    // Evaluar la amplitud de la señal
     const amplitude = maxRed - minRed;
-    const amplitudeQuality = Math.min(1, amplitude / 30); // Más sensible a cambios pequeños
+    const amplitudeQuality = Math.min(1, amplitude / 25); // Reducido de 30 a 25
 
-    // Evaluar cobertura de píxeles válidos
-    const coverageQuality = validPixels / totalPixels;
+    // Evaluar cobertura de píxeles válidos con umbral más bajo
+    const coverageQuality = Math.pow(validPixels / totalPixels, 0.8); // Ajuste exponencial más suave
 
-    // Evaluar intensidad media (debe estar en un rango óptimo)
-    const optimalRedMean = 150; // Valor óptimo esperado
+    // Evaluar intensidad media
+    const optimalRedMean = 140; // Reducido de 150 a 140
     const intensityQuality = 1 - Math.min(1, Math.abs(avgRed - optimalRedMean) / optimalRedMean);
 
-    // Calcular calidad final considerando todos los factores
+    // Calcular calidad final con pesos ajustados
     const rawQuality = (
-      amplitudeQuality * 0.5 + // La amplitud es el factor más importante
-      coverageQuality * 0.3 + // La cobertura es el segundo factor más importante
-      intensityQuality * 0.2   // La intensidad es el factor menos importante
+      amplitudeQuality * 0.6 +  // Aumentado de 0.5 a 0.6
+      coverageQuality * 0.25 +  // Reducido de 0.3 a 0.25
+      intensityQuality * 0.15   // Reducido de 0.2 a 0.15
     );
 
     // Aplicar reducción de ruido y normalizar
@@ -191,16 +190,14 @@ export class UltraAdvancedPPGProcessor {
   }
 
   private calculateSpO2(quality: number, signal: number): number {
-    // Solo calcular SpO2 si la calidad es suficiente
-    if (quality < 0.6) return 0;
+    if (quality < 0.5) return 0; // Reducido de 0.6 a 0.5
     
     const baseSpO2 = 95 + (quality * 4);
     return Math.min(100, Math.max(80, Math.round(baseSpO2 + (signal * 0.01))));
   }
 
   private calculateBloodPressure(signal: number, quality: number): { systolic: number; diastolic: number } {
-    // Solo calcular presión si la calidad es suficiente
-    if (quality < 0.7) return { systolic: 0, diastolic: 0 };
+    if (quality < 0.6) return { systolic: 0, diastolic: 0 };
     
     const baseSystolic = 120 + (signal * 0.2);
     const baseDiastolic = 80 + (signal * 0.1);
