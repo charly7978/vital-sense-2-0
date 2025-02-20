@@ -141,9 +141,7 @@ export interface Channels {
 export interface ProcessedPPGSignal {
   signal: number[];
   quality: number;
-  features: SignalFeatures;
-  confidence: number;
-  timestamp: number;
+  isHeartbeat: boolean;
   bpm: number;
   spo2: number;
   systolic: number;
@@ -152,6 +150,7 @@ export interface ProcessedPPGSignal {
   arrhythmiaType: string;
   readings: VitalReading[];
   signalQuality: number;
+  timestamp: number;
 }
 
 export class ProcessingError extends Error {

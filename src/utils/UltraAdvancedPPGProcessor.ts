@@ -1,12 +1,27 @@
 
 import { QuantumHeartbeatDetector } from './QuantumHeartbeatDetector';
-import type { ProcessedPPGSignal } from './types';
+import type { ProcessedPPGSignal, SensitivitySettings } from './types';
 
 export class UltraAdvancedPPGProcessor {
   private readonly heartbeatDetector: QuantumHeartbeatDetector;
+  private sensitivitySettings: SensitivitySettings = {
+    signalAmplification: 1.5,
+    noiseReduction: 1.2,
+    peakDetection: 1.3,
+    heartbeatThreshold: 0.5,
+    responseTime: 1.0,
+    signalStability: 0.5,
+    brightness: 1.0,
+    redIntensity: 1.0
+  };
   
   constructor() {
     this.heartbeatDetector = new QuantumHeartbeatDetector();
+  }
+
+  updateSensitivitySettings(settings: SensitivitySettings) {
+    this.sensitivitySettings = { ...this.sensitivitySettings, ...settings };
+    console.log('Configuración de sensibilidad actualizada:', this.sensitivitySettings);
   }
 
   async processFrame(imageData: ImageData): Promise<ProcessedPPGSignal> {
@@ -14,34 +29,41 @@ export class UltraAdvancedPPGProcessor {
       // Extraer señal del frame y normalizar
       const { red, quality } = this.extractSignal(imageData);
       
+      // Aplicar amplificación de señal basada en la configuración
+      const amplifiedRed = red * this.sensitivitySettings.signalAmplification;
+      
       // Detectar latido usando el detector cuántico
-      const isHeartbeat = this.heartbeatDetector.addSample(red, quality);
+      const isHeartbeat = this.heartbeatDetector.addSample(
+        amplifiedRed, 
+        quality * this.sensitivitySettings.signalStability
+      );
       
       // Obtener BPM actual
       const bpm = this.heartbeatDetector.getCurrentBPM();
 
       console.log('📊 Procesamiento de frame:', {
-        valorRojo: red,
+        valorRojo: amplifiedRed,
         calidadSeñal: quality,
         esLatido: isHeartbeat,
-        bpm: bpm
+        bpm: bpm,
+        configuracion: this.sensitivitySettings
       });
 
       // Construir respuesta
       return {
-        signal: [red],
+        signal: [amplifiedRed],
         quality: quality,
         isHeartbeat: isHeartbeat,
         bpm: bpm,
         timestamp: Date.now(),
         spo2: quality > 0.6 ? Math.round(95 + (quality * 4)) : 0,
-        systolic: quality > 0.7 ? Math.round(120 + (red * 0.2)) : 0,
-        diastolic: quality > 0.7 ? Math.round(80 + (red * 0.1)) : 0,
+        systolic: quality > 0.7 ? Math.round(120 + (amplifiedRed * 0.2)) : 0,
+        diastolic: quality > 0.7 ? Math.round(80 + (amplifiedRed * 0.1)) : 0,
         hasArrhythmia: false,
         arrhythmiaType: 'Normal',
         readings: [{
           timestamp: Date.now(),
-          value: red
+          value: amplifiedRed
         }],
         signalQuality: quality
       };
@@ -85,9 +107,12 @@ export class UltraAdvancedPPGProcessor {
     const avgRed = redSum / validPixels;
     const quality = this.calculateSignalQuality(avgRed, maxRed, minRed, validPixels);
 
+    // Aplicar ajustes de brillo y intensidad del rojo
+    const adjustedRed = avgRed * this.sensitivitySettings.brightness * this.sensitivitySettings.redIntensity;
+
     return {
-      red: avgRed,
-      quality: quality
+      red: adjustedRed,
+      quality: quality * this.sensitivitySettings.signalStability
     };
   }
 
@@ -98,6 +123,8 @@ export class UltraAdvancedPPGProcessor {
     const coverageQuality = Math.min(1, validPixels / 1000);
     const intensityQuality = Math.min(1, (avgRed - 20) / 100);
 
-    return Math.min(1, (amplitudeQuality + coverageQuality + intensityQuality) / 3);
+    // Aplicar factor de reducción de ruido
+    const baseQuality = (amplitudeQuality + coverageQuality + intensityQuality) / 3;
+    return Math.min(1, baseQuality * this.sensitivitySettings.noiseReduction);
   }
 }
