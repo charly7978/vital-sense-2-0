@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { BeepPlayer } from '../utils/audioUtils';
 import { UltraAdvancedPPGProcessor } from '../utils/UltraAdvancedPPGProcessor';
@@ -41,10 +42,10 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const processingInterval = 33; // ~30fps
 
   const [sensitivitySettings, setSensitivitySettings] = useState<SensitivitySettings>({
-    signalAmplification: 1.8, // Aumentado para mayor sensibilidad
+    signalAmplification: 1.8,
     noiseReduction: 1.2,
-    peakDetection: 1.4, // Aumentado para mayor sensibilidad
-    heartbeatThreshold: 0.4, // Reducido para mayor sensibilidad
+    peakDetection: 1.4,
+    heartbeatThreshold: 0.4,
     responseTime: 1.0,
     signalStability: 0.5,
     brightness: 1.0,
@@ -170,6 +171,14 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
     }
   }, [isStarted, toast, resetMeasurements]);
+
+  const updateSensitivitySettings = useCallback((settings: Partial<SensitivitySettings>) => {
+    setSensitivitySettings(prev => {
+      const newSettings = { ...prev, ...settings };
+      ppgProcessor.current.updateSensitivitySettings(newSettings);
+      return newSettings;
+    });
+  }, []);
 
   const value = {
     bpm,
