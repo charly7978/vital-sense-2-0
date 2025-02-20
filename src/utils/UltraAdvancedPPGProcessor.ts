@@ -1,22 +1,23 @@
+
 import { QuantumHeartbeatDetector } from './QuantumHeartbeatDetector';
 import type { ProcessedPPGSignal, SensitivitySettings } from './types';
 
 export class UltraAdvancedPPGProcessor {
   private readonly heartbeatDetector: QuantumHeartbeatDetector;
   private sensitivitySettings: SensitivitySettings = {
-    signalAmplification: 1.2,      // Reducido para luz activa
-    noiseReduction: 1.5,           // Mantiene buen filtrado
-    peakDetection: 2.0,           // Aumentado para mejor detección con luz directa
-    heartbeatThreshold: 0.4,      // Umbral más alto para señal fuerte
-    responseTime: 1.0,
-    signalStability: 0.9,         // Mayor estabilidad con luz constante
-    brightness: 1.0,              // Normal con luz activa
-    redIntensity: 1.2            // Ajustado para luz directa
+    signalAmplification: 0.8,      // Reducido para no saturar con luz intensa
+    noiseReduction: 2.0,           // Aumentado para filtrar ruido de luz intensa
+    peakDetection: 1.5,           // Ajustado para detectar picos claros
+    heartbeatThreshold: 0.6,      // Más alto para aprovechar señal fuerte
+    responseTime: 0.8,            // Más rápido con señal clara
+    signalStability: 1.2,         // Aumentado para estabilidad con luz fuerte
+    brightness: 0.7,              // Reducido para compensar luz intensa
+    redIntensity: 0.9            // Reducido para no saturar el rojo
   };
   
   constructor() {
     this.heartbeatDetector = new QuantumHeartbeatDetector();
-    console.log('🌟 Iniciando procesador PPG optimizado para luz activa');
+    console.log('🌟 Iniciando procesador PPG con calibración para luz intensa');
   }
 
   updateSensitivitySettings(settings: Partial<SensitivitySettings>) {
@@ -28,8 +29,8 @@ export class UltraAdvancedPPGProcessor {
     try {
       const { red, quality, validPixels, totalPixels } = this.extractSignal(imageData);
       
-      // Umbral más bajo para píxeles válidos en luz ambiental
-      if (validPixels / totalPixels < 0.03) {
+      // Umbral más bajo para favorecer luz intensa
+      if (validPixels / totalPixels < 0.02) {
         console.log('⚠️ Señal débil:', {
           pixelesValidos: validPixels,
           pixelesTotales: totalPixels,
@@ -38,15 +39,15 @@ export class UltraAdvancedPPGProcessor {
         return this.createInvalidSignalResponse();
       }
 
-      // Mayor amplificación para señales débiles
+      // Menor amplificación para señales fuertes
       const amplifiedRed = red * this.sensitivitySettings.signalAmplification;
       const isHeartbeat = this.heartbeatDetector.addSample(amplifiedRed, quality);
       const bpm = this.heartbeatDetector.getCurrentBPM();
 
-      // Ajuste de calidad para luz ambiental
-      const signalQuality = quality * (bpm > 0 ? 1.5 : 0.8);
-      const spo2 = signalQuality > 0.4 ? this.calculateSpO2(signalQuality, amplifiedRed) : 0;
-      const { systolic, diastolic } = signalQuality > 0.5 ? 
+      // Ajuste de calidad para luz intensa
+      const signalQuality = quality * (bpm > 0 ? 1.2 : 0.6);
+      const spo2 = signalQuality > 0.3 ? this.calculateSpO2(signalQuality, amplifiedRed) : 0;
+      const { systolic, diastolic } = signalQuality > 0.4 ? 
         this.calculateBloodPressure(amplifiedRed, signalQuality) : 
         { systolic: 0, diastolic: 0 };
 
@@ -93,10 +94,10 @@ export class UltraAdvancedPPGProcessor {
     let maxRed = 0;
     let minRed = 255;
 
-    // Área de análisis ampliada para mejor captación
+    // Área de análisis reducida para enfocarse en zona más iluminada
     const centerX = Math.floor(width / 2);
     const centerY = Math.floor(height / 2);
-    const regionSize = Math.floor(Math.min(width, height) * 0.35); // Aumentado para mayor área
+    const regionSize = Math.floor(Math.min(width, height) * 0.25); // Reducido para mayor precisión
 
     const startY = Math.max(0, centerY - regionSize);
     const endY = Math.min(height, centerY + regionSize);
@@ -104,7 +105,7 @@ export class UltraAdvancedPPGProcessor {
     const endX = Math.min(width, centerX + regionSize);
     const totalPixels = (endX - startX) * (endY - startY);
 
-    // Análisis de píxeles optimizado para luz ambiental
+    // Análisis optimizado para luz intensa
     for (let y = startY; y < endY; y++) {
       for (let x = startX; x < endX; x++) {
         const i = (y * width + x) * 4;
@@ -112,10 +113,10 @@ export class UltraAdvancedPPGProcessor {
         const green = data[i + 1];
         const blue = data[i + 2];
 
-        // Detección mejorada de píxeles válidos
-        if (red > 30 && red < 250 && // Rango más amplio
-            red > green * 1.1 && // Asegurar dominancia del rojo
-            red > blue * 1.1) {  // Asegurar dominancia del rojo
+        // Detección ajustada para luz intensa
+        if (red > 50 && red < 240 && // Rango ajustado para luz intensa
+            red > green * 1.2 && // Mayor diferencia requerida
+            red > blue * 1.2) {  // Mayor diferencia requerida
           redSum += red;
           validPixels++;
           maxRed = Math.max(maxRed, red);
@@ -147,33 +148,33 @@ export class UltraAdvancedPPGProcessor {
     validPixels: number,
     totalPixels: number
   ): number {
-    // Cálculo de calidad adaptado para luz ambiental
+    // Cálculo de calidad optimizado para luz intensa
     const amplitude = maxRed - minRed;
-    const amplitudeQuality = Math.min(1, amplitude / 20); // Umbral más bajo
+    const amplitudeQuality = Math.min(1, amplitude / 30); // Umbral más alto
 
-    const coverageQuality = Math.pow(validPixels / totalPixels, 0.7); // Más tolerante
+    const coverageQuality = Math.pow(validPixels / totalPixels, 0.5); // Menos exigente
 
-    const optimalRedMean = 120; // Ajustado para luz ambiental
+    const optimalRedMean = 150; // Ajustado para luz intensa
     const intensityQuality = 1 - Math.min(1, Math.abs(avgRed - optimalRedMean) / optimalRedMean);
 
     const rawQuality = (
-      amplitudeQuality * 0.7 +   // Mayor peso en amplitud
-      coverageQuality * 0.2 +    // Menor peso en cobertura
-      intensityQuality * 0.1     // Menor peso en intensidad
+      amplitudeQuality * 0.5 +    // Menor peso en amplitud
+      coverageQuality * 0.3 +     // Mayor peso en cobertura
+      intensityQuality * 0.2      // Mayor peso en intensidad
     );
 
     return Math.min(1, rawQuality * this.sensitivitySettings.noiseReduction);
   }
 
   private calculateSpO2(quality: number, signal: number): number {
-    if (quality < 0.4) return 0; // Umbral más bajo
+    if (quality < 0.3) return 0; // Umbral más bajo
     
     const baseSpO2 = 95 + (quality * 4);
     return Math.min(100, Math.max(80, Math.round(baseSpO2 + (signal * 0.01))));
   }
 
   private calculateBloodPressure(signal: number, quality: number): { systolic: number; diastolic: number } {
-    if (quality < 0.5) return { systolic: 0, diastolic: 0 };
+    if (quality < 0.4) return { systolic: 0, diastolic: 0 };
     
     const baseSystolic = 120 + (signal * 0.2);
     const baseDiastolic = 80 + (signal * 0.1);
