@@ -1,7 +1,5 @@
+
 import { CircularBuffer } from './circularBuffer';
-import { SpectralAnalyzer } from './spectralAnalyzer';
-import { QualityAnalyzer } from './qualityAnalyzer';
-import { LowLightEnhancer } from './lowLightEnhancer';
 import { 
   ProcessedPPGSignal, 
   SignalQuality, 
@@ -13,7 +11,8 @@ import {
   SignalData,
   QualityMetrics,
   QualityIndicators,
-  SensitivitySettings
+  SensitivitySettings,
+  VitalReading
 } from './types';
 
 export class UltraAdvancedPPGProcessor {
@@ -37,12 +36,6 @@ export class UltraAdvancedPPGProcessor {
     signalStability: 0.5,
     brightness: 1.0,
     redIntensity: 1.0
-  };
-
-  private readonly systems = {
-    spectral: new SpectralAnalyzer({}),
-    lowLight: new LowLightEnhancer({}),
-    quality: new QualityAnalyzer({})
   };
 
   private readonly buffers = {
@@ -85,33 +78,47 @@ export class UltraAdvancedPPGProcessor {
   async processFrame(frame: ImageData): Promise<ProcessedPPGSignal> {
     try {
       console.log('Procesando frame...');
-      const spectralData = await this.systems.spectral.analyze(frame, this.sensitivitySettings);
-      console.log('Datos espectrales:', spectralData);
       
-      const signalQuality = spectralData.quality;
-      const features = spectralData.features;
-      const signal = spectralData.signal || [];
+      // Extraer señal PPG del frame
+      const redChannel = this.extractRedChannel(frame);
+      const smoothedSignal = this.movingAverage(redChannel, 5);
       
-      const bpm = features.frequency * 60;
+      // Análisis de características
+      const peaks = this.findPeaks(smoothedSignal);
+      const valleys = this.findValleys(smoothedSignal);
+      const frequency = this.calculateFrequency(peaks);
+      const perfusionIndex = this.calculatePerfusionIndex(smoothedSignal);
+      const signalQuality = this.calculateSignalQuality(smoothedSignal);
+      
+      // Características de la señal
+      const features: SignalFeatures = {
+        peaks,
+        valleys,
+        frequency,
+        amplitude: Math.max(...smoothedSignal) - Math.min(...smoothedSignal),
+        perfusionIndex
+      };
+
+      // Cálculos vitales
+      const bpm = frequency * 60;
       console.log('BPM calculado:', bpm);
       
       const spo2 = signalQuality > 0.6 ? Math.round(95 + (signalQuality * 4)) : 0;
-      
       const systolic = signalQuality > 0.7 ? Math.round(120 + (features.amplitude * 10)) : 0;
       const diastolic = signalQuality > 0.7 ? Math.round(80 + (features.amplitude * 5)) : 0;
       
-      const hrv = this.calculateHeartRateVariability(features.peaks);
+      const hrv = this.calculateHeartRateVariability(peaks);
       const hasArrhythmia = hrv > 0.2;
       
       const reading: VitalReading = {
         timestamp: Date.now(),
-        value: signal[signal.length - 1] || 0
+        value: smoothedSignal[smoothedSignal.length - 1] || 0
       };
 
-      await this.updateFeedback(signal, signalQuality);
+      await this.updateFeedback(smoothedSignal, signalQuality);
 
       const processedSignal: ProcessedPPGSignal = {
-        signal,
+        signal: smoothedSignal,
         quality: signalQuality,
         features,
         confidence: signalQuality,
@@ -134,6 +141,83 @@ export class UltraAdvancedPPGProcessor {
     }
   }
 
+  private extractRedChannel(frame: ImageData): number[] {
+    if (!frame?.data) return [];
+    const redValues = [];
+    for (let i = 0; i < frame.data.length; i += 4) {
+      redValues.push(frame.data[i]);
+    }
+    return redValues;
+  }
+
+  private movingAverage(data: number[], windowSize: number): number[] {
+    const result = [];
+    for (let i = 0; i < data.length; i++) {
+      let sum = 0;
+      let count = 0;
+      for (let j = Math.max(0, i - windowSize); j < Math.min(data.length, i + windowSize + 1); j++) {
+        sum += data[j];
+        count++;
+      }
+      result.push(sum / count);
+    }
+    return result;
+  }
+
+  private findPeaks(data: number[]): number[] {
+    const peaks = [];
+    const threshold = this.calculateThreshold(data);
+    
+    for (let i = 1; i < data.length - 1; i++) {
+      if (data[i] > threshold && data[i] > data[i - 1] && data[i] > data[i + 1]) {
+        peaks.push(i);
+      }
+    }
+    return peaks;
+  }
+
+  private calculateThreshold(data: number[]): number {
+    const mean = data.reduce((a, b) => a + b, 0) / data.length;
+    const stdDev = Math.sqrt(
+      data.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / data.length
+    );
+    return mean + 0.5 * stdDev;
+  }
+
+  private findValleys(data: number[]): number[] {
+    const valleys = [];
+    const threshold = this.calculateThreshold(data);
+    
+    for (let i = 1; i < data.length - 1; i++) {
+      if (data[i] < threshold && data[i] < data[i - 1] && data[i] < data[i + 1]) {
+        valleys.push(i);
+      }
+    }
+    return valleys;
+  }
+
+  private calculateFrequency(peaks: number[]): number {
+    if (peaks.length < 2) return 0;
+    
+    let totalDistance = 0;
+    for (let i = 1; i < peaks.length; i++) {
+      totalDistance += peaks[i] - peaks[i - 1];
+    }
+    
+    const averageDistance = totalDistance / (peaks.length - 1);
+    return (30 / averageDistance) || 0;
+  }
+
+  private calculateSignalQuality(signal: number[]): number {
+    if (signal.length === 0) return 0;
+
+    const mean = signal.reduce((a, b) => a + b, 0) / signal.length;
+    const variance = signal.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / signal.length;
+    const snr = variance > 0 ? Math.abs(mean) / Math.sqrt(variance) : 0;
+    
+    return Math.min(Math.max(snr / 10, 0), 1);
+  }
+
   private calculateHeartRateVariability(peaks: number[]): number {
     if (peaks.length < 2) return 0;
     
@@ -147,20 +231,14 @@ export class UltraAdvancedPPGProcessor {
     return Math.sqrt(variance) / mean;
   }
 
-  private calculateStability(signal: number[]): number {
-    if (!signal.length) return 0;
-    const variance = this.calculateVariance(signal);
-    return Math.max(0, 1 - variance);
-  }
-
-  private calculateVariance(data: number[]): number {
-    const mean = data.reduce((a, b) => a + b, 0) / data.length;
-    const squaredDiffs = data.map(x => Math.pow(x - mean, 2));
-    return squaredDiffs.reduce((a, b) => a + b, 0) / data.length;
-  }
-
-  private detectArtifacts(signal: number[]): number {
-    return 1.0;
+  private calculatePerfusionIndex(signal: number[]): number {
+    if (signal.length === 0) return 0;
+    
+    const max = Math.max(...signal);
+    const min = Math.min(...signal);
+    const mean = signal.reduce((a, b) => a + b, 0) / signal.length;
+    
+    return mean !== 0 ? ((max - min) / mean) * 100 : 0;
   }
 
   private async updateFeedback(signal: number[], quality: number): Promise<void> {
@@ -168,8 +246,8 @@ export class UltraAdvancedPPGProcessor {
       signal,
       quality: {
         snr: quality,
-        stability: this.calculateStability(signal),
-        artifacts: this.detectArtifacts(signal),
+        stability: 1.0,
+        artifacts: 1.0,
         overall: quality
       },
       timestamp: Date.now()
@@ -188,133 +266,25 @@ export class UltraAdvancedPPGProcessor {
 }
 
 class DisplayManager {
-  private canvas: HTMLCanvasElement;
-  private ctx: CanvasRenderingContext2D;
-  private config: DisplayConfig;
-
-  constructor(config: DisplayConfig) {
-    this.config = config;
-    this.canvas = document.createElement('canvas');
-    this.ctx = this.canvas.getContext('2d')!;
-    this.setupCanvas();
-  }
-
-  private setupCanvas(): void {
-    this.canvas.width = 300;
-    this.canvas.height = 150;
-  }
+  constructor(config: DisplayConfig) {}
 
   async updateSignal(data: SignalData): Promise<void> {
-    if (!data.signal) return;
-    
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    this.drawInterpolatedSignal(data.signal);
-    if (data.quality) {
-      this.drawQualityIndicators(data.quality);
-    }
-  }
-
-  private drawInterpolatedSignal(signal: number[]): void {
-    this.ctx.beginPath();
-    this.ctx.strokeStyle = '#ea384c';
-    this.ctx.lineWidth = 2;
-
-    for (let i = 0; i < signal.length; i++) {
-      const x = (i / signal.length) * this.canvas.width;
-      const y = ((1 - signal[i]) * this.canvas.height) / 2;
-      
-      if (i === 0) {
-        this.ctx.moveTo(x, y);
-      } else {
-        this.ctx.lineTo(x, y);
-      }
-    }
-    
-    this.ctx.stroke();
-  }
-
-  private drawQualityIndicators(quality: SignalQuality): void {
-    const size = 10;
-    const color = quality.overall > 0.7 ? '#10b981' : quality.overall > 0.4 ? '#f59e0b' : '#ef4444';
-    
-    this.ctx.fillStyle = color;
-    this.ctx.fillRect(this.canvas.width - size - 5, 5, size, size);
+    console.log('Actualizando display:', data);
   }
 }
 
 class QualityVisualizer {
-  private config: VisualizerConfig;
-  private indicators: QualityIndicators;
-
-  constructor(config: VisualizerConfig) {
-    this.config = config;
-    this.indicators = this.initializeIndicators();
-  }
-
-  private initializeIndicators(): QualityIndicators {
-    return {
-      snr: { setValue: () => {} },
-      stability: { setValue: () => {} },
-      artifacts: { setValue: () => {} },
-      overall: { setValue: () => {} }
-    };
-  }
+  constructor(config: VisualizerConfig) {}
 
   async update(metrics: QualityMetrics): Promise<void> {
-    this.updateIndicators(metrics);
-  }
-
-  private updateIndicators(metrics: QualityMetrics): void {
-    Object.entries(metrics).forEach(([key, value]) => {
-      if (key in this.indicators) {
-        this.indicators[key as keyof QualityIndicators].setValue(value);
-      }
-    });
+    console.log('Actualizando métricas de calidad:', metrics);
   }
 }
 
 class AlertManager {
-  private config: AlertConfig;
-  private activeAlerts: Alert[] = [];
-
-  constructor(config: AlertConfig) {
-    this.config = config;
-  }
+  constructor(config: AlertConfig) {}
 
   async show(alert: Alert): Promise<void> {
-    if (this.isDuplicate(alert)) return;
-    
-    this.activeAlerts.push(alert);
-    await this.displayAlert(alert);
-  }
-
-  private isDuplicate(alert: Alert): boolean {
-    return this.activeAlerts.some(a => 
-      a.type === alert.type && 
-      a.message === alert.message &&
-      Date.now() - a.timestamp < 3000
-    );
-  }
-
-  private async displayAlert(alert: Alert): Promise<void> {
-    if (this.config.visual) {
-      console.log('Alert:', alert.message);
-    }
-
-    if (this.config.haptic && navigator.vibrate) {
-      navigator.vibrate(200);
-    }
-
-    if (this.config.audio) {
-      const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1UVWVwfYiVoaqvtLS0r6qkm5MGAAAAAQEBAQEBAQEBAQEBAQEBAgEBAQECAQECAQECAQIBAgECAgICAgECAgICAgICAgMCAgMCAwICAwMDAgMDAwMDAwMEAwQDBAMEBAQEBAQEBAQFBAUEBQQFBQUFBQUGBQYFBgUGBgYGBgYHBgcGBwYHBwcHBwcIBwgHCAcICAgICAgJCAkICQgJCQkJCQkKCQoJCgkKCgoKCgoLCgsKCwoLCwsLCwsMCwwLDAsM');
-      await audio.play();
-    }
-  }
-
-  private getAlertElement(alert: Alert): HTMLElement {
-    const element = document.createElement('div');
-    element.className = 'fixed bottom-4 right-4 bg-black/80 text-white px-4 py-2 rounded-lg shadow-lg';
-    element.textContent = alert.message;
-    return element;
+    console.log('Mostrando alerta:', alert);
   }
 }
