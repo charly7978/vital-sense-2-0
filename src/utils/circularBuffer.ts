@@ -14,8 +14,12 @@ export class CircularBuffer {
     this.pointer = (this.pointer + 1) % this.size;
   }
 
-  get(): number[] {
+  getData(): number[] {
     return [...this.buffer.slice(this.pointer), ...this.buffer.slice(0, this.pointer)];
+  }
+
+  get(): number[] {
+    return this.getData();
   }
 
   clear(): void {

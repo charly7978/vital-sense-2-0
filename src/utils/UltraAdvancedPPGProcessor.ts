@@ -86,13 +86,15 @@ export class UltraAdvancedPPGProcessor {
       redChannel.forEach(value => this.buffers.raw.push(value));
       
       // Procesar señal
-      const smoothedSignal = this.movingAverage(Array.from(this.buffers.raw.getData()), 5);
+      const rawData = this.buffers.raw.getData();
+      const smoothedSignal = this.movingAverage(rawData, 5);
       
       // Almacenar señal procesada
       smoothedSignal.forEach(value => this.buffers.processed.push(value));
       
       // Obtener últimos N puntos para análisis
-      const signalForAnalysis = Array.from(this.buffers.processed.getData()).slice(-100);
+      const processedData = this.buffers.processed.getData();
+      const signalForAnalysis = processedData.slice(-100);
       
       // Análisis de características
       const peaks = this.findPeaks(signalForAnalysis);
