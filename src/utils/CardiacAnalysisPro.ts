@@ -220,19 +220,11 @@ export class CardiacAnalysisPro {
 
   // Reproducción de audio cardíaco profesional
   private async playCardiacSound(heartbeat: HeartbeatDetection): Promise<void> {
-    try {
-      await this.systems.audio.synthesize({
-        ...this.CARDIAC_CONFIG.audio.heartbeat,
-        intensity: heartbeat.intensity || 1.0,
-        timing: heartbeat.timing
-      });
-      console.log('🎵 Sonido cardíaco sintetizado:', {
-        intensidad: heartbeat.intensity,
-        tiempo: heartbeat.timing
-      });
-    } catch (error) {
-      console.error('🔇 Error reproduciendo sonido cardíaco:', error);
-    }
+    await this.systems.audio.synthesize({
+      ...this.CARDIAC_CONFIG.audio.heartbeat,
+      intensity: heartbeat.intensity || 1.0,
+      timing: heartbeat.timing
+    });
   }
 
   // Actualización de visualización médica
