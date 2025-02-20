@@ -16,19 +16,19 @@ const MeasurementControls: React.FC<MeasurementControlsProps> = ({
     <div className="w-full flex items-center justify-center">
       <Button
         onClick={onToggleMeasurement}
-        size="lg"
+        size="sm"
         variant={isStarted ? "destructive" : "default"}
-        className="w-full md:w-auto min-w-[200px] text-lg gap-2"
+        className="w-full md:w-auto min-w-[150px] text-sm gap-2"
       >
         {isStarted ? (
           <>
-            <StopCircle className="w-5 h-5" />
-            Detener Medición
+            <StopCircle className="w-4 h-4" />
+            Detener
           </>
         ) : (
           <>
-            <PlayCircle className="w-5 h-5" />
-            Iniciar Medición
+            <PlayCircle className="w-4 h-4" />
+            Iniciar
           </>
         )}
       </Button>
