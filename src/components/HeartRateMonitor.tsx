@@ -6,6 +6,7 @@ import VitalChart from './VitalChart';
 import VitalSignsDisplay from './vitals/VitalSignsDisplay';
 import SignalQualityIndicator from './vitals/SignalQualityIndicator';
 import MeasurementControls from './vitals/MeasurementControls';
+import AutoCalibrationButton from './vitals/AutoCalibrationButton';
 import CalibrationPanel from './CalibrationPanel';
 import { useVitals } from '@/contexts/VitalsContext';
 import { Button } from "@/components/ui/button";
@@ -68,6 +69,12 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
                         Coloque su dedo sobre el lente de la cámara
                       </p>
                     </div>
+                  </div>
+                )}
+
+                {isStarted && (
+                  <div className="bg-black/30 backdrop-blur-md rounded-lg p-2 border border-white/10">
+                    <AutoCalibrationButton />
                   </div>
                 )}
               </div>
