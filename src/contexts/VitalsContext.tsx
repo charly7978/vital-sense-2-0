@@ -20,15 +20,13 @@ interface VitalsContextType {
   toggleMeasurement: () => void;
   resetMeasurement: () => void;
   processFrame: (imageData: ImageData) => void;
-  updateSensitivitySettings: (settings: SensitivitySettings) => void;
+  updateSensitivitySettings: (settings: Partial<SensitivitySettings>) => void;
 }
 
 const VitalsContext = createContext<VitalsContextType | undefined>(undefined);
 
 const beepPlayer = new BeepPlayer();
 const ppgProcessor = new UltraAdvancedPPGProcessor();
-
-const MEASUREMENT_DURATION = 30;
 
 export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [bpm, setBpm] = useState<number>(0);
@@ -72,7 +70,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setIsProcessing(true);
       const processedSignal = await ppgProcessor.processFrame(imageData);
       
-      // Actualizar lecturas en tiempo real
       const newReading: VitalReading = {
         timestamp: processedSignal.timestamp,
         value: processedSignal.signal[0] || 0
@@ -80,11 +77,9 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       setReadings(prev => [...prev.slice(-100), newReading]);
       
-      // Actualizar BPM y reproducir sonido solo si se detectó un latido real
       if (processedSignal.isHeartbeat && processedSignal.bpm > 30 && processedSignal.bpm < 200) {
         setBpm(processedSignal.bpm);
         
-        // Reproducir sonido con volumen basado en la calidad
         const volumeMultiplier = Math.min(1, processedSignal.signalQuality * 2);
         beepPlayer.playHeartbeatSound(volumeMultiplier);
         
@@ -95,7 +90,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         });
       }
 
-      // Actualizar otros signos vitales
       if (processedSignal.spo2 > 0) {
         setSpo2(processedSignal.spo2);
       }
@@ -157,9 +151,12 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   }, [isStarted, resetMeasurements, toast]);
 
-  const updateSensitivitySettings = useCallback((newSettings: SensitivitySettings) => {
-    setSensitivitySettings(newSettings);
-    ppgProcessor.updateSensitivitySettings(newSettings);
+  const updateSensitivitySettings = useCallback((settings: Partial<SensitivitySettings>) => {
+    setSensitivitySettings(prev => {
+      const newSettings = { ...prev, ...settings };
+      ppgProcessor.updateSensitivitySettings(newSettings);
+      return newSettings;
+    });
   }, []);
 
   const toggleMeasurement = useCallback(() => {

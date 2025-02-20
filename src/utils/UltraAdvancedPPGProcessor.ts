@@ -19,7 +19,7 @@ export class UltraAdvancedPPGProcessor {
     this.heartbeatDetector = new QuantumHeartbeatDetector();
   }
 
-  updateSensitivitySettings(settings: SensitivitySettings) {
+  updateSensitivitySettings(settings: Partial<SensitivitySettings>) {
     this.sensitivitySettings = { ...this.sensitivitySettings, ...settings };
     console.log('Configuración de sensibilidad actualizada:', this.sensitivitySettings);
   }
@@ -49,7 +49,6 @@ export class UltraAdvancedPPGProcessor {
         configuracion: this.sensitivitySettings
       });
 
-      // Construir respuesta
       return {
         signal: [amplifiedRed],
         quality: quality,
