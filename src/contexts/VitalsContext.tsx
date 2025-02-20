@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { BeepPlayer } from '../utils/audioUtils';
 import { PPGProcessor } from '../utils/ppgProcessor';
@@ -68,7 +69,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const updateSensitivitySettings = useCallback((newSettings: SensitivitySettings) => {
     setSensitivitySettings(newSettings);
-    ppgProcessor.updateSensitivitySettings(newSettings);
   }, []);
 
   const processFrame = useCallback(async (imageData: ImageData) => {
