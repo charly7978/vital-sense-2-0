@@ -24,21 +24,27 @@ const BPCalibrationForm = () => {
     setIsSubmitting(true);
 
     try {
-      const calibrationData: BPCalibrationData = {
-        systolic_reference: systolic,
-        diastolic_reference: diastolic,
-        age,
-        weight,
-        height,
-        notes,
-        environmental_conditions: {
+      const calibrationData = {
+        calibration_type: 'blood_pressure',
+        calibration_values: {
+          systolic_reference: systolic,
+          diastolic_reference: diastolic,
+        },
+        environmental_data: {
           timestamp: new Date().toISOString(),
           device_type: navigator.userAgent,
         },
+        reference_measurements: {
+          age,
+          weight,
+          height,
+          notes,
+        },
+        is_active: true
       };
 
       const { error } = await supabase
-        .from('blood_pressure_calibration')
+        .from('unified_calibration')
         .insert([calibrationData]);
 
       if (error) throw error;
@@ -166,3 +172,4 @@ const BPCalibrationForm = () => {
 };
 
 export default BPCalibrationForm;
+
