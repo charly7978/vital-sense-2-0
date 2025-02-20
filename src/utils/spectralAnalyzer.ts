@@ -1,4 +1,3 @@
-
 export class SpectralAnalyzer {
   private config: any;
 
@@ -14,11 +13,15 @@ export class SpectralAnalyzer {
       // Calcular la media móvil para suavizar la señal
       const smoothedSignal = this.movingAverage(redChannel, 5);
       
-      // Detectar picos para frecuencia cardíaca
+      // Detectar picos y valles para frecuencia cardíaca
       const peaks = this.findPeaks(smoothedSignal);
+      const valleys = this.findValleys(smoothedSignal);
       
       // Calcular la frecuencia cardíaca
       const frequency = this.calculateFrequency(peaks);
+      
+      // Calcular índice de perfusión
+      const perfusionIndex = this.calculatePerfusionIndex(smoothedSignal);
       
       // Calcular la calidad de la señal
       const quality = this.calculateSignalQuality(smoothedSignal);
@@ -30,8 +33,10 @@ export class SpectralAnalyzer {
         signal: smoothedSignal,
         features: {
           peaks,
+          valleys,
           frequency,
-          amplitude: Math.max(...smoothedSignal) - Math.min(...smoothedSignal)
+          amplitude: Math.max(...smoothedSignal) - Math.min(...smoothedSignal),
+          perfusionIndex
         },
         quality
       };
@@ -42,7 +47,13 @@ export class SpectralAnalyzer {
         amplitudes: [],
         phase: [],
         signal: [],
-        features: {},
+        features: {
+          peaks: [],
+          valleys: [],
+          frequency: 0,
+          amplitude: 0,
+          perfusionIndex: 0
+        },
         quality: 0
       };
     }
@@ -84,6 +95,16 @@ export class SpectralAnalyzer {
     return peaks;
   }
 
+  private findValleys(data: number[]): number[] {
+    const valleys = [];
+    for (let i = 1; i < data.length - 1; i++) {
+      if (data[i] < data[i - 1] && data[i] < data[i + 1]) {
+        valleys.push(i);
+      }
+    }
+    return valleys;
+  }
+
   private calculateFrequency(peaks: number[]): number {
     if (peaks.length < 2) return 0;
     
@@ -119,6 +140,20 @@ export class SpectralAnalyzer {
     
     // Normalizar a un valor entre 0 y 1
     return Math.min(Math.max(snr / 10, 0), 1);
+  }
+
+  private calculatePerfusionIndex(signal: number[]): number {
+    if (signal.length === 0) return 0;
+    
+    const max = Math.max(...signal);
+    const min = Math.min(...signal);
+    const mean = signal.reduce((a, b) => a + b, 0) / signal.length;
+    
+    // Calcular PI como (AC/DC)*100
+    const ac = max - min;
+    const dc = mean;
+    
+    return dc !== 0 ? (ac / dc) * 100 : 0;
   }
 }
 
