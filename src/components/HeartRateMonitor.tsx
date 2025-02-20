@@ -46,12 +46,12 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
   return (
     <div className="fixed inset-0 flex flex-col bg-black overflow-hidden">
       <div className="relative flex-1">
-        {/* Cámara siempre visible pero con menor z-index */}
+        {/* Cámara */}
         <div className="absolute inset-0 z-0">
           <CameraView onFrame={processFrame} isActive={isStarted} />
         </div>
 
-        {/* Gradiente más suave */}
+        {/* Gradiente */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-black/50 z-10" />
 
         {/* Contenido principal */}
@@ -64,7 +64,8 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
               }`}
             >
               <div className="h-full p-3 flex flex-col">
-                <div className="space-y-2">
+                {/* Parte superior con indicadores */}
+                <div className="space-y-2 mb-3">
                   {isStarted && (
                     <div className="bg-black/30 backdrop-blur-md rounded-lg p-2 border border-white/10">
                       <SignalQualityIndicator
@@ -87,8 +88,9 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
                   )}
                 </div>
 
-                <div className="mt-3 space-y-2">
-                  <div className="bg-black/30 backdrop-blur-md rounded-lg p-2.5 border border-white/10">
+                {/* Signos vitales y gráfico */}
+                <div className="flex-1 flex flex-col min-h-0">
+                  <div className="bg-black/30 backdrop-blur-md rounded-lg p-2.5 border border-white/10 mb-3">
                     <VitalSignsDisplay
                       bpm={bpm}
                       spo2={spo2}
@@ -99,10 +101,13 @@ const HeartRateMonitor: React.FC<HeartRateMonitorProps> = ({ onShowControls }) =
                     />
                   </div>
 
-                  <div className="rounded-lg p-2">
-                    <h3 className="text-xs font-medium mb-1 text-gray-100">PPG en Tiempo Real</h3>
-                    <div className="h-[50px]">
-                      <VitalChart data={readings} color="#ea384c" />
+                  {/* Gráfico PPG con espacio garantizado */}
+                  <div className="flex-1 mb-24">
+                    <div className="bg-black/30 backdrop-blur-md rounded-lg p-2 border border-white/10">
+                      <h3 className="text-xs font-medium mb-1 text-gray-100">PPG en Tiempo Real</h3>
+                      <div className="h-[100px]">
+                        <VitalChart data={readings} color="#ea384c" />
+                      </div>
                     </div>
                   </div>
                 </div>

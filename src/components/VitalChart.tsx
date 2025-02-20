@@ -15,18 +15,18 @@ const VitalChart: React.FC<VitalChartProps> = ({ data, color = "#9b87f5" }) => {
   }));
 
   return (
-    <div className="w-full h-[200px] bg-black/70 backdrop-blur-sm rounded-xl p-4">
+    <div className="w-full h-full">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={formattedData}>
           <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
           <XAxis 
             dataKey="timestamp" 
             stroke="#ffffff60"
-            tick={{ fill: '#ffffff60' }}
+            tick={{ fill: '#ffffff60', fontSize: 10 }}
           />
           <YAxis 
             stroke="#ffffff60"
-            tick={{ fill: '#ffffff60' }}
+            tick={{ fill: '#ffffff60', fontSize: 10 }}
           />
           <Line
             type="monotone"
