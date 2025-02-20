@@ -1,16 +1,15 @@
-
 import { SignalFilter } from './signalFilter';
 
 export class QuantumHeartbeatDetector {
   private readonly sampleRate: number = 30;
-  private readonly windowSize: number = 64; // Reducido para mayor sensibilidad
-  private readonly minPeakDistance: number = Math.floor(0.3 * 30); // 300ms mínimo entre latidos
-  private readonly maxPeakDistance: number = Math.floor(2.0 * 30); // 2s máximo entre latidos
+  private readonly windowSize: number = 32; // Reducido aún más para mayor sensibilidad
+  private readonly minPeakDistance: number = Math.floor(0.25 * 30); // Reducido a 250ms
+  private readonly maxPeakDistance: number = Math.floor(2.0 * 30);
   private readonly signalFilter: SignalFilter;
   private lastPeakIndex: number = -1;
-  private readonly noiseThreshold: number = 0.15; // Reducido para mayor sensibilidad
-  private readonly minSignalQuality: number = 0.3; // Reducido umbral mínimo de calidad
-  private readonly minAmplitude: number = 5; // Reducido para detectar cambios más sutiles
+  private readonly noiseThreshold: number = 0.1; // Reducido para mayor sensibilidad
+  private readonly minSignalQuality: number = 0.2; // Reducido umbral mínimo
+  private readonly minAmplitude: number = 3; // Reducido para detectar cambios más sutiles
 
   private readonly buffer: number[] = [];
   private readonly qualityBuffer: number[] = [];
@@ -23,7 +22,6 @@ export class QuantumHeartbeatDetector {
   }
 
   addSample(value: number, quality: number): boolean {
-    // Normalizar el valor entre 0 y 1
     const normalizedValue = value / 255;
     this.buffer.push(normalizedValue);
     this.qualityBuffer.push(quality);
@@ -41,17 +39,11 @@ export class QuantumHeartbeatDetector {
       return false;
     }
 
-    // Filtrar la señal para eliminar ruido
-    const filtered = this.signalFilter.lowPassFilter(this.buffer, 4);
-    
-    // Aplicar transformada wavelet para detectar patrones de latido
+    const filtered = this.signalFilter.lowPassFilter(this.buffer, 3); // Reducido factor de filtrado
     const wavelets = this.waveletTransform(filtered);
-    
-    // Calcular umbral adaptativo
     const threshold = this.calculateAdaptiveThreshold(wavelets);
-    
-    // Verificar calidad de la señal
     const signalQuality = this.analyzeSignalQuality();
+
     if (signalQuality < this.minSignalQuality) {
       return false;
     }
@@ -59,12 +51,10 @@ export class QuantumHeartbeatDetector {
     const currentValue = wavelets[wavelets.length - 1];
     const now = Date.now();
     
-    // Evitar detecciones demasiado cercanas
-    if (now - this.lastPeakTime < 300) {
+    if (now - this.lastPeakTime < 250) { // Reducido a 250ms
       return false;
     }
 
-    // Validar si es un latido real
     if (this.validatePeak(wavelets, threshold)) {
       this.lastPeakTime = now;
       this.updatePeakHistory();
@@ -110,17 +100,14 @@ export class QuantumHeartbeatDetector {
     const currentIndex = signal.length - 1;
     const currentValue = signal[currentIndex];
 
-    // Verificar si supera el umbral mínimo
     if (currentValue < threshold || currentValue < this.minAmplitude) {
       return false;
     }
 
-    // Verificar si es un máximo local
     if (!this.isLocalMaximum(signal, currentIndex)) {
       return false;
     }
 
-    // Verificar patrón de latido
     return this.validateHeartbeatPattern(signal, currentIndex);
   }
 
@@ -149,7 +136,6 @@ export class QuantumHeartbeatDetector {
       if (windowAfter[i] < windowAfter[i-1]) decreasing++;
     }
 
-    // Relajado los requisitos de validación
     return increasing >= 1 && decreasing >= 1;
   }
 

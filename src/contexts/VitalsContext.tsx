@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { BeepPlayer } from '../utils/audioUtils';
 import { UltraAdvancedPPGProcessor } from '../utils/UltraAdvancedPPGProcessor';
@@ -26,10 +25,6 @@ interface VitalsContextType {
 
 const VitalsContext = createContext<VitalsContextType | undefined>(undefined);
 
-const beepPlayer = new BeepPlayer();
-const ppgProcessor = new UltraAdvancedPPGProcessor();
-const MEASUREMENT_DURATION = 30; // Duration of measurement in seconds
-
 export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [bpm, setBpm] = useState<number>(0);
   const [spo2, setSpo2] = useState<number>(0);
@@ -42,15 +37,14 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isStarted, setIsStarted] = useState<boolean>(false);
   const [measurementProgress, setMeasurementProgress] = useState(0);
   const [measurementQuality, setMeasurementQuality] = useState(0);
-  const [measurementStartTime, setMeasurementStartTime] = useState<number | null>(null);
   const lastProcessedTime = useRef<number>(0);
   const processingInterval = 33; // ~30fps
 
   const [sensitivitySettings, setSensitivitySettings] = useState<SensitivitySettings>({
-    signalAmplification: 1.5,
+    signalAmplification: 1.8, // Aumentado para mayor sensibilidad
     noiseReduction: 1.2,
-    peakDetection: 1.3,
-    heartbeatThreshold: 0.5,
+    peakDetection: 1.4, // Aumentado para mayor sensibilidad
+    heartbeatThreshold: 0.4, // Reducido para mayor sensibilidad
     responseTime: 1.0,
     signalStability: 0.5,
     brightness: 1.0,
@@ -58,6 +52,8 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   });
 
   const { toast } = useToast();
+  const ppgProcessor = useRef(new UltraAdvancedPPGProcessor());
+  const beepPlayer = useRef(new BeepPlayer());
 
   const processFrame = useCallback(async (imageData: ImageData) => {
     if (!isStarted) return;
@@ -70,7 +66,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     try {
       setIsProcessing(true);
-      const processedSignal = await ppgProcessor.processFrame(imageData);
+      const processedSignal = await ppgProcessor.current.processFrame(imageData);
       
       if (!processedSignal) {
         console.log('No se detectó señal válida');
@@ -92,7 +88,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         
         // Reproducir sonido con volumen basado en la calidad de la señal
         const volumeMultiplier = Math.min(1, processedSignal.signalQuality * 2);
-        await beepPlayer.playHeartbeatSound(volumeMultiplier);
+        await beepPlayer.current.playHeartbeatSound(volumeMultiplier);
         
         // Actualizar SpO2 si es válido
         if (processedSignal.spo2 >= 80 && processedSignal.spo2 <= 100) {
@@ -154,26 +150,15 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   }, [isStarted, resetMeasurements, toast]);
 
-  const updateSensitivitySettings = useCallback((settings: Partial<SensitivitySettings>) => {
-    setSensitivitySettings(prev => {
-      const newSettings = { ...prev, ...settings };
-      ppgProcessor.updateSensitivitySettings(newSettings);
-      return newSettings;
-    });
-  }, []);
-
   const toggleMeasurement = useCallback(() => {
     if (isStarted) {
       setIsStarted(false);
-      setMeasurementStartTime(null);
       resetMeasurements();
     } else {
       resetMeasurements();
       setIsStarted(true);
-      setMeasurementStartTime(Date.now());
       
-      // Inicializar el contexto de audio al comenzar la medición
-      beepPlayer.playHeartbeatSound(0.1).then(() => {
+      beepPlayer.current.playHeartbeatSound(0.1).then(() => {
         console.log('Audio inicializado correctamente');
       }).catch(error => {
         console.error('Error inicializando audio:', error);
@@ -185,32 +170,6 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
     }
   }, [isStarted, toast, resetMeasurements]);
-
-  React.useEffect(() => {
-    let interval: NodeJS.Timeout;
-
-    if (isStarted && measurementStartTime) {
-      interval = setInterval(() => {
-        const elapsed = (Date.now() - measurementStartTime) / 1000;
-        const progress = Math.min((elapsed / MEASUREMENT_DURATION) * 100, 100);
-        setMeasurementProgress(progress);
-
-        if (elapsed >= MEASUREMENT_DURATION) {
-          setIsStarted(false);
-          toast({
-            title: "Medición completada",
-            description: "La medición se ha completado exitosamente."
-          });
-        }
-      }, 100);
-    }
-
-    return () => {
-      if (interval) {
-        clearInterval(interval);
-      }
-    };
-  }, [isStarted, measurementStartTime, toast]);
 
   const value = {
     bpm,
