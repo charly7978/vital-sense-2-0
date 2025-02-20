@@ -31,7 +31,7 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
         <CardHeader className="pb-2">
           <CardTitle className="text-white text-lg">Calibración de Señal PPG</CardTitle>
           <CardDescription className="text-gray-400 text-sm">
-            Ajuste la sensibilidad para una mejor detección del pulso
+            Ajustes técnicos del procesamiento de la señal fotopletismográfica
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -42,7 +42,7 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
                 <div className="flex items-center gap-2">
                   <Target className="w-4 h-4 text-blue-400" />
                   <label className="text-sm font-medium text-white">
-                    Amplificación de Señal PPG
+                    Ganancia del Sensor PPG
                   </label>
                 </div>
                 <span className="text-xs text-gray-400">
@@ -58,11 +58,11 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
                 className="[&_[role=slider]]:bg-blue-400"
               />
               <p className="text-xs text-gray-400 mt-2">
-                Aumenta o disminuye la intensidad general de la señal PPG.
+                Ajusta la ganancia del sensor óptico para la captura de señal PPG.
                 <br />
-                ↑ Mayor valor: Mejora detección en señales débiles, pero puede saturarse
+                ↑ Alto (5.0): Máxima sensibilidad para captar señales muy débiles
                 <br />
-                ↓ Menor valor: Reduce saturación, mejor para señales fuertes
+                ↓ Bajo (1.0): Evita saturación en señales fuertes y piel clara
               </p>
             </div>
 
@@ -72,7 +72,7 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
                 <div className="flex items-center gap-2">
                   <Heart className="w-4 h-4 text-red-400" />
                   <label className="text-sm font-medium text-white">
-                    Umbral de Detección de Picos
+                    Umbral de Detección R-R
                   </label>
                 </div>
                 <span className="text-xs text-gray-400">
@@ -88,11 +88,11 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
                 className="[&_[role=slider]]:bg-red-400"
               />
               <p className="text-xs text-gray-400 mt-2">
-                Define qué tan pronunciado debe ser un pico para considerarse pulso.
+                Configura el umbral para detección de intervalos R-R en la señal PPG.
                 <br />
-                ↑ Mayor valor: Detecta solo picos muy pronunciados, más preciso pero puede perder pulsos
+                ↑ Alto (2.5): Mayor precisión, requiere señal fuerte y estable
                 <br />
-                ↓ Menor valor: Detecta picos más sutiles, mejor para pulsos débiles pero puede dar falsos positivos
+                ↓ Bajo (0.5): Mejor detección en señales débiles o irregulares
               </p>
             </div>
 
@@ -102,7 +102,7 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
                 <div className="flex items-center gap-2">
                   <Gauge className="w-4 h-4 text-green-400" />
                   <label className="text-sm font-medium text-white">
-                    Sensibilidad de Picos
+                    Discriminador de Impulsos
                   </label>
                 </div>
                 <span className="text-xs text-gray-400">
@@ -118,11 +118,11 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
                 className="[&_[role=slider]]:bg-green-400"
               />
               <p className="text-xs text-gray-400 mt-2">
-                Ajusta la sensibilidad para diferenciar picos reales de ruido.
+                Nivel de discriminación entre pulsos cardíacos y artefactos.
                 <br />
-                ↑ Mayor valor: Más estricto, solo detecta picos muy claros, reduce falsos positivos
+                ↑ Alto (1.0): Máxima discriminación, elimina falsos positivos
                 <br />
-                ↓ Menor valor: Más permisivo, detecta picos más sutiles, útil en señales débiles
+                ↓ Bajo (0.1): Mayor sensibilidad, útil en señales atenuadas
               </p>
             </div>
 
@@ -132,7 +132,7 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
                 <div className="flex items-center gap-2">
                   <Waves className="w-4 h-4 text-purple-400" />
                   <label className="text-sm font-medium text-white">
-                    Filtro de Ruido PPG
+                    Filtro Digital PPG
                   </label>
                 </div>
                 <span className="text-xs text-gray-400">
@@ -148,11 +148,11 @@ const CalibrationPanel: React.FC<CalibrationPanelProps> = ({
                 className="[&_[role=slider]]:bg-purple-400"
               />
               <p className="text-xs text-gray-400 mt-2">
-                Controla la intensidad del filtrado de ruido en la señal.
+                Filtrado digital de la señal PPG (paso bajo y banda).
                 <br />
-                ↑ Mayor valor: Señal más suave, elimina más ruido pero puede perder detalles
+                ↑ Alto (2.5): Máxima limpieza, mejor para entornos ruidosos
                 <br />
-                ↓ Menor valor: Señal más cruda, mantiene más detalles pero con más ruido
+                ↓ Bajo (0.5): Mínimo procesamiento, preserva detalles de la onda
               </p>
             </div>
           </div>
