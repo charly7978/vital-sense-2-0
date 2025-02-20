@@ -154,6 +154,22 @@ export interface ProcessedPPGSignal {
   signalQuality: number;
 }
 
+export interface ProcessedSignal extends ProcessedPPGSignal {
+  value: number[];
+  quality: SignalQuality;
+  features: SignalFeatures;
+  confidence: number;
+  timestamp: number;
+  bpm: number;
+  spo2: number;
+  systolic: number;
+  diastolic: number;
+  hasArrhythmia: boolean;
+  arrhythmiaType: string;
+  readings: VitalReading[];
+  signalQuality: number;
+}
+
 export class ProcessingError extends Error {
   constructor(message: string, public originalError?: any) {
     super(message);

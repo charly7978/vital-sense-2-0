@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useRef } from 
 import { BeepPlayer } from '../utils/audioUtils';
 import { UltraAdvancedPPGProcessor } from '../utils/UltraAdvancedPPGProcessor';
 import { useToast } from "@/hooks/use-toast";
-import type { VitalReading, SensitivitySettings } from '../utils/types';
+import type { VitalReading, SensitivitySettings, ProcessedSignal } from '../utils/types';
 
 interface VitalsContextType {
   bpm: number;
@@ -96,21 +96,10 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const currentTime = Date.now();
     if (currentTime - lastProcessedTime.current < processingInterval) {
-      console.log('[PPG] Frame ignorado por intervalo mínimo no cumplido:', {
-        currentTime,
-        lastProcessed: lastProcessedTime.current,
-        diff: currentTime - lastProcessedTime.current,
-        minInterval: processingInterval
-      });
+      console.log('[PPG] Frame ignorado por intervalo mínimo no cumplido');
       return;
     }
     lastProcessedTime.current = currentTime;
-
-    console.log('[PPG] Iniciando procesamiento de frame:', {
-      width: imageData.width,
-      height: imageData.height,
-      timestamp: currentTime
-    });
 
     try {
       setIsProcessing(true);
@@ -118,86 +107,21 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const processedSignal = await ppgProcessor.processFrame(imageData);
       console.log('[PPG] Señal procesada:', processedSignal);
       
-      // Actualizar lecturas en tiempo real
-      const newReading: VitalReading = {
-        timestamp: processedSignal.timestamp,
-        value: processedSignal.signal[0] || 0
-      };
-
-      console.log('[PPG] Nueva lectura:', newReading);
-      setReadings(prev => [...prev.slice(-100), newReading]);
+      // Actualizar todas las métricas vitales
+      if (processedSignal.bpm) setBpm(processedSignal.bpm);
+      if (processedSignal.spo2) setSpo2(processedSignal.spo2);
+      if (processedSignal.systolic) setSystolic(processedSignal.systolic);
+      if (processedSignal.diastolic) setDiastolic(processedSignal.diastolic);
+      if (processedSignal.hasArrhythmia !== undefined) setHasArrhythmia(processedSignal.hasArrhythmia);
+      if (processedSignal.arrhythmiaType) setArrhythmiaType(processedSignal.arrhythmiaType);
       
-      // Actualizar métricas vitales
-      if (processedSignal.bpm > 40 && processedSignal.bpm < 200) {
-        console.log('[PPG] BPM válido detectado:', processedSignal.bpm);
-        setBpm(Math.round(processedSignal.bpm));
-      } else {
-        console.log('[PPG] BPM fuera de rango:', processedSignal.bpm);
-      }
-
-      // Actualizar SpO2
-      if (processedSignal.spo2 > 0) {
-        console.log('[PPG] SpO2 válido detectado:', processedSignal.spo2);
-        setSpo2(processedSignal.spo2);
-      } else {
-        console.log('[PPG] SpO2 inválido:', processedSignal.spo2);
-      }
-
-      // Actualizar presión arterial
-      if (processedSignal.systolic > 0 && processedSignal.diastolic > 0) {
-        console.log('[PPG] Presión arterial válida:', {
-          systolic: processedSignal.systolic,
-          diastolic: processedSignal.diastolic
-        });
-        setSystolic(processedSignal.systolic);
-        setDiastolic(processedSignal.diastolic);
-      } else {
-        console.log('[PPG] Presión arterial inválida:', {
-          systolic: processedSignal.systolic,
-          diastolic: processedSignal.diastolic
-        });
-      }
-
-      // Actualizar calidad de la señal
-      const quality = Math.min(1, Math.max(0, processedSignal.quality));
-      console.log('[PPG] Calidad de señal:', {
-        raw: processedSignal.quality,
-        normalized: quality,
-        settings: sensitivitySettings
-      });
-      setMeasurementQuality(quality);
-
-      // Analizar detección de dedo
-      if (quality < 0.15) {
-        console.log('[PPG] No se detecta dedo en la cámara');
-      } else if (quality < 0.3) {
-        console.log('[PPG] Dedo detectado pero señal muy débil');
-      } else if (quality < 0.6) {
-        console.log('[PPG] Dedo detectado, señal regular');
-      } else {
-        console.log('[PPG] Dedo detectado, señal óptima');
-      }
-
-      // Actualizar estado de arritmia
-      console.log('[PPG] Estado de arritmia:', {
-        hasArrhythmia: processedSignal.hasArrhythmia,
-        type: processedSignal.arrhythmiaType
-      });
-      setHasArrhythmia(processedSignal.hasArrhythmia);
-      setArrhythmiaType(processedSignal.arrhythmiaType);
-
-      // Mostrar feedback de calidad si es muy baja
-      if (quality < 0.3 && isStarted) {
-        console.log('[PPG] Enviando alerta de calidad baja');
-        toast({
-          title: "Calidad de señal baja",
-          description: "Por favor, ajuste la posición de su dedo",
-          variant: "destructive"
-        });
+      // Actualizar calidad y lecturas
+      setMeasurementQuality(processedSignal.quality.overall);
+      if (processedSignal.readings) {
+        setReadings(prev => [...prev, ...processedSignal.readings].slice(-100));
       }
 
       setIsProcessing(false);
-      console.log('[PPG] Frame procesado completamente');
     } catch (error) {
       console.error('[PPG] Error procesando frame:', error);
       setIsProcessing(false);
@@ -207,7 +131,7 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         description: "Error al procesar la imagen de la cámara."
       });
     }
-  }, [isStarted, toast, sensitivitySettings]);
+  }, [isStarted, toast]);
 
   const toggleMeasurement = useCallback(() => {
     console.log('[PPG] Toggling medición:', {
