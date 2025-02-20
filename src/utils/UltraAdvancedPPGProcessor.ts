@@ -1,3 +1,4 @@
+
 // UltraAdvancedPPGProcessor.ts - Sistema Completo de Procesamiento PPG
 import type { VitalReading, SensitivitySettings, ProcessedSignal, SignalQuality } from './types';
 
@@ -10,30 +11,6 @@ import type { VitalReading, SensitivitySettings, ProcessedSignal, SignalQuality 
  * - Optimizaciones automáticas
  */
 
-// Interfaces necesarias
-interface ProcessedSignal {
-  valid: boolean;
-  signal?: number[];
-  quality?: SignalQuality;
-  timestamp?: number;
-  reason?: string;
-  bpm?: number;
-  spo2?: number;
-  systolic?: number;
-  diastolic?: number;
-  hasArrhythmia?: boolean;
-  arrhythmiaType?: string;
-  readings?: VitalReading[];
-  signalQuality?: number;
-}
-
-interface SignalQuality {
-  snr: number;
-  stability: number;
-  artifacts: number;
-  overall: number;
-}
-
 interface FingerDetection {
   detected: boolean;
   confidence: number;
@@ -42,8 +19,8 @@ interface FingerDetection {
 
 // Clases de visualización
 export class SignalVisualizer {
-  private canvas: HTMLCanvasElement;
-  private ctx: CanvasRenderingContext2D;
+  private canvas: HTMLCanvasElement | null = null;
+  private ctx: CanvasRenderingContext2D | null = null;
   private readonly config = {
     width: 800,
     height: 200,
@@ -57,18 +34,39 @@ export class SignalVisualizer {
   };
 
   constructor(containerId: string) {
+    // Esperamos a que el DOM esté listo
+    requestAnimationFrame(() => {
+      this.initializeCanvas(containerId);
+    });
+  }
+
+  private initializeCanvas(containerId: string): void {
     this.canvas = document.getElementById(containerId) as HTMLCanvasElement;
-    this.ctx = this.canvas.getContext('2d')!;
+    if (!this.canvas) {
+      console.error(`Canvas element with id ${containerId} not found`);
+      return;
+    }
+    
+    this.ctx = this.canvas.getContext('2d');
+    if (!this.ctx) {
+      console.error('Could not get 2D context from canvas');
+      return;
+    }
+    
     this.setupCanvas();
   }
 
   private setupCanvas(): void {
+    if (!this.canvas || !this.ctx) return;
+    
     this.canvas.width = this.config.width;
     this.canvas.height = this.config.height;
     this.canvas.style.backgroundColor = this.config.backgroundColor;
   }
 
   public drawSignal(signal: number[]): void {
+    if (!this.canvas || !this.ctx) return;
+    
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.drawGrid();
     
@@ -84,9 +82,9 @@ export class SignalVisualizer {
       const y = this.canvas.height / 2 - value * yScale;
       
       if (index === 0) {
-        this.ctx.moveTo(x, y);
+        this.ctx?.moveTo(x, y);
       } else {
-        this.ctx.lineTo(x, y);
+        this.ctx?.lineTo(x, y);
       }
     });
 
@@ -94,6 +92,8 @@ export class SignalVisualizer {
   }
 
   private drawGrid(): void {
+    if (!this.canvas || !this.ctx) return;
+    
     this.ctx.strokeStyle = this.config.gridColor;
     this.ctx.lineWidth = 0.5;
 
@@ -114,24 +114,37 @@ export class SignalVisualizer {
 }
 
 export class QualityIndicator {
-  private element: HTMLElement;
+  private element: HTMLElement | null = null;
   private qualityBar: HTMLDivElement;
   private label: HTMLDivElement;
   private metrics: HTMLDivElement;
 
   constructor(containerId: string) {
-    this.element = document.getElementById(containerId)!;
+    this.qualityBar = document.createElement('div');
+    this.label = document.createElement('div');
+    this.metrics = document.createElement('div');
+    
+    // Esperamos a que el DOM esté listo
+    requestAnimationFrame(() => {
+      this.initializeElements(containerId);
+    });
+  }
+
+  private initializeElements(containerId: string): void {
+    this.element = document.getElementById(containerId);
+    if (!this.element) {
+      console.error(`Element with id ${containerId} not found`);
+      return;
+    }
+    
     this.setupElements();
   }
 
   private setupElements(): void {
-    this.qualityBar = document.createElement('div');
+    if (!this.element) return;
+    
     this.qualityBar.className = 'quality-bar';
-    
-    this.label = document.createElement('div');
     this.label.className = 'quality-label';
-    
-    this.metrics = document.createElement('div');
     this.metrics.className = 'quality-metrics';
     
     this.element.appendChild(this.qualityBar);
@@ -140,6 +153,8 @@ export class QualityIndicator {
   }
 
   public updateQuality(quality: SignalQuality): void {
+    if (!this.element) return;
+    
     const percentage = quality.overall * 100;
     this.qualityBar.style.width = `${percentage}%`;
     this.qualityBar.style.backgroundColor = this.getColorForQuality(quality.overall);
