@@ -80,36 +80,34 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       setReadings(prev => [...prev.slice(-100), newReading]);
       
-      // Actualizar métricas vitales y reproducir sonido si se detecta un latido
-      if (processedSignal.bpm > 40 && processedSignal.bpm < 200) {
-        setBpm(Math.round(processedSignal.bpm));
+      // Actualizar BPM y reproducir sonido solo si se detectó un latido real
+      if (processedSignal.isHeartbeat && processedSignal.bpm > 30 && processedSignal.bpm < 200) {
+        setBpm(processedSignal.bpm);
         
-        // Calcular volumen basado en la calidad de la señal
+        // Reproducir sonido con volumen basado en la calidad
         const volumeMultiplier = Math.min(1, processedSignal.signalQuality * 2);
+        beepPlayer.playHeartbeatSound(volumeMultiplier);
         
-        // Reproducir sonido de latido si la calidad de señal es aceptable
-        if (processedSignal.signalQuality > 0.3) {
-          beepPlayer.playHeartbeatSound(volumeMultiplier);
-        }
+        console.log('♥ Latido registrado:', {
+          bpm: processedSignal.bpm,
+          calidad: processedSignal.signalQuality,
+          volumen: volumeMultiplier
+        });
       }
 
-      // Actualizar SpO2
+      // Actualizar otros signos vitales
       if (processedSignal.spo2 > 0) {
         setSpo2(processedSignal.spo2);
       }
-
-      // Actualizar presión arterial
+      
       if (processedSignal.systolic > 0 && processedSignal.diastolic > 0) {
         setSystolic(processedSignal.systolic);
         setDiastolic(processedSignal.diastolic);
       }
 
-      // Actualizar calidad de la señal
-      setMeasurementQuality(processedSignal.signalQuality);
-
-      // Actualizar estado de arritmia
       setHasArrhythmia(processedSignal.hasArrhythmia);
       setArrhythmiaType(processedSignal.arrhythmiaType);
+      setMeasurementQuality(processedSignal.signalQuality);
 
       setIsProcessing(false);
     } catch (error) {
