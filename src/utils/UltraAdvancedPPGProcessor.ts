@@ -1,4 +1,3 @@
-
 import { QuantumProcessor } from './quantumProcessor';
 import { SpectralAnalyzer } from './spectralAnalyzer';
 import { WaveletTransform, UnscentedKalmanFilter, QuantumICA } from './signalProcessors';
@@ -98,36 +97,35 @@ export class UltraAdvancedPPGProcessor {
 
   async processFrame(imageData: ImageData): Promise<ProcessedPPGSignal> {
     try {
-      // 1. Extraer señal cruda
+      // 1. Extraer señal cruda del frame
       const rawSignal = await this.extractSignal(imageData);
-      this.buffers.raw.push(rawSignal.red[rawSignal.red.length - 1]);
-
-      // 2. Procesamiento cuántico inicial
-      const quantumSignal = await this.systems.quantum.preProcess(rawSignal, {
-        amplification: this.settings.signalAmplification,
-        noiseReduction: this.settings.noiseReduction
-      });
-
-      // 3. Análisis espectral
-      const spectralData = await this.systems.spectral.analyze(quantumSignal, {
+      
+      // 2. Análisis espectral directo
+      const spectralData = await this.systems.spectral.analyze(imageData, {
         sensitivity: this.settings.signalStability
       });
 
-      // 4. Procesamiento de señal avanzado
-      const processedData = await this.mainProcessing(spectralData);
-
-      // 5. Optimización final
-      const optimizedSignal = await this.systems.quantum.optimize(processedData, {
-        threshold: this.settings.heartbeatThreshold
+      // 3. Calcular características
+      const features = this.extractFeatures({
+        data: spectralData.signal,
+        quality: spectralData.quality,
+        features: spectralData.features
       });
 
-      // 6. Validación y control de calidad
-      const quality = this.systems.quality.analyze(optimizedSignal);
-      const validatedSignal = this.validateSignal(optimizedSignal, quality);
+      // 4. Calcular calidad y confianza
+      const quality = spectralData.quality;
+      const confidence = this.calculateConfidence({
+        data: spectralData.signal,
+        quality: quality,
+        features: features
+      });
 
-      // 7. Extracción de características y cálculo de confianza
-      const features = this.extractFeatures(validatedSignal);
-      const confidence = this.calculateConfidence(validatedSignal);
+      // 5. Crear señal validada
+      const validatedSignal = {
+        data: spectralData.signal,
+        quality: quality,
+        features: features
+      };
 
       return {
         signal: validatedSignal,
@@ -161,13 +159,23 @@ export class UltraAdvancedPPGProcessor {
   }
 
   private detectOptimalRegion(frame: ImageData): ImageData {
-    // Implementación de la detección de región óptima
+    // Por ahora, usar todo el frame
     return frame;
   }
 
   private assessROIQuality(frame: ImageData): number {
-    // Implementación de evaluación de calidad de ROI
-    return 0;
+    // Implementación básica de calidad de ROI
+    const data = frame.data;
+    let redSum = 0;
+    let count = 0;
+    
+    for (let i = 0; i < data.length; i += 4) {
+      redSum += data[i];
+      count++;
+    }
+    
+    const avgRed = redSum / count;
+    return Math.min(avgRed / 255, 1);
   }
 
   private separateChannels(roi: ROI): Channels {
