@@ -72,39 +72,53 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setIsProcessing(true);
       const processedSignal = await ppgProcessor.processFrame(imageData);
       
+      if (!processedSignal) {
+        console.log('No se detectó señal válida');
+        return;
+      }
+
+      // Actualizar lecturas PPG
       const newReading: VitalReading = {
-        timestamp: processedSignal.timestamp,
+        timestamp: Date.now(),
         value: processedSignal.signal[0] || 0
       };
 
       setReadings(prev => [...prev.slice(-100), newReading]);
       
+      // Procesar latido cardíaco
       if (processedSignal.isHeartbeat && processedSignal.bpm > 30 && processedSignal.bpm < 200) {
-        setBpm(processedSignal.bpm);
+        console.log('Latido detectado:', processedSignal.bpm, 'BPM');
+        setBpm(Math.round(processedSignal.bpm));
         
+        // Reproducir sonido con volumen basado en la calidad de la señal
         const volumeMultiplier = Math.min(1, processedSignal.signalQuality * 2);
-        beepPlayer.playHeartbeatSound(volumeMultiplier);
+        await beepPlayer.playHeartbeatSound(volumeMultiplier);
         
-        console.log('♥ Latido registrado:', {
+        // Actualizar SpO2 si es válido
+        if (processedSignal.spo2 >= 80 && processedSignal.spo2 <= 100) {
+          setSpo2(Math.round(processedSignal.spo2));
+        }
+        
+        // Actualizar presión arterial si los valores son válidos
+        if (processedSignal.systolic >= 80 && processedSignal.systolic <= 180 &&
+            processedSignal.diastolic >= 50 && processedSignal.diastolic <= 120) {
+          setSystolic(Math.round(processedSignal.systolic));
+          setDiastolic(Math.round(processedSignal.diastolic));
+        }
+
+        setHasArrhythmia(processedSignal.hasArrhythmia);
+        setArrhythmiaType(processedSignal.arrhythmiaType);
+        
+        console.log('♥ Mediciones actualizadas:', {
           bpm: processedSignal.bpm,
+          spo2: processedSignal.spo2,
+          systolic: processedSignal.systolic,
+          diastolic: processedSignal.diastolic,
           calidad: processedSignal.signalQuality,
-          volumen: volumeMultiplier
         });
       }
 
-      if (processedSignal.spo2 > 0) {
-        setSpo2(processedSignal.spo2);
-      }
-      
-      if (processedSignal.systolic > 0 && processedSignal.diastolic > 0) {
-        setSystolic(processedSignal.systolic);
-        setDiastolic(processedSignal.diastolic);
-      }
-
-      setHasArrhythmia(processedSignal.hasArrhythmia);
-      setArrhythmiaType(processedSignal.arrhythmiaType);
       setMeasurementQuality(processedSignal.signalQuality);
-
       setIsProcessing(false);
     } catch (error) {
       console.error('Error procesando frame:', error);
@@ -157,6 +171,14 @@ export const VitalsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       resetMeasurements();
       setIsStarted(true);
       setMeasurementStartTime(Date.now());
+      
+      // Inicializar el contexto de audio al comenzar la medición
+      beepPlayer.playHeartbeatSound(0.1).then(() => {
+        console.log('Audio inicializado correctamente');
+      }).catch(error => {
+        console.error('Error inicializando audio:', error);
+      });
+
       toast({
         title: "Iniciando medición",
         description: "Por favor, mantenga su dedo frente a la cámara."
