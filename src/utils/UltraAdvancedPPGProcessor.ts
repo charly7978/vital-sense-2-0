@@ -1,12 +1,3 @@
-/**
- * Sistema avanzado de procesamiento PPG con:
- * - Extracción de señal cuántica
- * - Algoritmos patentados
- * - Procesamiento en tiempo real
- * - Optimización para luz baja
- * - Análisis espectral completo
- */
-
 import { QuantumProcessor } from './quantumProcessor';
 import { SpectralAnalyzer } from './spectralAnalyzer';
 import { WaveletTransform, UnscentedKalmanFilter, QuantumICA } from './signalProcessors';
@@ -218,11 +209,8 @@ export class UltraAdvancedPPGProcessor {
 
   // MÉTODOS DE PROCESAMIENTO ESPECÍFICOS
   private async extractSignal(frame: ImageData): Promise<RawSignal> {
-    // Extracción optimizada para luz baja
-    const roi = this.extractROI(frame);
+    const roi = this.getROI(frame);
     const channels = this.separateChannels(roi);
-    
-    // Optimización inicial
     const enhanced = await this.systems.lowLight.enhance(channels);
     
     return {
@@ -230,6 +218,35 @@ export class UltraAdvancedPPGProcessor {
       ir: enhanced.ir,
       quality: this.assessInitialQuality(enhanced)
     };
+  }
+
+  private getROI(frame: ImageData): ROI {
+    const region = this.detectOptimalRegion(frame);
+    const quality = this.assessROIQuality(frame);
+    return { region, quality };
+  }
+
+  private detectOptimalRegion(frame: ImageData): ImageData {
+    // Implementación de la detección de región óptima
+    return frame;
+  }
+
+  private assessROIQuality(frame: ImageData): number {
+    // Implementación de evaluación de calidad de ROI
+    return 0;
+  }
+
+  private separateChannels(roi: ROI): Channels {
+    return {
+      red: this.extractChannel(roi, 'red'),
+      ir: this.extractChannel(roi, 'ir'),
+      ambient: this.extractChannel(roi, 'ambient')
+    };
+  }
+
+  private extractChannel(roi: ROI, channel: 'red' | 'ir' | 'ambient'): number[] {
+    // Implementación de extracción de canal
+    return [];
   }
 
   private async quantumPreProcess(signal: RawSignal): Promise<QuantumSignal> {
@@ -286,28 +303,24 @@ export class UltraAdvancedPPGProcessor {
     };
   }
 
-  // MÉTODOS DE SOPORTE
-  private detectOptimalRegion(frame: ImageData): ImageData {
-    // Implementación de la detección de región óptima
-    return frame;
-  }
-
-  private assessROIQuality(frame: ImageData): number {
-    // Implementación de evaluación de calidad de ROI
-    return 0;
-  }
-
-  private separateChannels(roi: ROI): Channels {
+  private extractFeatures(signal: ValidatedSignal): SignalFeatures {
     return {
-      red: this.extractChannel(roi, 'red'),
-      ir: this.extractChannel(roi, 'ir'),
-      ambient: this.extractChannel(roi, 'ambient')
+      peaks: this.detectPeaks(signal),
+      valleys: this.detectValleys(signal),
+      frequency: this.calculateFrequency(signal),
+      amplitude: this.calculateAmplitude(signal),
+      perfusionIndex: this.calculatePerfusion(signal)
     };
   }
 
-  private extractChannel(roi: ROI, channel: 'red' | 'ir' | 'ambient'): number[] {
-    // Implementación de extracción de canal
-    return [];
+  private calculateConfidence(signal: ValidatedSignal): number {
+    const metrics = {
+      snr: this.calculateSNR(signal),
+      stability: this.calculateStability(signal),
+      quality: this.assessSignalQuality(signal)
+    };
+
+    return this.combineMetrics(metrics);
   }
 
   private detectPeaks(signal: ValidatedSignal): number[] {
@@ -356,7 +369,6 @@ export class UltraAdvancedPPGProcessor {
   }
 
   private validateSignal(signal: OptimizedSignal, quality: number): ValidatedSignal {
-    // Implementación de validación de señal
     return {
       data: signal.data,
       quality: quality,

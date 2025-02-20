@@ -96,6 +96,9 @@ export interface SpectralData {
   frequencies: number[];
   amplitudes: number[];
   phase: number[];
+  signal: number[];
+  features: any;
+  quality: number;
 }
 
 export interface ProcessedData {
