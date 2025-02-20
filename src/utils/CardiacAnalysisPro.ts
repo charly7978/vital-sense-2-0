@@ -1,4 +1,3 @@
-
 /**
  * Sistema DEFINITIVO de análisis cardíaco que recibe señal PPG procesada y realiza:
  * - Detección cuántica de latidos (99.999% precisión)
@@ -136,28 +135,36 @@ export class CardiacAnalysisPro {
   // Método principal de análisis
   async analyzeCardiacSignal(processedSignal: ProcessedPPGSignal): Promise<CardiacAnalysis> {
     try {
+      console.log('🫀 Iniciando análisis cardíaco avanzado...');
+      
       // 1. Detección neuronal cuántica
+      console.log('⚛️ Realizando detección neuronal cuántica...');
       const heartbeat = await this.detectHeartbeat(processedSignal);
       
       if (!heartbeat.isValid) {
+        console.warn('⚠️ Detección de latido inválida:', heartbeat.reason);
         return { valid: false, reason: heartbeat.reason };
       }
 
       // 2. Análisis profundo de arritmias
+      console.log('🔍 Analizando arritmias...');
       const arrhythmia = await this.analyzeArrhythmia(heartbeat);
 
       // 3. Predicción de próximos eventos
+      console.log('🔮 Prediciendo eventos futuros...');
       const prediction = await this.predictNextEvents(heartbeat, arrhythmia);
 
       // 4. Actualización de visualización
+      console.log('📊 Actualizando visualización médica...');
       await this.updateMedicalDisplay(heartbeat, arrhythmia, prediction);
 
       // 5. Reproducción de sonido cardíaco
       if (heartbeat.isValid && !arrhythmia.isCritical) {
+        console.log('🔊 Reproduciendo sonido cardíaco...');
         await this.playCardiacSound(heartbeat);
       }
 
-      return {
+      const result = {
         valid: true,
         heartbeat,
         arrhythmia,
@@ -165,8 +172,11 @@ export class CardiacAnalysisPro {
         timestamp: Date.now()
       };
 
+      console.log('✅ Análisis cardíaco completado:', result);
+      return result;
+
     } catch (error) {
-      console.error('Error crítico en análisis cardíaco:', error);
+      console.error('❌ Error crítico en análisis cardíaco:', error);
       return { valid: false, reason: 'critical_error' };
     }
   }
@@ -306,9 +316,69 @@ class ArrhythmiaAnalyzer {
 }
 
 class CardiacSynthesizer {
-  constructor(config: any) {}
+  private audioContext: AudioContext | null = null;
+
+  constructor(config: any) {
+    this.initAudioContext();
+  }
+
+  private async initAudioContext() {
+    try {
+      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      await this.audioContext.resume();
+      console.log('✓ Audio Context CardiacPro iniciado');
+    } catch (error) {
+      console.error('✗ Error iniciando audio CardiacPro:', error);
+    }
+  }
+
   async synthesize(options: any): Promise<void> {
-    console.log('Synthesizing cardiac sound...');
+    console.log('🎵 Sintetizando sonido cardíaco:', options);
+
+    if (!this.audioContext) {
+      await this.initAudioContext();
+    }
+
+    if (!this.audioContext) {
+      console.error('✗ No se pudo inicializar el audio CardiacPro');
+      return;
+    }
+
+    try {
+      const oscillator = this.audioContext.createOscillator();
+      const gainNode = this.audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(this.audioContext.destination);
+
+      const currentTime = this.audioContext.currentTime;
+
+      // Configuración de frecuencia basada en la intensidad
+      oscillator.frequency.value = options.intensity * 880 || 880; // A5 note
+      
+      // Volumen basado en la configuración
+      const baseVolume = 0.75;
+      gainNode.gain.setValueAtTime(0, currentTime);
+      gainNode.gain.linearRampToValueAtTime(baseVolume, currentTime + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, currentTime + 0.05);
+
+      oscillator.start(currentTime);
+      oscillator.stop(currentTime + 0.05);
+
+      console.log('♥ Sonido cardíaco reproducido:', {
+        tiempo: currentTime,
+        frecuencia: oscillator.frequency.value,
+        intensidad: options.intensity
+      });
+
+      setTimeout(() => {
+        oscillator.disconnect();
+        gainNode.disconnect();
+      }, 100);
+
+    } catch (error) {
+      console.error('✗ Error reproduciendo sonido cardíaco:', error);
+    }
   }
 }
 
