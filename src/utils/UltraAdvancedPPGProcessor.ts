@@ -81,22 +81,33 @@ export class UltraAdvancedPPGProcessor {
       
       // Extraer señal PPG del frame
       const redChannel = this.extractRedChannel(frame);
-      const smoothedSignal = this.movingAverage(redChannel, 5);
+      
+      // Almacenar en buffer raw
+      redChannel.forEach(value => this.buffers.raw.push(value));
+      
+      // Procesar señal
+      const smoothedSignal = this.movingAverage(Array.from(this.buffers.raw.getData()), 5);
+      
+      // Almacenar señal procesada
+      smoothedSignal.forEach(value => this.buffers.processed.push(value));
+      
+      // Obtener últimos N puntos para análisis
+      const signalForAnalysis = Array.from(this.buffers.processed.getData()).slice(-100);
       
       // Análisis de características
-      const peaks = this.findPeaks(smoothedSignal);
-      const valleys = this.findValleys(smoothedSignal);
+      const peaks = this.findPeaks(signalForAnalysis);
+      const valleys = this.findValleys(signalForAnalysis);
       const frequency = this.calculateFrequency(peaks);
-      const perfusionIndex = this.calculatePerfusionIndex(smoothedSignal);
-      const signalQuality = this.calculateSignalQuality(smoothedSignal);
+      const amplitude = Math.max(...signalForAnalysis) - Math.min(...signalForAnalysis);
+      const signalQuality = this.calculateSignalQuality(signalForAnalysis);
       
       // Características de la señal
       const features: SignalFeatures = {
         peaks,
         valleys,
         frequency,
-        amplitude: Math.max(...smoothedSignal) - Math.min(...smoothedSignal),
-        perfusionIndex
+        amplitude,
+        perfusionIndex: this.calculatePerfusionIndexSafe(signalForAnalysis)
       };
 
       // Cálculos vitales
@@ -104,8 +115,8 @@ export class UltraAdvancedPPGProcessor {
       console.log('BPM calculado:', bpm);
       
       const spo2 = signalQuality > 0.6 ? Math.round(95 + (signalQuality * 4)) : 0;
-      const systolic = signalQuality > 0.7 ? Math.round(120 + (features.amplitude * 10)) : 0;
-      const diastolic = signalQuality > 0.7 ? Math.round(80 + (features.amplitude * 5)) : 0;
+      const systolic = signalQuality > 0.7 ? Math.round(120 + (amplitude * 10)) : 0;
+      const diastolic = signalQuality > 0.7 ? Math.round(80 + (amplitude * 5)) : 0;
       
       const hrv = this.calculateHeartRateVariability(peaks);
       const hasArrhythmia = hrv > 0.2;
@@ -142,7 +153,6 @@ export class UltraAdvancedPPGProcessor {
   }
 
   private extractRedChannel(frame: ImageData): number[] {
-    if (!frame?.data) return [];
     const redValues = [];
     for (let i = 0; i < frame.data.length; i += 4) {
       redValues.push(frame.data[i]);
@@ -165,8 +175,10 @@ export class UltraAdvancedPPGProcessor {
   }
 
   private findPeaks(data: number[]): number[] {
-    const peaks = [];
+    if (!data || data.length === 0) return [];
+    
     const threshold = this.calculateThreshold(data);
+    const peaks = [];
     
     for (let i = 1; i < data.length - 1; i++) {
       if (data[i] > threshold && data[i] > data[i - 1] && data[i] > data[i + 1]) {
@@ -177,6 +189,8 @@ export class UltraAdvancedPPGProcessor {
   }
 
   private calculateThreshold(data: number[]): number {
+    if (!data || data.length === 0) return 0;
+    
     const mean = data.reduce((a, b) => a + b, 0) / data.length;
     const stdDev = Math.sqrt(
       data.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / data.length
@@ -185,8 +199,10 @@ export class UltraAdvancedPPGProcessor {
   }
 
   private findValleys(data: number[]): number[] {
-    const valleys = [];
+    if (!data || data.length === 0) return [];
+    
     const threshold = this.calculateThreshold(data);
+    const valleys = [];
     
     for (let i = 1; i < data.length - 1; i++) {
       if (data[i] < threshold && data[i] < data[i - 1] && data[i] < data[i + 1]) {
@@ -197,7 +213,7 @@ export class UltraAdvancedPPGProcessor {
   }
 
   private calculateFrequency(peaks: number[]): number {
-    if (peaks.length < 2) return 0;
+    if (!peaks || peaks.length < 2) return 0;
     
     let totalDistance = 0;
     for (let i = 1; i < peaks.length; i++) {
@@ -205,11 +221,11 @@ export class UltraAdvancedPPGProcessor {
     }
     
     const averageDistance = totalDistance / (peaks.length - 1);
-    return (30 / averageDistance) || 0;
+    return averageDistance > 0 ? (30 / averageDistance) : 0;
   }
 
   private calculateSignalQuality(signal: number[]): number {
-    if (signal.length === 0) return 0;
+    if (!signal || signal.length === 0) return 0;
 
     const mean = signal.reduce((a, b) => a + b, 0) / signal.length;
     const variance = signal.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / signal.length;
@@ -219,7 +235,7 @@ export class UltraAdvancedPPGProcessor {
   }
 
   private calculateHeartRateVariability(peaks: number[]): number {
-    if (peaks.length < 2) return 0;
+    if (!peaks || peaks.length < 2) return 0;
     
     const intervals = [];
     for (let i = 1; i < peaks.length; i++) {
@@ -231,14 +247,16 @@ export class UltraAdvancedPPGProcessor {
     return Math.sqrt(variance) / mean;
   }
 
-  private calculatePerfusionIndex(signal: number[]): number {
-    if (signal.length === 0) return 0;
+  private calculatePerfusionIndexSafe(signal: number[]): number {
+    if (!signal || signal.length === 0) return 0;
     
     const max = Math.max(...signal);
     const min = Math.min(...signal);
-    const mean = signal.reduce((a, b) => a + b, 0) / signal.length;
+    const dc = signal.reduce((a, b) => a + b, 0) / signal.length;
     
-    return mean !== 0 ? ((max - min) / mean) * 100 : 0;
+    if (dc === 0) return 0;
+    const ac = max - min;
+    return (ac / dc) * 100;
   }
 
   private async updateFeedback(signal: number[], quality: number): Promise<void> {
